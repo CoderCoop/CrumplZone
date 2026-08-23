@@ -10,6 +10,7 @@ permissions:
 
 env:
   GITLEAKS_VERSION: 8.18.4
+  GODOT_VERSION: 4.6-stable
 
 jobs:
   ci:
@@ -26,17 +27,51 @@ jobs:
             | tar -xz gitleaks
           ./gitleaks detect --source . --redact --no-banner --exit-code 1
 
-      - name: Build and test
+      # This check must do real work or say plainly that there is none to do.
+      # A green tick that means nothing is worse than no check at all — so
+      # every ecosystem this repository does not yet build fails loudly rather
+      # than being skipped silently.
+      - name: Refuse to skip a build system nobody taught this step about
         run: |
-          # This check must do real work or say plainly that there is none to
-          # do. A green tick that means nothing is worse than no check at all.
           if   [ -f package.json ];    then echo "::error::package.json found but this step was never taught to build it"; exit 1
           elif [ -f pyproject.toml ];  then echo "::error::pyproject.toml found but this step was never taught to build it"; exit 1
           elif [ -f Cargo.toml ];      then echo "::error::Cargo.toml found but this step was never taught to build it"; exit 1
           elif [ -f go.mod ];          then echo "::error::go.mod found but this step was never taught to build it"; exit 1
-          else
-            echo "No build system and no test suite in this repository."
-            echo "Nothing to build, nothing to run. The secret scan above is"
-            echo "the whole of this check's coverage today."
-            echo "::notice::ci passed with no build and no tests — secret scan only"
           fi
+
+      - name: Check the Godot projects
+        run: |
+          projects=$(find . -name project.godot -not -path '*/.godot/*' \
+            | sed 's|/project.godot$||' | sort)
+          if [ -z "$projects" ]; then
+            echo "No Godot project and no other build system in this repository."
+            echo "::notice::ci passed with nothing to build — secret scan only"
+            exit 0
+          fi
+
+          curl -sSL -o godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          unzip -q godot.zip
+          chmod +x "Godot_v${GODOT_VERSION}_linux.x86_64"
+          godot="$PWD/Godot_v${GODOT_VERSION}_linux.x86_64"
+
+          # No export templates here on purpose: importing and type-checking
+          # every script catches the errors worth catching at gate speed, and
+          # the export itself is exercised by the pages workflow.
+          failed=0
+          for project in $projects; do
+            echo "--- $project ---"
+            "$godot" --headless --path "$project" --import >/dev/null
+            for script in $(cd "$project" && ls *.gd 2>/dev/null); do
+              if "$godot" --headless --path "$project" --check-only --script "$script" 2>&1 \
+                  | grep -qE 'SCRIPT ERROR|Parse Error'; then
+                echo "::error file=$project/$script::GDScript check failed"
+                "$godot" --headless --path "$project" --check-only --script "$script" 2>&1 | head -20
+                failed=1
+              else
+                echo "  ok  $project/$script"
+              fi
+            done
+          done
+          if [ "$failed" -ne 0 ]; then exit 1; fi
+          echo "::notice::ci passed — secret scan plus GDScript checks on $(echo "$projects" | wc -l) project(s)"
