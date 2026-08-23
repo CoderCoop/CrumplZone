@@ -164,6 +164,20 @@ func cleared() -> bool:
 	return standing() == 0
 
 
+## How far the highest remaining point sits below the line, in pixels.
+## Positive means clear with room to spare; negative means something is above
+## it. The solver ranks by this rather than by a bare pass/fail, because a
+## result that clears by a hair is exactly the one physics can flip — see
+## spikes/determinism/.
+func clearance() -> float:
+	var highest := INF
+	for body in live_blocks():
+		highest = minf(highest, _top_of(body))
+	if highest == INF:
+		return 9999.0
+	return highest - spec["height_line"]
+
+
 ## True once nothing is moving meaningfully any more. Tracked over several
 ## ticks so a block at the top of a bounce does not read as at rest.
 func tick_settle() -> bool:
