@@ -6,8 +6,9 @@ implementation choices can be checked against an agreed intent rather than
 re-argued. Read the Open Questions section last — it is the part most likely
 to change.
 
-Status: agreed in outline. No game code yet; one spike run, recorded under
-`spikes/determinism/`.
+Status: agreed in outline. A playable slice exists and deploys to the web —
+one hand-placed tower and explosive charges, no tools, no generation, no
+scoring. One spike run, recorded under `spikes/determinism/`.
 
 ---
 
@@ -139,9 +140,13 @@ open source, which fails the requirement).
 Costs accepted with this choice, to be confirmed rather than assumed:
 
 - iOS builds require a Mac with Xcode.
-- Godot's threaded web export expects cross-origin isolation headers, which
-  GitHub Pages cannot set. A single-threaded export or a service-worker shim is
-  the likely answer, and needs verifying before the web build is promised.
+- ~~Godot's threaded web export expects cross-origin isolation headers, which
+  GitHub Pages cannot set.~~ **Settled.** Threads are off in the export preset,
+  and the build has been served from a host sending no COOP/COEP headers and
+  driven in a real browser: it renders and responds to input. The pipeline
+  re-runs that check before every deploy, so the setting cannot regress
+  silently. Godot's PWA option is on, so the export ships a manifest and
+  service worker.
 - CI is heavier than a plain-JS project: headless Godot, and a test framework
   chosen for it.
 - 2D physics engine choice (Godot's built-in 2D physics versus a Box2D
