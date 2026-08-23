@@ -8,10 +8,19 @@ install, works on phones, and installable as a PWA.
 
 ## What's actually here
 
-Early. One hand-placed tower and explosive charges, so the physics can be
-looked at rather than described. Click or tap to place a charge, `R` to reset.
+Early, but a real puzzle. One hand-built four-storey frame and three tools:
 
-Not built yet: the jackhammer and wrecking ball, generated levels, and scoring.
+- **Jackhammer** — takes out the single block you point at.
+- **Wrecking ball** — swings in from the side you clicked nearer and shoves a
+  horizontal band sideways.
+- **Explosive** — pushes everything nearby outwards, shatters what is closest.
+
+Pick a tool with the on-screen buttons or the `1`/`2`/`3` keys, click or tap to
+use it, `R` to reset. Each costs one move; you get five, and the level can be
+cleared in three. A tool that finds nothing to act on costs nothing.
+
+Not built yet: generated levels, scoring, undo, and sound.
+
 [`CHARTER.md`](CHARTER.md) says what it is meant to become and why, including
 the decisions already made and the questions still open.
 
@@ -32,6 +41,9 @@ rests on physics repeating reliably, which was measured rather than assumed:
 ```sh
 # Play it locally — needs Godot 4.6
 godot --path game
+
+# Check the level is still solvable within its budget, and not in one move
+godot --headless --fixed-fps 60 --path game res://playtest.tscn
 
 # Export the web build and check it runs on a header-less static host
 godot --headless --path game --import
