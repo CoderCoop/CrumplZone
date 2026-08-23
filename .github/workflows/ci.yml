@@ -1,0 +1,42 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  GITLEAKS_VERSION: 8.18.4
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan history for secrets
+        run: |
+          curl -sSfL \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz gitleaks
+          ./gitleaks detect --source . --redact --no-banner --exit-code 1
+
+      - name: Build and test
+        run: |
+          # This check must do real work or say plainly that there is none to
+          # do. A green tick that means nothing is worse than no check at all.
+          if   [ -f package.json ];    then echo "::error::package.json found but this step was never taught to build it"; exit 1
+          elif [ -f pyproject.toml ];  then echo "::error::pyproject.toml found but this step was never taught to build it"; exit 1
+          elif [ -f Cargo.toml ];      then echo "::error::Cargo.toml found but this step was never taught to build it"; exit 1
+          elif [ -f go.mod ];          then echo "::error::go.mod found but this step was never taught to build it"; exit 1
+          else
+            echo "No build system and no test suite in this repository."
+            echo "Nothing to build, nothing to run. The secret scan above is"
+            echo "the whole of this check's coverage today."
+            echo "::notice::ci passed with no build and no tests — secret scan only"
+          fi

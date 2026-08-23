@@ -1,0 +1,10 @@
+# Layer one of three: catch secrets before they enter history.
+# CI (.github/workflows/ci.yml) is layer two; GitHub secret scanning with
+# push protection is layer three and is enabled outside this repo.
+#
+#   pip install pre-commit && pre-commit install
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.4
+    hooks:
+      - id: gitleaks
