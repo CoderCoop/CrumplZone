@@ -1,0 +1,83 @@
+name: pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a running deploy finish rather than cancelling it half-published.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  GODOT_VERSION: 4.6-stable
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot and its export templates
+        run: |
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}"
+          curl -sSL -o godot.zip "$base/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          unzip -q godot.zip
+          chmod +x "Godot_v${GODOT_VERSION}_linux.x86_64"
+          curl -sSL -o templates.tpz "$base/Godot_v${GODOT_VERSION}_export_templates.tpz"
+          unzip -q templates.tpz
+          # Godot looks for templates under a dotted version directory.
+          mkdir -p ~/.local/share/godot/export_templates
+          mv templates ~/.local/share/godot/export_templates/"${GODOT_VERSION/-/.}"
+
+      - name: Export the web build
+        run: |
+          godot="./Godot_v${GODOT_VERSION}_linux.x86_64"
+          # A fresh checkout has no .godot/ import cache. Exporting without one
+          # produces a build missing its resources, so import first.
+          "$godot" --headless --path game --import
+          mkdir -p build/web
+          "$godot" --headless --path game --export-release "Web" ../build/web/index.html
+          test -s build/web/index.html
+          test -s build/web/index.wasm
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # The build is only useful if it runs on a host that sends no COOP/COEP
+      # headers, which is what Pages is. Threads are off in the export preset
+      # for that reason; this is what stops that from silently regressing.
+      - name: Verify the build runs without cross-origin isolation headers
+        run: |
+          npm install --no-save --silent playwright
+          npx playwright install --with-deps chromium
+          tools/verify-web-export.sh
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verification-screenshots
+          path: build/verify
+          if-no-files-found: warn
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
