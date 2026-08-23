@@ -1,0 +1,29 @@
+; CrumplZone. Currently a web-export proving ground with a playable toy in it,
+; not the game — see CHARTER.md for what it is meant to become.
+
+config_version=5
+
+[application]
+
+config/name="CrumplZone"
+config/description="Casual 2D physics demolition."
+run/main_scene="res://main.tscn"
+config/features=PackedStringArray("4.6", "GL Compatibility")
+
+[display]
+
+window/size/viewport_width=800
+window/size/viewport_height=600
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[physics]
+
+common/physics_ticks_per_second=60
+2d/default_gravity=980.0
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+environment/defaults/default_clear_color=Color(0.13, 0.14, 0.17, 1)
