@@ -26,7 +26,10 @@ branches:
           - ci
       # A gate you can walk around is a gate for other people.
       enforce_admins: true
-      required_pull_request_reviews:
-        required_approving_review_count: 1
-        dismiss_stale_reviews: true
+      # No approval requirement: mchelen is the only collaborator, and GitHub
+      # forbids self-approval, so requiring one review would deadlock the repo
+      # against its own admin. Revisit when a second collaborator is added —
+      # that is also when CODEOWNERS on this file starts mattering, since the
+      # escalation it mitigates needs a push-only collaborator to exist.
+      required_pull_request_reviews: null
       restrictions: null

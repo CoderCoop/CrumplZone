@@ -1,5 +1,10 @@
 # The Settings app escalates anyone with push access to admin, because pushing
 # .github/settings.yml to the default branch changes repository settings.
 # Code-owner review on that file is the mitigation its own docs prescribe.
+#
+# NOT CURRENTLY ENFORCED: enforcing it needs require_code_owner_reviews in
+# settings.yml, which needs an approval requirement, which would deadlock a
+# repo with one admin and no other collaborators. This file records the intent
+# and takes effect the moment a second collaborator makes the escalation real.
 /.github/settings.yml @mchelen
 /.github/CODEOWNERS   @mchelen
