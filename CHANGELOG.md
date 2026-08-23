@@ -14,7 +14,9 @@ sections are dated.
   slice, not the game — there are no tools to choose between, no generated
   levels and no scoring — but the collapse is real physics and the win
   condition is the one the game will keep.
-- Published automatically to GitHub Pages on every change to `main`.
+- Published automatically on every change to `main`, and playable now at
+  <https://codercoop.github.io/CrumplZone/>.
+- A README that says what the game is, how to play it, and how to work on it.
 
 ### Notes
 

@@ -4,7 +4,14 @@
 
 repository:
   name: CrumplZone
-  description: CrumplZone
+  description: A casual 2D physics game about demolition — bring the structure down in as few moves as you can.
+  homepage: https://codercoop.github.io/CrumplZone/
+  topics:
+    - game
+    - godot
+    - physics
+    - puzzle-game
+    - gamedev
   has_issues: true
   has_projects: false
   has_wiki: false
