@@ -1,0 +1,32 @@
+# Repository settings as code, applied by the Settings GitHub App
+# (https://github.com/apps/settings) on every push of this file to the
+# default branch. Change settings here, never in the web UI.
+
+repository:
+  name: CrumplZone
+  description: CrumplZone
+  has_issues: true
+  has_projects: false
+  has_wiki: false
+  has_downloads: false
+  default_branch: main
+  allow_squash_merge: true
+  allow_merge_commit: false
+  allow_rebase_merge: false
+  delete_branch_on_merge: true
+  enable_vulnerability_alerts: true
+  enable_automated_security_fixes: true
+
+branches:
+  - name: main
+    protection:
+      required_status_checks:
+        strict: true
+        contexts:
+          - ci
+      # A gate you can walk around is a gate for other people.
+      enforce_admins: true
+      required_pull_request_reviews:
+        required_approving_review_count: 1
+        dismiss_stale_reviews: true
+      restrictions: null
