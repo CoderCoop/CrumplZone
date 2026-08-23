@@ -6,7 +6,8 @@ implementation choices can be checked against an agreed intent rather than
 re-argued. Read the Open Questions section last — it is the part most likely
 to change.
 
-Status: agreed in outline, no code written yet.
+Status: agreed in outline. No game code yet; one spike run, recorded under
+`spikes/determinism/`.
 
 ---
 
@@ -103,11 +104,21 @@ differences. Two mitigations, both intended:
 - Verify **with margin** — require the solution to succeed comfortably, not by
   a hair — so small divergences do not flip the outcome.
 
-This risk should be tested early, with a spike that runs the same seed twice
-and compares final states. If determinism turns out to be worse than expected,
-the fallback is constrained templates: generate by recombining hand-designed
-structural motifs with known weak points, where solvability holds by
-construction.
+**This has now been measured** — see `spikes/determinism/`. Godot 4.6's 2D
+physics is fully reproducible across processes, but rebuilding an identical
+scene inside one process cycles between two outcomes rather than repeating
+exactly. On the metric the height-line rule actually reads, the two outcomes
+differ by 0.07 px, against blocks 20 px wide. Generate-and-verify survives, and
+the margin to verify with now has a measured number behind it instead of a
+guess. The spike also suggests a cheap hardening: simulate each candidate
+solution at two consecutive sequence positions and require both to pass, which
+covers the cycle rather than hoping the play-through lands on the same phase.
+
+Cross-platform determinism remains untested, which is the main reason to keep
+verification on the player's own device. If it later turns out worse than
+expected, the fallback is unchanged: constrained templates, generating by
+recombining hand-designed structural motifs with known weak points, where
+solvability holds by construction.
 
 ## Technology
 
