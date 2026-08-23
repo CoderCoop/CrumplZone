@@ -6,11 +6,22 @@ device. That guarantee only holds if repeating an identical simulation gives an
 identical result. If it doesn't, generate-and-verify has to be replaced by
 constrained templates, and that is a large change to make late.
 
-**Answer: generate-and-verify is viable.** Godot's 2D physics is fully
-reproducible, but rebuilding an identical scene inside one process does not
-reproduce exactly — it cycles between a small number of outcomes. On the metric
-the game actually scores, that difference is 0.07 px. Verify with margin and it
-is a non-issue.
+**Answer: generate-and-verify is viable** — but read the correction below
+before using the number on this page.
+
+Godot's 2D physics is fully reproducible across processes, but rebuilding an
+identical scene inside one process does not reproduce exactly: it cycles
+between a small number of outcomes. For the case measured here — one standing
+frame, one impulse — that difference is 0.07 px on the metric the game scores.
+
+> **Correction, from later work.** That 0.07 px does **not** generalise. Once
+> the real solver ran multi-move sequences that destroy blocks and topple
+> structures, the same rebuild-parity difference began flipping outcomes
+> outright — solutions clearing the line by 20 px on one rebuild left blocks
+> standing on the next. Everything measured on this page still holds for what
+> it measured; it is simply not a bound on a chaotic collapse. The consequence
+> is that parity confirmation is essential rather than optional. See the
+> determinism section of `CHARTER.md`.
 
 Run it yourself: `./run.sh` (downloads Godot 4.6 on first use, takes a second).
 
@@ -74,8 +85,9 @@ Consequences for the design:
 
 - **Generate-and-verify survives.** A solver evaluating many candidate move
   sequences does many build/teardown cycles, so each candidate is simulated
-  under a slightly different ordering than the eventual play-through. The
-  resulting error on the scored metric is sub-pixel.
+  under a slightly different ordering than the eventual play-through. For the
+  case measured here the resulting error on the scored metric is sub-pixel.
+  *(In practice it is not — see the correction at the top.)*
 - **Verify with margin, as the charter already says** — and now there's a
   number to size it with rather than a guess. A level whose solution clears the
   height line by a whole block width is not going to be flipped by 0.07 px. A
@@ -99,6 +111,14 @@ Stated plainly, because the temptation is to over-read a green result:
   agree — and they may well not.
 - **One structure, one impulse.** A larger or more chaotic collapse may spread
   further. The 0.07 px figure is evidence, not a bound.
+
+  **This caveat turned out to be the important one.** Running the real solver
+  over generated levels — multi-move sequences that destroy blocks and topple
+  structures — the same rebuild-parity difference flips outcomes outright:
+  solutions clearing the line by 20 px on one rebuild leave blocks standing on
+  the next. Everything measured on this page still holds for the case it
+  measured. It just does not generalise to a chaotic collapse. See the
+  determinism section of `CHARTER.md`.
 - **The mechanism is a hypothesis.** Allocation ordering fits the period-2
   pattern, but this measures behaviour, not cause.
 - **Godot's built-in 2D physics only.** A Box2D GDExtension, still an open

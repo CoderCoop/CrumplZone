@@ -32,9 +32,18 @@ finish the job — so difficulty comes from seeing the structure clearly, not
 from clicking precisely.
 
 Levels will be procedurally generated and verified solvable before you play
-them, with the move budget set from the verified solution plus slack. That
-rests on physics repeating reliably, which was measured rather than assumed:
-[`spikes/determinism/`](spikes/determinism/) has the numbers.
+them, with the move budget set from the verified solution plus slack. The
+generator and the solver that verifies its output both exist; wiring them in
+front of players needs the search to run in the background, because verifying
+one level takes several seconds.
+
+That whole approach rests on physics repeating reliably, which was measured
+rather than assumed — and the measurement changed the design. A narrow spike
+found rebuild-to-rebuild differences of 0.07 px; running real multi-move
+solutions found the same effect flipping outcomes outright. So every candidate
+solution is replayed and has to clear the line twice, with room to spare.
+[`spikes/determinism/`](spikes/determinism/) has the original numbers and the
+correction.
 
 ## Working on it
 
@@ -49,6 +58,9 @@ godot --headless --fixed-fps 60 --path game res://playtest.tscn
 godot --headless --path game --import
 godot --headless --path game --export-release Web ../build/web/index.html
 tools/verify-web-export.sh
+
+# Generate levels and verify each one solvable — reports accept rate and cost
+godot --headless --fixed-fps 60 --path game res://verify_levels.tscn
 
 # Re-run the physics determinism measurement (downloads Godot on first use)
 spikes/determinism/run.sh
