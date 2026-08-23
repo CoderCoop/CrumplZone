@@ -15,11 +15,14 @@ graph TD
         main["main.gd<br/>input, tool choice, readout"]
         level["level.gd<br/>structure, physics, the rule"]
         tools["tools.gd<br/>the three verbs"]
-        levels["levels.gd<br/>where specs come from"]
+        levels["levels.gd<br/>hand-built specs"]
+        generator["generator.gd<br/>seeded specs"]
+        solver["solver.gd<br/>searches for a solution"]
     end
 
     subgraph checks["Checked, not shipped"]
-        playtest["playtest.gd<br/>headless difficulty search"]
+        playtest["playtest.gd<br/>hand-built level difficulty"]
+        verifylv["verify_levels.gd<br/>generate-and-verify measurement"]
     end
 
     subgraph build["Build and deploy"]
@@ -41,8 +44,13 @@ graph TD
     main --> tools
     levels -->|level spec| level
     tools -->|acts on| level
+    generator -->|level spec| solver
+    solver -->|drives headlessly| level
+    solver -->|budget = solution + slack| levels
     playtest -->|drives headlessly| level
+    verifylv -->|drives| solver
     playtest -->|gates| ci
+    verifylv -->|gates| ci
     main -->|exported as WASM| pages
     pages --> verify
     verify -->|blocks deploy on failure| pages
@@ -62,9 +70,16 @@ matters:
   structure rather than a damage number: the jackhammer removes the one block
   you point at, the wrecking ball shoves a horizontal band sideways, the
   explosive pushes radially and shatters what is very close. All cost one move.
-- **`levels.gd`** produces level specs — plain dictionaries of blocks. Levels
-  are hand-built today; the generator will emit the same shape, which is why
-  this is a separate file from the thing that simulates it.
+- **`levels.gd`** produces hand-built level specs — plain dictionaries of
+  blocks. **`generator.gd`** produces the same shape from a seed, varying
+  storeys, bays, spacing, pillar widths and which interior pillars are missing.
+  Neither decides whether a level is any good.
+- **`solver.gd`** does. It searches a level's move space by playing it: build,
+  apply a candidate move, simulate to rest, score what is left, beam-search
+  outward. A level is only playable once the solver has found a solution, and
+  the move budget is that solution's length plus slack. It is tick-driven
+  rather than a blocking loop, because physics only advances on physics frames
+  and because generation will eventually need to run without freezing the game.
 - **`main.gd`** is the player-facing wrapper: input, tool selection, the
   readout, and on-screen buttons for touch.
 
@@ -142,6 +157,11 @@ to do.
   level is solvable within its budget and not solvable in one move. All three
   run in CI. A unit framework becomes worth proposing when the generator
   arrives and there are pure functions worth pinning.
+- **Generated levels are not wired into the game yet.** The generator and
+  solver work and are measured, but verifying one level takes several seconds —
+  far too long to run while a player waits. Putting generated levels in front
+  of players needs the search to run in the background, which is a design step
+  of its own rather than a line of glue.
 - **No scoring or progression.** Moves remaining is the obvious score and the
   charter has not settled what surrounds it — stars, chapters, endless — so
   nothing is built.

@@ -105,15 +105,31 @@ differences. Two mitigations, both intended:
 - Verify **with margin** — require the solution to succeed comfortably, not by
   a hair — so small divergences do not flip the outcome.
 
-**This has now been measured** — see `spikes/determinism/`. Godot 4.6's 2D
-physics is fully reproducible across processes, but rebuilding an identical
-scene inside one process cycles between two outcomes rather than repeating
-exactly. On the metric the height-line rule actually reads, the two outcomes
-differ by 0.07 px, against blocks 20 px wide. Generate-and-verify survives, and
-the margin to verify with now has a measured number behind it instead of a
-guess. The spike also suggests a cheap hardening: simulate each candidate
-solution at two consecutive sequence positions and require both to pass, which
-covers the cycle rather than hoping the play-through lands on the same phase.
+**This has been measured twice, and the second measurement matters more.**
+
+The first — `spikes/determinism/` — found Godot 4.6's 2D physics fully
+reproducible across processes, but rebuilding an identical scene inside one
+process cycles between two outcomes. On the height-line metric those two
+outcomes differed by 0.07 px, against blocks 20 px wide. Reassuring, and the
+spike said plainly that one structure and one impulse made it evidence rather
+than a bound.
+
+It was not a bound. Running the real solver over generated levels — multi-move
+sequences that destroy blocks and topple structures — the same rebuild-parity
+difference routinely flips the outcome outright. Solutions that clear the line
+by 20 px on one rebuild leave two or three blocks standing on the next. On one
+generated level, ten candidate solutions failed replay before one held.
+
+Chaos is the difference: a single impulse into a standing frame diverges by a
+hair, but four moves that remove supports and let a building fall amplify that
+hair into a different collapse.
+
+**So parity confirmation is not a cheap hardening — it is what makes generated
+levels honest.** Without it, a large fraction of shipped levels would carry an
+intended solution that does not actually work. The solver therefore replays
+every candidate at consecutive rebuilds and requires it to clear both times
+with margin to spare, and works down its ranked candidates until one holds
+rather than discarding the level at the first fragile answer.
 
 Cross-platform determinism remains untested, which is the main reason to keep
 verification on the player's own device. If it later turns out worse than
