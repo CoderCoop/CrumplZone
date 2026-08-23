@@ -7,21 +7,34 @@ sections are dated.
 
 ## [Unreleased]
 
+Nothing has been released, so this section describes what exists rather than
+each step it took to get here.
+
 ### Added
 
-- **A playable thing in a browser.** One tower, a height line, and four
-  explosive charges. Click or tap to place a charge, `R` to reset. It is a
-  slice, not the game — there are no tools to choose between, no generated
-  levels and no scoring — but the collapse is real physics and the win
-  condition is the one the game will keep.
-- Published automatically on every change to `main`, and playable now at
-  <https://codercoop.github.io/CrumplZone/>.
-- A README that says what the game is, how to play it, and how to work on it.
+- **A game you can play in a browser**, at
+  <https://codercoop.github.io/CrumplZone/>. No install, works on phones, and
+  installable as a PWA. Published automatically whenever the game changes.
+- **One level: a four-storey frame** that has to come down so nothing stands
+  above the height line. The best single move leaves six blocks standing, and
+  it can be cleared in three. You get five.
+- **Three tools.** The jackhammer takes out the single block you point at. The
+  wrecking ball swings in from whichever side you clicked nearer and shoves a
+  horizontal band sideways. The explosive pushes everything nearby outwards and
+  shatters what is closest. Pick with the on-screen buttons or the `1`/`2`/`3`
+  keys, `R` to reset. Each costs one move — they differ in what they do, not
+  what they cost.
+- **A misclick is free.** A tool that finds nothing to act on does not spend a
+  move.
 
 ### Notes
 
-- The build runs on any plain static host, with no special server
+- Not built yet: generated levels, scoring, undo, and sound.
+- The build runs on any plain static host with no special server
   configuration. That is a deliberate constraint rather than a happy accident:
   it is what keeps the game installable as a PWA from a static host.
-- The one level is currently far too easy — a single well-placed charge clears
-  it with three moves to spare.
+- Difficulty is measured rather than eyeballed. A headless search runs the move
+  space on every change and fails the build if the level stops being solvable
+  within its budget, or becomes solvable in a single move.
+- The download is around 37 MB, which is fine on a desktop and unkind on mobile
+  data. Not addressed yet.
