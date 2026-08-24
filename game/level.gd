@@ -195,3 +195,20 @@ func tick_settle() -> bool:
 
 func reset_settle() -> void:
 	_settled_ticks = 0
+
+
+## Wakes every remaining block. Called whenever a tool changes the world.
+##
+## Godot's rigid bodies sleep once they settle, and deleting the body holding a
+## sleeping one up does not reliably wake it: the stack above a cut block hung
+## in mid-air indefinitely. That was the reported "I remove pieces and nothing
+## happens".
+##
+## DO NOT remove this as dead code. No headless harness reproduces the bug —
+## they drive physics directly and always see a normal collapse. It was found,
+## and the fix confirmed, by clicking the exported web build in a real browser
+## and watching for thirty seconds: without this the stack hangs and the count
+## never changes; with it the building comes down.
+func wake_all() -> void:
+	for body in live_blocks():
+		body.sleeping = false

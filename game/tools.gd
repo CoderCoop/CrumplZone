@@ -41,14 +41,19 @@ const BLAST_SHATTER := 26.0
 ## a move is only spent when the tool had an effect, so a misclick on empty
 ## sky costs nothing.
 static func apply(kind: Kind, level: Level, at: Vector2) -> bool:
+	var acted := false
 	match kind:
 		Kind.JACKHAMMER:
-			return _jackhammer(level, at)
+			acted = _jackhammer(level, at)
 		Kind.WRECKING_BALL:
-			return _wrecking_ball(level, at)
+			acted = _wrecking_ball(level, at)
 		Kind.EXPLOSIVE:
-			return _explosive(level, at)
-	return false
+			acted = _explosive(level, at)
+	# Waking lives here, not in each tool, so the game and the solver cannot
+	# drift apart on it. A sleeping block does not notice its support is gone.
+	if acted:
+		level.wake_all()
+	return acted
 
 
 static func _jackhammer(level: Level, at: Vector2) -> bool:
