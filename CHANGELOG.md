@@ -7,7 +7,45 @@ sections are dated.
 
 ## [Unreleased]
 
-Nothing since 0.1.0.
+Nothing since 0.2.0.
+
+## [0.2.0] - 2026-08-24
+
+The building is made of something now, the tools show what they are doing, and
+the whole thing is laid out for a phone rather than shrunk to fit one.
+
+### Added
+
+- **Materials, with durability.** The level is a curtain-wall office block:
+  steel columns carrying concrete floor slabs, with glass glazing the bays.
+  Glass breaks first and holds nothing up, concrete takes two hits, steel takes
+  three. Damaged pieces darken, so you can see what you have already weakened
+  before you spend another move on it. The intro screen lists what each
+  material costs.
+- **Animations for every tool.** The jackhammer hammers, the wrecking ball
+  swings in on its chain, and the charge blows a front outwards to exactly the
+  radius it reaches. They are drawn above the point you touched, not under it,
+  so a thumb does not cover the feedback.
+- **A place to stand.** Dusk sky, a lit city skyline behind the site, and the
+  street it is being demolished on — kerb, hoarding and lane markings.
+
+### Changed
+
+- **The jackhammer shatters instead of halving.** It does to one piece what the
+  explosive does to whatever is closest: precise, and with no collateral. Tough
+  material takes more than one go, which is what makes choosing where to cut a
+  decision rather than a formality.
+- **The game fills the screen.** The camera frames the level for whatever shape
+  of screen it is given, so the whole building is visible in portrait without
+  pinching, and no part of it hides behind the readout or the controls.
+- **Controls are built for thumbs.** The three tools sit in a full-width row
+  along the bottom, in reach; reset and help moved to the top corner, out of the
+  way of the hand. Everything is sized in real screen pixels, so a button is the
+  same size on a phone as it is on a laptop — measured in a browser, at portrait
+  and landscape phone sizes, not assumed.
+- **The intro screen scrolls**, and Play is pinned to the bottom where it can
+  always be reached — on a phone held sideways the guide used to run off the
+  end of the screen with no way out of it.
 
 ## [0.1.0] - 2026-08-24
 

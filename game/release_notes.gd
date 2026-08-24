@@ -11,6 +11,19 @@ extends RefCounted
 
 const NOTES: Array = [
 	{
+		"version": "0.2.0",
+		"date": "2026-08-24",
+		"lines": [
+			"The building is made of something: glass breaks first, concrete "
+			+ "takes two hits, steel takes three.",
+			"Damaged pieces darken, so you can see what you have weakened.",
+			"The jackhammer shatters what you point at instead of halving it.",
+			"Every tool now shows what it is doing.",
+			"Built for a phone: the whole building fits in portrait, and the "
+			+ "tools sit where a thumb reaches.",
+		],
+	},
+	{
 		"version": "0.1.0",
 		"date": "2026-08-24",
 		"lines": [

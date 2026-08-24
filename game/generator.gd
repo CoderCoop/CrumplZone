@@ -50,14 +50,26 @@ static func generate(level_seed: int) -> Dictionary:
 				"x": first_x + i * spacing,
 				"y": y - pillar_h * 0.5,
 				"w": width, "h": pillar_h,
-				"role": "pillar",
+				"role": "column", "material": Materials.STEEL,
+			})
+		# Bays are glazed, or bricked up where the generator wants a solid
+		# wall. Neither holds the building up; both change how it reads.
+		for i in pillars - 1:
+			if i == missing or i + 1 == missing:
+				continue
+			blocks.append({
+				"x": first_x + i * spacing + spacing * 0.5,
+				"y": y - pillar_h * 0.5,
+				"w": spacing - pillar_w - 6.0, "h": pillar_h - 8.0,
+				"role": "infill",
+				"material": Materials.BRICK if rng.randf() < 0.25 else Materials.GLASS,
 			})
 		y -= pillar_h
 		blocks.append({
 			"x": CENTRE_X + rng.randf_range(-6.0, 6.0),
 			"y": y - SLAB_H * 0.5,
 			"w": slab_w, "h": SLAB_H,
-			"role": "slab",
+			"role": "slab", "material": Materials.CONCRETE,
 		})
 		y -= SLAB_H
 

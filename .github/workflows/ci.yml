@@ -94,16 +94,38 @@ jobs:
           done
           if [ "$failed" -ne 0 ]; then exit 1; fi
 
+          # --check-only does NOT catch a call to a method that does not
+          # exist: it type-checks, it does not resolve dynamic calls. A stale
+          # level.split() survived every check here and errored on every
+          # simulated frame while the gate stayed green. So the harnesses below
+          # are run through a wrapper that fails on any SCRIPT ERROR, because
+          # Godot prints those and carries on with exit code 0.
+          run_harness() {
+            local name="$1" scene="$2" log
+            log="$(mktemp)"
+            echo "--- $name ---"
+            # pipefail, or the pipeline reports tee's exit status and a failing
+            # harness sails through.
+            set -o pipefail
+            if ! "$godot" --headless --fixed-fps 60 --path game "$scene" 2>&1 | tee "$log"; then
+              echo "::error::$name failed"
+              return 1
+            fi
+            if grep -q "SCRIPT ERROR" "$log"; then
+              echo "::error::$name printed SCRIPT ERROR — the game is erroring at runtime"
+              grep -m5 -A3 "SCRIPT ERROR" "$log"
+              return 1
+            fi
+          }
+
           # Settled bodies must be woken when a tool changes the world, or
           # everything above a cut block hangs in mid-air. Asserts the
           # mechanism, since the symptom only shows up in a real browser.
-          echo "--- wake test ---"
-          "$godot" --headless --fixed-fps 60 --path game res://waketest.tscn
+          run_harness "wake test" res://waketest.tscn
 
           # The hand-built level must stay worth playing: beatable within its
           # move budget, and not beatable in one move. Both are easy to break
           # by retuning a tool, and neither is visible in a diff.
-          echo "--- playtest ---"
-          "$godot" --headless --fixed-fps 60 --path game res://playtest.tscn
+          run_harness "playtest" res://playtest.tscn
 
           echo "::notice::ci passed — secret scan, GDScript checks, wake test, playtest"

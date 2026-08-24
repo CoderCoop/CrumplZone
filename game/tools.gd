@@ -19,9 +19,16 @@ const NAMES := {
 	Kind.EXPLOSIVE: "explosive",
 }
 
-## Jackhammer: breaks the one block you point at in two, and nothing else.
-## No tool deletes anything — a block that vanished never read as physics.
-const JACKHAMMER_REACH := 26.0
+## Jackhammer: shatters the one thing you point at, and nothing else. It does
+## what the explosive does to whatever is closest, but precisely and with no
+## collateral — the scalpel to the explosive's shortcut.
+##
+## Against tough material one hit is not enough: glass and brick go first time,
+## a concrete slab takes two, a steel column three. That is what durability is
+## for, and it is why the jackhammer is the tool you spend moves on when you
+## know exactly which piece matters.
+const JACKHAMMER_REACH := 30.0
+const JACKHAMMER_DAMAGE := 2
 
 ## Wrecking ball: a lateral shove through a horizontal band, swung in from
 ## whichever side you clicked nearer. Falls off with distance so it topples the
@@ -30,12 +37,18 @@ const BALL_BAND := 70.0
 const BALL_RANGE := 420.0
 const BALL_FORCE := 780.0
 const BALL_LIFT := 0.18
+## The ball cracks what it strikes squarely without pulverising it: its job is
+## to topple a building, not to demolish it a piece at a time.
+const BALL_DAMAGE := 1
+const BALL_DAMAGE_RANGE := 60.0
 
 ## Explosive: radial impulse, and blocks very close to the charge are broken
 ## apart. Deliberately not strong enough to flatten a building on its own.
 const BLAST_RADIUS := 120.0
 const BLAST_FORCE := 640.0
-const BLAST_SHATTER := 26.0
+const BLAST_SHATTER := 30.0
+## Enough to take out anything but steel in one go.
+const BLAST_DAMAGE := 3
 
 
 ## Applies a tool at a point. Returns true if it actually did something —
@@ -61,8 +74,7 @@ static func _jackhammer(level: Level, at: Vector2) -> bool:
 	var target: RigidBody2D = level.block_at(at, JACKHAMMER_REACH)
 	if target == null:
 		return false
-	# Already rubble: no move is spent chipping it smaller.
-	return level.split(target)
+	return level.damage(target, JACKHAMMER_DAMAGE)
 
 
 static func _wrecking_ball(level: Level, at: Vector2) -> bool:
@@ -71,7 +83,9 @@ static func _wrecking_ball(level: Level, at: Vector2) -> bool:
 	var centre := level.centre_x()
 	var direction := 1.0 if at.x < centre else -1.0
 	var hit := false
-	for body in level.live_blocks():
+	for body in level.live_blocks().duplicate():
+		if not is_instance_valid(body):
+			continue
 		if absf(body.global_position.y - at.y) > BALL_BAND:
 			continue
 		var reach := absf(body.global_position.x - at.x)
@@ -81,12 +95,16 @@ static func _wrecking_ball(level: Level, at: Vector2) -> bool:
 		var push := Vector2(direction, -BALL_LIFT).normalized()
 		body.apply_impulse(push * BALL_FORCE * falloff * body.mass)
 		hit = true
+		if reach < BALL_DAMAGE_RANGE:
+			level.damage(body, BALL_DAMAGE)
 	return hit
 
 
 static func _explosive(level: Level, at: Vector2) -> bool:
 	var touched := false
-	for body in level.live_blocks():
+	for body in level.live_blocks().duplicate():
+		if not is_instance_valid(body):
+			continue
 		var offset: Vector2 = body.global_position - at
 		var distance := offset.length()
 		if distance > BLAST_RADIUS:
@@ -94,9 +112,10 @@ static func _explosive(level: Level, at: Vector2) -> bool:
 		touched = true
 		var falloff := 1.0 - distance / BLAST_RADIUS
 		if distance < BLAST_SHATTER:
-			# Shattered, not deleted: the pieces stay and still have to end up
-			# below the line.
-			level.split(body)
+			# Damaged, not deleted: the pieces stay and still have to end up
+			# below the line. Tough material survives a charge that would
+			# shatter glass.
+			level.damage(body, BLAST_DAMAGE)
 			continue
 		# A floor on the distance keeps a charge placed on a block's centre
 		# from producing a near-infinite direction vector.
