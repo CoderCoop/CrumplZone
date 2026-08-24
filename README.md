@@ -8,22 +8,30 @@ install, works on phones, and installable as a PWA.
 
 ## What's actually here
 
-Early, but a real puzzle. One hand-built four-storey frame and three tools:
+Early, but a real puzzle. One hand-built curtain-wall office block — steel
+columns carrying concrete floor slabs, glass glazing the bays — and three
+tools:
 
-- **Jackhammer** — breaks the block you point at into two pieces.
-- **Wrecking ball** — swings in from the side you clicked nearer and shoves a
+- **Jackhammer** — shatters the one piece you point at, and nothing else.
+- **Wrecking ball** — swings in from the side you tapped nearer and shoves a
   horizontal band sideways.
 - **Explosive** — pushes everything nearby outwards, shatters what is closest.
 
-Nothing is ever deleted: demolition turns big things into smaller things, and
-every piece still has to end up below the line.
+What things are made of is the puzzle. Glass breaks first and holds nothing up,
+concrete takes two hits, steel takes three; damaged pieces darken, so the
+building shows its wear. Nothing is ever deleted: demolition turns big things
+into smaller things, and every piece still has to end up below the line.
 
 The game opens on a screen explaining all of this, with the current version and
-what changed in it; the `?` button reopens it mid-level.
+what changed in it; the `help` button reopens it mid-level.
 
-Pick a tool with the on-screen buttons or the `1`/`2`/`3` keys, click or tap to
-use it, `R` to reset. Each costs one move; you get five, and the level can be
-cleared in three. A tool that finds nothing to act on costs nothing.
+Pick a tool from the row along the bottom — or the `1`/`2`/`3` keys on a
+keyboard — then tap the building to use it; `reset` (or `R`) starts over. Each
+costs one move; you get seven, and the level can be cleared in six. A tool that
+finds nothing to act on costs nothing.
+
+It is built for a phone first: the camera frames the whole building in
+portrait, and the controls sit along the bottom where a thumb reaches.
 
 Not built yet: generated levels, scoring, undo, and sound.
 

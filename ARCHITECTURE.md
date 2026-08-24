@@ -13,9 +13,13 @@ adds, removes or rewires a component.
 graph TD
     subgraph ships["Ships to players"]
         main["main.gd<br/>input, tool choice, readout"]
+        ui["ui.gd<br/>CSS pixels → viewport units"]
         intro["intro.gd<br/>guide, version, release notes"]
         notes["release_notes.gd<br/>player-facing changes"]
+        effects["effects.gd<br/>what the tool just did"]
+        backdrop["backdrop.gd<br/>sky, skyline, street"]
         level["level.gd<br/>structure, physics, the rule"]
+        materials["materials.gd<br/>durability and colour"]
         tools["tools.gd<br/>the three verbs"]
         levels["levels.gd<br/>hand-built specs"]
         generator["generator.gd<br/>seeded specs"]
@@ -45,8 +49,14 @@ graph TD
 
     main --> intro
     notes --> intro
+    ui --> main
+    ui --> intro
+    main --> effects
+    main --> backdrop
     main --> level
     main --> tools
+    materials -->|what a block is made of| level
+    materials -->|swatches and hit counts| intro
     levels -->|level spec| level
     tools -->|acts on| level
     generator -->|level spec| solver
@@ -73,11 +83,18 @@ matters:
   has no input handling, no UI and no scoring, because the charter's levels
   must be verified solvable before anyone plays them — which means a solver
   has to run this exact code thousands of times with nobody watching.
+- **`materials.gd`** says what a block is made of and how much damage it
+  absorbs before it comes apart, how many pieces it makes when it does, and what
+  colour it is at each stage of wear. It is the reason a structure can be read
+  before it is touched: glass is obviously the weak part and steel is obviously
+  the expensive one, without a legend.
 - **`tools.gd`** holds the three verbs. Each is a different way of acting on a
-  structure rather than a damage number: the jackhammer halves the block you
-  point at, the wrecking ball shoves a horizontal band sideways, the explosive
-  pushes radially and shatters what is very close. All cost one move, and none
-  of them delete anything — a block that vanished never read as physics.
+  structure rather than a damage number: the jackhammer shatters the one piece
+  you point at, the wrecking ball shoves a horizontal band sideways, the
+  explosive pushes radially and shatters what is very close. All cost one move,
+  and none of them delete anything — a block that vanished never read as
+  physics. What they cost in damage meets what a material absorbs, which is
+  where durability turns into a decision.
 - **`levels.gd`** produces hand-built level specs — plain dictionaries of
   blocks. **`generator.gd`** produces the same shape from a seed, varying
   storeys, bays, spacing, pillar widths and which interior pillars are missing.
@@ -89,7 +106,18 @@ matters:
   rather than a blocking loop, because physics only advances on physics frames
   and because generation will eventually need to run without freezing the game.
 - **`main.gd`** is the player-facing wrapper: input, tool selection, the
-  readout, and on-screen buttons for touch.
+  readout, and on-screen buttons for touch. It also frames the camera on the
+  level, so the building fills whatever shape of screen it is given rather than
+  sitting in a letterbox.
+- **`ui.gd`** converts CSS pixels — the unit the mobile-first rules in
+  `AGENTS.md` are written in — into the viewport units Godot lays out in. Every
+  screen is built in CSS pixels and its layer scaled by that factor, which is
+  what makes a 44 px touch target 44 px on a phone as well as on a laptop.
+- **`effects.gd`** draws what a tool just did, and **`backdrop.gd`** draws the
+  sky, the skyline and the street. Both are strictly cosmetic: they own no
+  bodies and apply no forces, because the solver replays this game thousands of
+  times headlessly and an animation that touched the simulation would make
+  every one of those verdicts a lie about the game the player gets.
 - **`intro.gd`** is the screen a player meets first — the goal, the three
   tools, the controls, the version and what changed in it. **`release_notes.gd`**
   holds the player-facing notes. The version itself lives in `project.godot` as
