@@ -22,6 +22,7 @@ graph TD
 
     subgraph checks["Checked, not shipped"]
         playtest["playtest.gd<br/>hand-built level difficulty"]
+        waketest["waketest.gd<br/>settled bodies get woken"]
         verifylv["verify_levels.gd<br/>generate-and-verify measurement"]
     end
 
@@ -50,6 +51,8 @@ graph TD
     playtest -->|drives headlessly| level
     verifylv -->|drives| solver
     playtest -->|gates| ci
+    waketest -->|drives| level
+    waketest -->|gates| ci
     verifylv -->|gates| ci
     main -->|exported as WASM| pages
     pages --> verify
@@ -151,17 +154,12 @@ to do.
 
 ## Things that are deliberately absent
 
-- **No test for the sleeping-body bug.** Settled bodies were not woken when
-  their support was cut, leaving stacks hanging in mid-air. No headless harness
-  reproduces it — they drive physics directly and always see a normal collapse —
-  so the fix is guarded by a comment in `level.gd` rather than by a test. A test
-  that passes with and without the fix would be worse than none.
 - **No unit test framework.** The charter's testing default says to propose a
   setup rather than impose one, and so far the checks that earn their keep are
   behavioural rather than unit-shaped: the secret scan, the web export
-  verification, and `playtest.gd`, which searches the move space to confirm the
-  level is solvable within its budget and not solvable in one move. All three
-  run in CI. A unit framework becomes worth proposing when the generator
+  verification, `playtest.gd`, which searches the move space to confirm the
+  level is solvable within its budget and not solvable in one move, and
+  `waketest.gd`, which guards the sleeping-body fix. All of them run in CI. A unit framework becomes worth proposing when the generator
   arrives and there are pure functions worth pinning.
 - **Generated levels are not wired into the game yet.** The generator and
   solver work and are measured, but verifying one level takes several seconds —

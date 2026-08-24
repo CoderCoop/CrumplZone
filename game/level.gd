@@ -251,16 +251,21 @@ func reset_settle() -> void:
 
 ## Wakes every remaining block. Called whenever a tool changes the world.
 ##
-## Godot's rigid bodies sleep once they settle, and deleting or splitting the
-## body holding a sleeping one up does not reliably wake it: the stack above a
-## cut block hung in mid-air indefinitely. That was the reported "I remove
-## pieces and nothing happens".
+## Godot's docs on RigidBody2D.sleeping: a sleeping body "will not move and
+## will not calculate forces until woken up by another body through, for
+## example, a collision, or by using the apply_impulse() or apply_force()
+## methods." Deleting a body is not on that list — nothing collides with the
+## block above it, so it never learns its support has gone and hangs in
+## mid-air indefinitely. That was the reported "I remove pieces and nothing
+## happens", and it is total: every body in a settled level is asleep.
 ##
-## DO NOT remove this as dead code. No headless harness reproduces the bug —
-## they drive physics directly and always see a normal collapse. It was found,
-## and the fix confirmed, by clicking the exported web build in a real browser
-## and watching for thirty seconds: without this the stack hangs and the count
-## never changes; with it the building comes down.
+## Setting can_sleep = false on every block would also work, at the cost of
+## never letting the simulation rest. Waking on change keeps sleeping's
+## benefit and pays only when something actually happens.
+##
+## Guarded by waketest.gd, which asserts the mechanism rather than the symptom:
+## the hanging itself does not reproduce headlessly, but "blocks are still
+## asleep after a tool acted" does, and that is what the bug is made of.
 func wake_all() -> void:
 	for body in live_blocks():
 		body.sleeping = false
