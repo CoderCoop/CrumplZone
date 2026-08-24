@@ -67,9 +67,10 @@ matters:
   must be verified solvable before anyone plays them — which means a solver
   has to run this exact code thousands of times with nobody watching.
 - **`tools.gd`** holds the three verbs. Each is a different way of acting on a
-  structure rather than a damage number: the jackhammer removes the one block
-  you point at, the wrecking ball shoves a horizontal band sideways, the
-  explosive pushes radially and shatters what is very close. All cost one move.
+  structure rather than a damage number: the jackhammer halves the block you
+  point at, the wrecking ball shoves a horizontal band sideways, the explosive
+  pushes radially and shatters what is very close. All cost one move, and none
+  of them delete anything — a block that vanished never read as physics.
 - **`levels.gd`** produces hand-built level specs — plain dictionaries of
   blocks. **`generator.gd`** produces the same shape from a seed, varying
   storeys, bays, spacing, pillar widths and which interior pillars are missing.
@@ -150,6 +151,11 @@ to do.
 
 ## Things that are deliberately absent
 
+- **No test for the sleeping-body bug.** Settled bodies were not woken when
+  their support was cut, leaving stacks hanging in mid-air. No headless harness
+  reproduces it — they drive physics directly and always see a normal collapse —
+  so the fix is guarded by a comment in `level.gd` rather than by a test. A test
+  that passes with and without the fix would be worse than none.
 - **No unit test framework.** The charter's testing default says to propose a
   setup rather than impose one, and so far the checks that earn their keep are
   behavioural rather than unit-shaped: the secret scan, the web export
