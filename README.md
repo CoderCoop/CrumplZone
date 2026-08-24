@@ -10,10 +10,13 @@ install, works on phones, and installable as a PWA.
 
 Early, but a real puzzle. One hand-built four-storey frame and three tools:
 
-- **Jackhammer** — takes out the single block you point at.
+- **Jackhammer** — breaks the block you point at into two pieces.
 - **Wrecking ball** — swings in from the side you clicked nearer and shoves a
   horizontal band sideways.
 - **Explosive** — pushes everything nearby outwards, shatters what is closest.
+
+Nothing is ever deleted: demolition turns big things into smaller things, and
+every piece still has to end up below the line.
 
 Pick a tool with the on-screen buttons or the `1`/`2`/`3` keys, click or tap to
 use it, `R` to reset. Each costs one move; you get five, and the level can be

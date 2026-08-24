@@ -19,7 +19,8 @@ const NAMES := {
 	Kind.EXPLOSIVE: "explosive",
 }
 
-## Jackhammer: takes out the one block you point at, and nothing else.
+## Jackhammer: breaks the one block you point at in two, and nothing else.
+## No tool deletes anything — a block that vanished never read as physics.
 const JACKHAMMER_REACH := 26.0
 
 ## Wrecking ball: a lateral shove through a horizontal band, swung in from
@@ -30,8 +31,8 @@ const BALL_RANGE := 420.0
 const BALL_FORCE := 780.0
 const BALL_LIFT := 0.18
 
-## Explosive: radial impulse, and blocks very close to the charge are destroyed
-## outright. Deliberately not strong enough to flatten a building on its own.
+## Explosive: radial impulse, and blocks very close to the charge are broken
+## apart. Deliberately not strong enough to flatten a building on its own.
 const BLAST_RADIUS := 120.0
 const BLAST_FORCE := 640.0
 const BLAST_SHATTER := 26.0
@@ -41,22 +42,27 @@ const BLAST_SHATTER := 26.0
 ## a move is only spent when the tool had an effect, so a misclick on empty
 ## sky costs nothing.
 static func apply(kind: Kind, level: Level, at: Vector2) -> bool:
+	var acted := false
 	match kind:
 		Kind.JACKHAMMER:
-			return _jackhammer(level, at)
+			acted = _jackhammer(level, at)
 		Kind.WRECKING_BALL:
-			return _wrecking_ball(level, at)
+			acted = _wrecking_ball(level, at)
 		Kind.EXPLOSIVE:
-			return _explosive(level, at)
-	return false
+			acted = _explosive(level, at)
+	# Waking lives here, not in each tool, so the game and the solver cannot
+	# drift apart on it. A sleeping block does not notice its support is gone.
+	if acted:
+		level.wake_all()
+	return acted
 
 
 static func _jackhammer(level: Level, at: Vector2) -> bool:
 	var target: RigidBody2D = level.block_at(at, JACKHAMMER_REACH)
 	if target == null:
 		return false
-	level.destroy(target)
-	return true
+	# Already rubble: no move is spent chipping it smaller.
+	return level.split(target)
 
 
 static func _wrecking_ball(level: Level, at: Vector2) -> bool:
@@ -86,10 +92,12 @@ static func _explosive(level: Level, at: Vector2) -> bool:
 		if distance > BLAST_RADIUS:
 			continue
 		touched = true
-		if distance < BLAST_SHATTER:
-			level.destroy(body)
-			continue
 		var falloff := 1.0 - distance / BLAST_RADIUS
+		if distance < BLAST_SHATTER:
+			# Shattered, not deleted: the pieces stay and still have to end up
+			# below the line.
+			level.split(body)
+			continue
 		# A floor on the distance keeps a charge placed on a block's centre
 		# from producing a near-infinite direction vector.
 		var push := offset.normalized() if distance > 1.0 else Vector2.UP

@@ -75,10 +75,16 @@ jobs:
           done
           if [ "$failed" -ne 0 ]; then exit 1; fi
 
+          # Settled bodies must be woken when a tool changes the world, or
+          # everything above a cut block hangs in mid-air. Asserts the
+          # mechanism, since the symptom only shows up in a real browser.
+          echo "--- wake test ---"
+          "$godot" --headless --fixed-fps 60 --path game res://waketest.tscn
+
           # The hand-built level must stay worth playing: beatable within its
           # move budget, and not beatable in one move. Both are easy to break
           # by retuning a tool, and neither is visible in a diff.
           echo "--- playtest ---"
           "$godot" --headless --fixed-fps 60 --path game res://playtest.tscn
 
-          echo "::notice::ci passed — secret scan, GDScript checks, playtest"
+          echo "::notice::ci passed — secret scan, GDScript checks, wake test, playtest"

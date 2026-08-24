@@ -22,6 +22,7 @@ graph TD
 
     subgraph checks["Checked, not shipped"]
         playtest["playtest.gd<br/>hand-built level difficulty"]
+        waketest["waketest.gd<br/>settled bodies get woken"]
         verifylv["verify_levels.gd<br/>generate-and-verify measurement"]
     end
 
@@ -50,6 +51,8 @@ graph TD
     playtest -->|drives headlessly| level
     verifylv -->|drives| solver
     playtest -->|gates| ci
+    waketest -->|drives| level
+    waketest -->|gates| ci
     verifylv -->|gates| ci
     main -->|exported as WASM| pages
     pages --> verify
@@ -67,9 +70,10 @@ matters:
   must be verified solvable before anyone plays them — which means a solver
   has to run this exact code thousands of times with nobody watching.
 - **`tools.gd`** holds the three verbs. Each is a different way of acting on a
-  structure rather than a damage number: the jackhammer removes the one block
-  you point at, the wrecking ball shoves a horizontal band sideways, the
-  explosive pushes radially and shatters what is very close. All cost one move.
+  structure rather than a damage number: the jackhammer halves the block you
+  point at, the wrecking ball shoves a horizontal band sideways, the explosive
+  pushes radially and shatters what is very close. All cost one move, and none
+  of them delete anything — a block that vanished never read as physics.
 - **`levels.gd`** produces hand-built level specs — plain dictionaries of
   blocks. **`generator.gd`** produces the same shape from a seed, varying
   storeys, bays, spacing, pillar widths and which interior pillars are missing.
@@ -153,9 +157,9 @@ to do.
 - **No unit test framework.** The charter's testing default says to propose a
   setup rather than impose one, and so far the checks that earn their keep are
   behavioural rather than unit-shaped: the secret scan, the web export
-  verification, and `playtest.gd`, which searches the move space to confirm the
-  level is solvable within its budget and not solvable in one move. All three
-  run in CI. A unit framework becomes worth proposing when the generator
+  verification, `playtest.gd`, which searches the move space to confirm the
+  level is solvable within its budget and not solvable in one move, and
+  `waketest.gd`, which guards the sleeping-body fix. All of them run in CI. A unit framework becomes worth proposing when the generator
   arrives and there are pure functions worth pinning.
 - **Generated levels are not wired into the game yet.** The generator and
   solver work and are measured, but verifying one level takes several seconds —

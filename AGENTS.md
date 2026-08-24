@@ -7,6 +7,9 @@ and Specification were deliberately left out.
 
 Edit these defaults in `defaults/` in the dotfiles-ai fork, not here.
 
+One further module, **Diagnose before fixing**, is local to this project and
+is not from dotfiles-ai. It lives at the bottom of this file.
+
 ---
 
 # Architecture documentation
@@ -478,3 +481,35 @@ retrying it.**
 - When a tool failure may have destroyed something I typed, say so explicitly
   instead of quietly proceeding on a guess.
 
+---
+
+# Diagnose before fixing
+
+*Project-local, not from dotfiles-ai. Written after a session that shipped
+three "fixes" for one bug, two of which fixed nothing.*
+
+**Don't change code to fix a bug you haven't reproduced and explained.**
+
+- **Reproduce it first.** A theory that fits the symptom is not a diagnosis.
+  Until you have made the bug happen on demand, every change is a guess wearing
+  a fix's clothing.
+- **Prove the fix with a negative control.** Show the check failing without the
+  change and passing with it. If it passes both ways, you have not demonstrated
+  anything — and a test that cannot fail is worse than no test, because it
+  looks like coverage.
+- **Remove a fix that fixed nothing.** When the negative control shows the code
+  was never the cause, take it out. Keeping it "just in case", with a comment
+  claiming it solved something, puts a lie in the codebase.
+- **Reproduce in the real target when the harness can't.** Headless tests drive
+  the system differently from the way a user does, and some bugs only exist in
+  that difference. If no test reproduces it, get the evidence where the bug
+  actually lives — a real browser, the real device — and say plainly in the
+  code that the guard is unverifiable by the test suite, so nobody deletes it
+  as dead.
+- **Never bundle speculative changes with a real fix.** Retuning things that
+  looked wrong along the way makes the change set impossible to judge, and
+  hides the one edit that mattered among several that did not. Fix the
+  diagnosed cause; propose the rest separately.
+- **Say which explanation was wrong.** When a first or second theory fails,
+  state it. A confident wrong diagnosis quietly retracted is how a codebase
+  accumulates cargo-cult code.

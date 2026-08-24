@@ -18,7 +18,7 @@ each step it took to get here.
 - **One level: a four-storey frame** that has to come down so nothing stands
   above the height line. The best single move leaves six blocks standing, and
   it can be cleared in three. You get five.
-- **Three tools.** The jackhammer takes out the single block you point at. The
+- **Three tools.** The jackhammer breaks the block you point at into two. The
   wrecking ball swings in from whichever side you clicked nearer and shoves a
   horizontal band sideways. The explosive pushes everything nearby outwards and
   shatters what is closest. Pick with the on-screen buttons or the `1`/`2`/`3`
@@ -26,6 +26,19 @@ each step it took to get here.
   what they cost.
 - **A misclick is free.** A tool that finds nothing to act on does not spend a
   move.
+
+### Fixed
+
+- **Removing a piece now actually brings things down.** Blocks that had settled
+  were falling asleep, and cutting away what held them up did not wake them, so
+  the stack above hung in mid-air indefinitely. This is the reported "I remove
+  pieces and nothing happens".
+
+### Changed
+
+- **Nothing vanishes any more.** The jackhammer breaks a block into two pieces
+  and the explosive shatters what is closest, instead of deleting them. Every
+  piece stays in the world and still has to end up below the line.
 
 ### Notes
 
