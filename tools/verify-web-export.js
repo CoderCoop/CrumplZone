@@ -45,6 +45,17 @@ if (process.env.CHROMIUM_PATH) launch.executablePath = process.env.CHROMIUM_PATH
   }));
 
   const canvas = page.locator('canvas');
+  const box = await canvas.boundingBox();
+  const click = async (fx, fy, settle) => {
+    await page.mouse.click(box.x + box.width * fx, box.y + box.height * fy);
+    await page.waitForTimeout(settle);
+  };
+
+  // Dismiss the intro screen before measuring anything. It covers the level
+  // and swallows clicks, so without this the input check sees no change and
+  // reports a working build as broken — which is exactly what it did the first
+  // time the intro shipped.
+  await click(0.50, 0.891, 2500);
   await canvas.screenshot({ path: `${out}-before.png` });
 
   // A build that loaded but never drew shows one flat colour. Sampling
@@ -63,9 +74,7 @@ if (process.env.CHROMIUM_PATH) launch.executablePath = process.env.CHROMIUM_PATH
 
   // Click where the tower stands, then confirm the pixels moved: proof that
   // input, physics and rendering are all live, not just that a page loaded.
-  const box = await canvas.boundingBox();
-  await page.mouse.click(box.x + box.width * 0.36, box.y + box.height * 0.72);
-  await page.waitForTimeout(6000);
+  await click(0.36, 0.72, 6000);
   await canvas.screenshot({ path: `${out}-after.png` });
   const changed = !fs.readFileSync(`${out}-before.png`).equals(fs.readFileSync(`${out}-after.png`));
 
