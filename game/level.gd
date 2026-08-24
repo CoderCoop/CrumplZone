@@ -22,9 +22,10 @@ const DENSITY := 0.001
 var spec: Dictionary = {}
 var blocks: Array[RigidBody2D] = []
 
+## Kept so older callers and the intro's tool swatches still resolve.
 const ROLE_COLOURS := {
-	"pillar": Color(0.79, 0.45, 0.29),
-	"slab": Color(0.62, 0.65, 0.71),
+	"pillar": Color(0.40, 0.45, 0.52),
+	"slab": Color(0.66, 0.67, 0.69),
 }
 
 var _settled_ticks := 0
@@ -54,7 +55,7 @@ func build(level_spec: Dictionary) -> void:
 	for b in spec["blocks"]:
 		blocks.append(_make_block(
 			Vector2(b["x"], b["y"]), Vector2(b["w"], b["h"]),
-			ROLE_COLOURS.get(b.get("role", "pillar"), Color.WHITE), material))
+			b.get("material", Materials.CONCRETE), material))
 
 	_settled_ticks = 0
 
@@ -66,11 +67,12 @@ func clear() -> void:
 	blocks = []
 
 
-func _make_block(pos: Vector2, size: Vector2, colour: Color,
-		material: PhysicsMaterial) -> RigidBody2D:
+func _make_block(pos: Vector2, size: Vector2, made_of: String,
+		material: PhysicsMaterial, integrity := -1) -> RigidBody2D:
+	var spec := Materials.of(made_of)
 	var body := RigidBody2D.new()
 	body.position = pos
-	body.mass = size.x * size.y * DENSITY
+	body.mass = size.x * size.y * spec["density"]
 	body.physics_material_override = material
 	# Rubble moves fast enough to tunnel through the ground without this.
 	body.continuous_cd = RigidBody2D.CCD_MODE_CAST_SHAPE
@@ -79,8 +81,11 @@ func _make_block(pos: Vector2, size: Vector2, colour: Color,
 	rect.size = size
 	shape.shape = rect
 	body.add_child(shape)
-	body.add_child(_visual(size, colour))
+	var left: int = integrity if integrity > 0 else int(spec["integrity"])
+	body.add_child(_visual(size, Materials.colour_at(made_of, left)))
 	body.set_meta("half", size * 0.5)
+	body.set_meta("material", made_of)
+	body.set_meta("integrity", left)
 	add_child(body)
 	return body
 
@@ -103,29 +108,62 @@ func live_blocks() -> Array[RigidBody2D]:
 	return out
 
 
-## Smallest piece worth having. Below this a block is rubble, and a hit on it
-## shoves it around rather than dividing it forever.
-const MIN_PIECE := 15.0
-
-
-## Breaks a block into two along its longer axis. Nothing leaves the world:
-## demolition turns big things into smaller things, and a block that simply
-## vanished never read as physics.
+## Damages a block. When its integrity runs out it comes apart; until then it
+## visibly wears. Returns true if anything happened at all.
 ##
-## Returns false if the block is already too small to be worth halving.
-func split(body: RigidBody2D) -> bool:
+## This is what makes durability legible: hitting steel twice is a decision the
+## player can see the result of, rather than a silent no-op.
+func damage(body: RigidBody2D, amount: int) -> bool:
+	if not is_instance_valid(body) or amount <= 0:
+		return false
+	var left: int = int(body.get_meta("integrity", 1)) - amount
+	if left > 0:
+		body.set_meta("integrity", left)
+		_repaint(body, left)
+		return true
+	return shatter(body)
+
+
+## Breaks a block into fragments, the way the explosive always did to whatever
+## was closest. Glass showers; concrete and steel come apart in slabs.
+##
+## Nothing leaves the world: demolition turns big things into smaller things.
+func shatter(body: RigidBody2D) -> bool:
 	if not is_instance_valid(body):
 		return false
+	var made_of: String = body.get_meta("material", Materials.CONCRETE)
+	var wanted: int = int(Materials.of(made_of)["pieces"])
+	var produced := _split(body, made_of)
+	if produced.is_empty():
+		return false
+	# A second pass turns halves into quarters for materials that shower.
+	if wanted > 2:
+		var finer: Array[RigidBody2D] = []
+		for piece in produced:
+			var more := _split(piece, made_of)
+			if more.is_empty():
+				finer.append(piece)
+			else:
+				finer.append_array(more)
+		produced = finer
+	return true
+
+
+## Halves a block along its longer axis. Returns the fragments, or nothing if
+## the block is already too small to be worth dividing.
+func _split(body: RigidBody2D, made_of: String) -> Array[RigidBody2D]:
+	var empty: Array[RigidBody2D] = []
+	if not is_instance_valid(body):
+		return empty
 	var half: Vector2 = body.get_meta("half")
 	var size := half * 2.0
 	var along_x := size.x >= size.y
-	if (size.x if along_x else size.y) < MIN_PIECE * 2.0:
-		return false
+	if (size.x if along_x else size.y) < Materials.MIN_PIECE * 2.0:
+		return empty
 
-	var colour := _colour_of(body)
 	var piece := Vector2(size.x * 0.5, size.y) if along_x else Vector2(size.x, size.y * 0.5)
 	var offset := Vector2(piece.x * 0.5, 0.0) if along_x else Vector2(0.0, piece.y * 0.5)
-	var material: PhysicsMaterial = body.physics_material_override
+	var physics: PhysicsMaterial = body.physics_material_override
 	var origin := body.global_position
 	var facing := body.rotation
 	var velocity := body.linear_velocity
@@ -133,9 +171,11 @@ func split(body: RigidBody2D) -> bool:
 
 	destroy(body)
 
+	var made: Array[RigidBody2D] = []
 	for side in [-1.0, 1.0]:
+		# Fragments are rubble: they do not carry the original's toughness.
 		var chunk := _make_block(
-			origin + (offset * side).rotated(facing), piece, colour, material)
+			origin + (offset * side).rotated(facing), piece, made_of, physics, 1)
 		# Tracked, or the win condition never sees the pieces and a chunk left
 		# above the line counts for nothing.
 		blocks.append(chunk)
@@ -144,15 +184,16 @@ func split(body: RigidBody2D) -> bool:
 		chunk.angular_velocity = spin
 		# A nudge apart, so a break reads as a break rather than as one block
 		# quietly becoming two in the same place.
-		chunk.apply_impulse(Vector2(side, 0.0).rotated(facing) * 12.0 * chunk.mass)
-	return true
+		chunk.apply_impulse(Vector2(side, 0.0).rotated(facing) * 14.0 * chunk.mass)
+		made.append(chunk)
+	return made
 
 
-func _colour_of(body: RigidBody2D) -> Color:
+func _repaint(body: RigidBody2D, integrity_left: int) -> void:
+	var made_of: String = body.get_meta("material", Materials.CONCRETE)
 	for child in body.get_children():
 		if child is Polygon2D:
-			return (child as Polygon2D).color
-	return Color.WHITE
+			(child as Polygon2D).color = Materials.colour_at(made_of, integrity_left)
 
 
 func destroy(body: RigidBody2D) -> void:
