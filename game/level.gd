@@ -103,6 +103,58 @@ func live_blocks() -> Array[RigidBody2D]:
 	return out
 
 
+## Smallest piece worth having. Below this a block is rubble, and a hit on it
+## shoves it around rather than dividing it forever.
+const MIN_PIECE := 15.0
+
+
+## Breaks a block into two along its longer axis. Nothing leaves the world:
+## demolition turns big things into smaller things, and a block that simply
+## vanished never read as physics.
+##
+## Returns false if the block is already too small to be worth halving.
+func split(body: RigidBody2D) -> bool:
+	if not is_instance_valid(body):
+		return false
+	var half: Vector2 = body.get_meta("half")
+	var size := half * 2.0
+	var along_x := size.x >= size.y
+	if (size.x if along_x else size.y) < MIN_PIECE * 2.0:
+		return false
+
+	var colour := _colour_of(body)
+	var piece := Vector2(size.x * 0.5, size.y) if along_x else Vector2(size.x, size.y * 0.5)
+	var offset := Vector2(piece.x * 0.5, 0.0) if along_x else Vector2(0.0, piece.y * 0.5)
+	var material: PhysicsMaterial = body.physics_material_override
+	var origin := body.global_position
+	var facing := body.rotation
+	var velocity := body.linear_velocity
+	var spin := body.angular_velocity
+
+	destroy(body)
+
+	for side in [-1.0, 1.0]:
+		var chunk := _make_block(
+			origin + (offset * side).rotated(facing), piece, colour, material)
+		# Tracked, or the win condition never sees the pieces and a chunk left
+		# above the line counts for nothing.
+		blocks.append(chunk)
+		chunk.rotation = facing
+		chunk.linear_velocity = velocity
+		chunk.angular_velocity = spin
+		# A nudge apart, so a break reads as a break rather than as one block
+		# quietly becoming two in the same place.
+		chunk.apply_impulse(Vector2(side, 0.0).rotated(facing) * 12.0 * chunk.mass)
+	return true
+
+
+func _colour_of(body: RigidBody2D) -> Color:
+	for child in body.get_children():
+		if child is Polygon2D:
+			return (child as Polygon2D).color
+	return Color.WHITE
+
+
 func destroy(body: RigidBody2D) -> void:
 	if not is_instance_valid(body):
 		return
@@ -199,10 +251,10 @@ func reset_settle() -> void:
 
 ## Wakes every remaining block. Called whenever a tool changes the world.
 ##
-## Godot's rigid bodies sleep once they settle, and deleting the body holding a
-## sleeping one up does not reliably wake it: the stack above a cut block hung
-## in mid-air indefinitely. That was the reported "I remove pieces and nothing
-## happens".
+## Godot's rigid bodies sleep once they settle, and deleting or splitting the
+## body holding a sleeping one up does not reliably wake it: the stack above a
+## cut block hung in mid-air indefinitely. That was the reported "I remove
+## pieces and nothing happens".
 ##
 ## DO NOT remove this as dead code. No headless harness reproduces the bug —
 ## they drive physics directly and always see a normal collapse. It was found,
