@@ -13,6 +13,7 @@ var _busy := false
 
 var _status: Label
 var _buttons: Array[Button] = []
+var _intro: Intro
 
 
 func _ready() -> void:
@@ -25,6 +26,10 @@ func _ready() -> void:
 
 	_build_ui()
 	_start()
+
+	# The intro is shown before the first move rather than behind a menu
+	# button nobody presses. It can be reopened from the bar.
+	_open_intro()
 
 
 func _start() -> void:
@@ -70,6 +75,28 @@ func _build_ui() -> void:
 	reset.pressed.connect(_start)
 	row.add_child(reset)
 
+	var help := Button.new()
+	help.text = "?"
+	help.focus_mode = Control.FOCUS_NONE
+	help.custom_minimum_size = Vector2(36.0, 34.0)
+	help.pressed.connect(_open_intro)
+	row.add_child(help)
+
+
+func _open_intro() -> void:
+	if _intro != null:
+		return
+	_intro = Intro.new()
+	_intro.play_pressed.connect(_close_intro)
+	add_child(_intro)
+
+
+func _close_intro() -> void:
+	if _intro == null:
+		return
+	_intro.queue_free()
+	_intro = null
+
 
 func _select(kind: Tools.Kind) -> void:
 	_tool = kind
@@ -78,6 +105,8 @@ func _select(kind: Tools.Kind) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
+		if _intro != null:
+			return
 		if event.keycode == KEY_R:
 			_start()
 			return
@@ -86,7 +115,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_select(Tools.ORDER[index])
 			return
 
-	if _busy or _resolved != "" or _moves_left <= 0:
+	if _intro != null or _busy or _resolved != "" or _moves_left <= 0:
 		return
 
 	var pressed: bool = (event is InputEventMouseButton and event.pressed

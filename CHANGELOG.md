@@ -7,8 +7,12 @@ sections are dated.
 
 ## [Unreleased]
 
-Nothing has been released, so this section describes what exists rather than
-each step it took to get here.
+Nothing since 0.1.0.
+
+## [0.1.0] - 2026-08-24
+
+The first version with a version number. Everything below is what a player
+gets, rather than each step it took to get here.
 
 ### Added
 
@@ -26,6 +30,10 @@ each step it took to get here.
   what they cost.
 - **A misclick is free.** A tool that finds nothing to act on does not spend a
   move.
+- **An intro screen** that explains the goal, what each tool does and the
+  controls, and shows the version and what changed in it. It appears before
+  your first move; the `?` button in the bar brings it back without losing the
+  level you are part-way through.
 
 ### Fixed
 

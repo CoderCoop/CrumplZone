@@ -39,6 +39,25 @@ jobs:
           elif [ -f go.mod ];          then echo "::error::go.mod found but this step was never taught to build it"; exit 1
           fi
 
+      # The intro screen shows config/version from project.godot. If that and
+      # the changelog disagree, the game tells the player one thing and the
+      # repository another.
+      - name: Version matches the changelog
+        run: |
+          declared=$(sed -n 's/^config\/version="\(.*\)"$/\1/p' game/project.godot)
+          latest=$(grep -m1 -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' CHANGELOG.md \
+            | tr -d '#[] ')
+          echo "project.godot : ${declared:-<unset>}"
+          echo "CHANGELOG.md  : ${latest:-<none>}"
+          if [ -z "$declared" ] || [ -z "$latest" ]; then
+            echo "::error::could not read a version from both files"; exit 1
+          fi
+          if [ "$declared" != "$latest" ]; then
+            echo "::error::version mismatch — the intro screen would show $declared"
+            exit 1
+          fi
+          echo "match"
+
       - name: Check the Godot projects
         run: |
           projects=$(find . -name project.godot -not -path '*/.godot/*' \

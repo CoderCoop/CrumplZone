@@ -13,6 +13,8 @@ adds, removes or rewires a component.
 graph TD
     subgraph ships["Ships to players"]
         main["main.gd<br/>input, tool choice, readout"]
+        intro["intro.gd<br/>guide, version, release notes"]
+        notes["release_notes.gd<br/>player-facing changes"]
         level["level.gd<br/>structure, physics, the rule"]
         tools["tools.gd<br/>the three verbs"]
         levels["levels.gd<br/>hand-built specs"]
@@ -41,6 +43,8 @@ graph TD
         arch["ARCHITECTURE.md"]
     end
 
+    main --> intro
+    notes --> intro
     main --> level
     main --> tools
     levels -->|level spec| level
@@ -86,6 +90,12 @@ matters:
   and because generation will eventually need to run without freezing the game.
 - **`main.gd`** is the player-facing wrapper: input, tool selection, the
   readout, and on-screen buttons for touch.
+- **`intro.gd`** is the screen a player meets first — the goal, the three
+  tools, the controls, the version and what changed in it. **`release_notes.gd`**
+  holds the player-facing notes. The version itself lives in `project.godot` as
+  `config/version`, and CI fails if it disagrees with the newest heading in
+  `CHANGELOG.md`, so the game cannot tell a player one version while the
+  repository says another.
 
 Scoring and generated levels are still absent.
 
