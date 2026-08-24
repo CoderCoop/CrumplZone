@@ -226,6 +226,22 @@ func block_at(point: Vector2, slack: float) -> RigidBody2D:
 	return best
 
 
+## The world rectangle worth looking at: everything the level was built from,
+## plus room for rubble to spread sideways and a strip of street below the
+## footing. main.gd frames the camera on this, so a level that is taller or
+## wider than another one is still fully on screen — including in portrait,
+## where fitting it is the whole problem.
+func frame() -> Rect2:
+	var floor_y: float = spec.get("floor_y", 540.0)
+	var rect := Rect2(Vector2(centre_x(), floor_y), Vector2.ZERO)
+	for b in spec.get("blocks", []):
+		var half := Vector2(b["w"], b["h"]) * 0.5
+		var centre := Vector2(b["x"], b["y"])
+		rect = rect.expand(centre - half)
+		rect = rect.expand(centre + half)
+	return rect.grow_individual(80.0, 46.0, 80.0, 78.0)
+
+
 func centre_x() -> float:
 	return spec.get("centre_x", 480.0)
 

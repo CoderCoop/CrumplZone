@@ -55,7 +55,13 @@ if (process.env.CHROMIUM_PATH) launch.executablePath = process.env.CHROMIUM_PATH
   // and swallows clicks, so without this the input check sees no change and
   // reports a working build as broken — which is exactly what it did the first
   // time the intro shipped.
-  await click(0.50, 0.891, 2500);
+  //
+  // Play is pinned a margin up from the bottom of the screen and is full
+  // width, so its position follows from the layout rather than from a
+  // screenshot: intro.gd puts its centre PLAY_HEIGHT/2 + MARGIN above the
+  // bottom edge, in CSS pixels, which is what boundingBox reports.
+  const PLAY_CENTRE_FROM_BOTTOM = 52 / 2 + 16;
+  await click(0.5, 1 - PLAY_CENTRE_FROM_BOTTOM / box.height, 2500);
   await canvas.screenshot({ path: `${out}-before.png` });
 
   // A build that loaded but never drew shows one flat colour. Sampling
@@ -72,9 +78,18 @@ if (process.env.CHROMIUM_PATH) launch.executablePath = process.env.CHROMIUM_PATH
     return seen.size;
   });
 
-  // Click where the tower stands, then confirm the pixels moved: proof that
+  // Use the tool on the building, then confirm the pixels moved: proof that
   // input, physics and rendering are all live, not just that a page loaded.
-  await click(0.36, 0.72, 6000);
+  //
+  // The camera centres the level horizontally, so the middle column always
+  // sits at x = 0.5. Its height on screen depends on the shape of the window,
+  // so this walks down the middle instead of guessing one point — a jackhammer
+  // that hits nothing costs no move and changes no pixels, which would fail
+  // the check for the wrong reason.
+  for (const fy of [0.45, 0.52, 0.59, 0.66, 0.73]) {
+    await click(0.5, fy, 700);
+  }
+  await page.waitForTimeout(5000);
   await canvas.screenshot({ path: `${out}-after.png` });
   const changed = !fs.readFileSync(`${out}-before.png`).equals(fs.readFileSync(`${out}-after.png`));
 
