@@ -18,6 +18,9 @@ Early, but a real puzzle. One hand-built four-storey frame and three tools:
 Nothing is ever deleted: demolition turns big things into smaller things, and
 every piece still has to end up below the line.
 
+The game opens on a screen explaining all of this, with the current version and
+what changed in it; the `?` button reopens it mid-level.
+
 Pick a tool with the on-screen buttons or the `1`/`2`/`3` keys, click or tap to
 use it, `R` to reset. Each costs one move; you get five, and the level can be
 cleared in three. A tool that finds nothing to act on costs nothing.
