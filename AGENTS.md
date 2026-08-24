@@ -7,8 +7,9 @@ and Specification were deliberately left out.
 
 Edit these defaults in `defaults/` in the dotfiles-ai fork, not here.
 
-One further module, **Diagnose before fixing**, is local to this project and
-is not from dotfiles-ai. It lives at the bottom of this file.
+Two further modules, **Diagnose before fixing** and **Mobile first**, are local
+to this project and are not from dotfiles-ai. They live at the bottom of this
+file.
 
 ---
 
@@ -513,3 +514,35 @@ three "fixes" for one bug, two of which fixed nothing.*
 - **Say which explanation was wrong.** When a first or second theory fails,
   state it. A confident wrong diagnosis quietly retracted is how a codebase
   accumulates cargo-cult code.
+
+---
+
+# Mobile first
+
+*Project-local, not from dotfiles-ai.*
+
+**A phone is the primary device, not a smaller version of the real one.**
+
+CrumplZone is a casual game people will play on a phone, in portrait, one-handed,
+often one-thumbed. Design for that first and let the desktop inherit it.
+
+- **Use the whole screen.** No fixed 800x600 letterbox with dead bars down the
+  sides. The play area and the controls should expand to fill whatever aspect
+  ratio they are given, and the level should stay fully visible in portrait
+  without pinching.
+- **Touch targets are at least 44x44 px** of *real* screen, and spaced far
+  enough apart that a thumb cannot hit two at once. A control that works with a
+  mouse cursor is not evidence that it works with a thumb.
+- **Keep controls in thumb reach.** The bottom third of a portrait screen is
+  comfortable; the top corners are not. Put the things played with at the
+  bottom, and information at the top.
+- **Nothing important hides under a thumb.** A finger covers roughly a 50 px
+  circle around the touch point, so the thing being aimed at must stay
+  visible — offset feedback above the touch, not under it.
+- **No hover, no right-click, no keyboard-only paths.** Keys are a convenience
+  for desktop, never the only way to reach something.
+- **Text is legible at arm's length on a small screen.** Test at the real size
+  rather than in a 900 px browser window that flatters it.
+- **Check it at real aspect ratios**, portrait included, before calling a UI
+  change done — a screenshot at desktop proportions proves nothing about a
+  phone.
