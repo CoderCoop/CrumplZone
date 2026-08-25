@@ -30,6 +30,26 @@ func play(kind: Tools.Kind, at: Vector2, from_left: bool) -> void:
 	queue_redraw()
 
 
+## The damage that blow did, floating up from the impact. Durability is the
+## number the whole game turns on, so a player should see it being spent
+## rather than infer it from a colour.
+func _draw_damage(at: Vector2, amount: int, progress: float) -> void:
+	var font := ThemeDB.fallback_font
+	if font == null:
+		return
+	var rise := 14.0 + 26.0 * progress
+	var fade: float = 1.0 if progress < 0.5 else 1.0 - (progress - 0.5) / 0.5
+	var text := "-%d" % amount
+	var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 20).x
+	# Up and to the side: above the touch, because a fingertip covers what it
+	# just hit, and clear of the tool art drawn straight above it.
+	var origin := at + Vector2(30.0 - width * 0.5, -rise - 10.0)
+	font.draw_string(get_canvas_item(), origin + Vector2(1.0, 1.0), text,
+		HORIZONTAL_ALIGNMENT_LEFT, -1.0, 20, Color(0.0, 0.0, 0.0, fade * 0.6))
+	font.draw_string(get_canvas_item(), origin, text,
+		HORIZONTAL_ALIGNMENT_LEFT, -1.0, 20, Color(1.0, 0.88, 0.55, fade))
+
+
 func _process(delta: float) -> void:
 	if _live.is_empty():
 		return
@@ -58,6 +78,8 @@ func _draw() -> void:
 				_draw_ball(effect["at"], progress, effect["left"])
 			Tools.Kind.EXPLOSIVE:
 				_draw_explosive(effect["at"], progress)
+		# Last, so the number is never drawn under the tool that made it.
+		_draw_damage(effect["at"], Tools.damage_of(effect["kind"]), progress)
 
 
 ## The tool itself, hammering. Three blows into the point tapped, with the

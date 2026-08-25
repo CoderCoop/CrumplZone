@@ -7,7 +7,39 @@ sections are dated.
 
 ## [Unreleased]
 
-Nothing since 0.2.0.
+Nothing since 0.3.0.
+
+## [0.3.0] - 2026-08-25
+
+Everything in the building can be broken, and every blow shows what it did.
+
+### Added
+
+- **Durability, on a scale of 1 to 100.** Every piece has a number that says
+  how much damage it absorbs before it comes apart: glass 1, brick 12, concrete
+  24, steel 36, reinforced concrete 100. One jackhammer blow is 12 of it, so
+  that reads as one blow, one blow, two, three — and nine for the reinforced
+  core, which is more than any level's move budget. The intro screen lists
+  them, and the numbers it shows are the numbers the game runs on.
+- **A reinforced concrete core** at ground level. You will not get through it
+  with the moves you have; you bring the building down around it. Two charges
+  will still break it, because nothing here is invincible — some things are
+  just a bad use of a move.
+- **Cracks.** A piece that takes damage and survives darkens and splits
+  visibly, so you can see what you have already weakened and how close it is.
+- **The damage each blow does floats up from the impact**, to the side of your
+  finger rather than under it.
+
+### Changed
+
+- **Every structural piece now comes apart into two or more pieces** when its
+  durability runs out — nothing is deleted, and nothing absorbs a blow with
+  nothing to show for it. A blow on rubble too small to divide is refused
+  instead of costing a move.
+- **Tools are quoted in the same units as durability**: the jackhammer does 12
+  damage to the one piece you point at, the wrecking ball 6 to what it strikes
+  squarely, and a charge 60 where you place it, falling off with distance so it
+  cracks what stands around it.
 
 ## [0.2.0] - 2026-08-24
 

@@ -29,6 +29,7 @@ graph TD
     subgraph checks["Checked, not shipped"]
         playtest["playtest.gd<br/>hand-built level difficulty"]
         waketest["waketest.gd<br/>settled bodies get woken"]
+        breaktest["breaktest.gd<br/>everything breakable breaks"]
         verifylv["verify_levels.gd<br/>generate-and-verify measurement"]
     end
 
@@ -67,6 +68,8 @@ graph TD
     playtest -->|gates| ci
     waketest -->|drives| level
     waketest -->|gates| ci
+    breaktest -->|drives| level
+    breaktest -->|gates| ci
     verifylv -->|gates| ci
     main -->|exported as WASM| pages
     pages --> verify
@@ -85,9 +88,12 @@ matters:
   has to run this exact code thousands of times with nobody watching.
 - **`materials.gd`** says what a block is made of and how much damage it
   absorbs before it comes apart, how many pieces it makes when it does, and what
-  colour it is at each stage of wear. It is the reason a structure can be read
-  before it is touched: glass is obviously the weak part and steel is obviously
-  the expensive one, without a legend.
+  colour it is at each stage of wear. Durability runs 1 to 100 and one
+  jackhammer blow is 12 of it, so the scale reads directly as blows: glass 1,
+  brick 1, concrete 2, steel 3, reinforced concrete 9 — more than any budget.
+  It is the reason a structure can be read before it is touched: glass is
+  obviously the weak part and the core is obviously not worth your moves,
+  without a legend.
 - **`tools.gd`** holds the three verbs. Each is a different way of acting on a
   structure rather than a damage number: the jackhammer shatters the one piece
   you point at, the wrecking ball shoves a horizontal band sideways, the

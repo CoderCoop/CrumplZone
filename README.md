@@ -17,10 +17,16 @@ tools:
   horizontal band sideways.
 - **Explosive** — pushes everything nearby outwards, shatters what is closest.
 
-What things are made of is the puzzle. Glass breaks first and holds nothing up,
-concrete takes two hits, steel takes three; damaged pieces darken, so the
-building shows its wear. Nothing is ever deleted: demolition turns big things
-into smaller things, and every piece still has to end up below the line.
+What things are made of is the puzzle. Every piece has a durability from 1 to
+100 — glass 1, brick 12, concrete 24, steel 36, the reinforced core 100 — and
+one jackhammer blow is 12 of it. Damaged pieces crack and darken, so the
+building shows its wear, and everything comes apart into pieces once its
+durability runs out. Nothing is ever deleted: demolition turns big things into
+smaller things, and every piece still has to end up below the line.
+
+The reinforced core at ground level takes nine blows, which is more than you
+have. Bring the building down around it — or spend two charges on it, because
+nothing here is invincible, some things are just a bad use of a move.
 
 The game opens on a screen explaining all of this, with the current version and
 what changed in it; the `help` button reopens it mid-level.
