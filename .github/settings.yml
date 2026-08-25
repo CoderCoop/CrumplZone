@@ -21,6 +21,10 @@ repository:
   allow_merge_commit: false
   allow_rebase_merge: false
   delete_branch_on_merge: true
+  # Lets a pull request be armed to merge itself the moment `ci` goes green,
+  # rather than waiting for whoever opened it to still be around and looking.
+  # Arming is per pull request and deliberate; this only makes it possible.
+  allow_auto_merge: true
   enable_vulnerability_alerts: true
   enable_automated_security_fixes: true
 
