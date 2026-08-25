@@ -11,6 +11,20 @@ extends RefCounted
 
 const NOTES: Array = [
 	{
+		"version": "0.6.0",
+		"date": "2026-08-25",
+		"lines": [
+			"Weight breaks things: glazing under a floor cracks and fails, and "
+			+ "so does anything hit hard enough.",
+			"Levels end properly now, with one to three stars for how much of "
+			+ "the bar you had left.",
+			"The bar shows what a hold will cost before you let go.",
+			"Rubble that comes to rest below the line settles into the street.",
+			"Tool buttons are icons, the city has depth, and you can install "
+			+ "the game as an app from the help screen.",
+		],
+	},
+	{
 		"version": "0.5.1",
 		"date": "2026-08-25",
 		"lines": [
