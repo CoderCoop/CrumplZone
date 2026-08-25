@@ -152,7 +152,8 @@ func build(level_spec: Dictionary) -> void:
 		blocks.append(_make_piece(
 			Vector2(b["x"], b["y"]),
 			Fracture.rectangle(Vector2(b["w"], b["h"])),
-			b.get("material", Materials.CONCRETE), material))
+			b.get("material", Materials.CONCRETE), material, -1,
+			String(b.get("role", ""))))
 
 	_settled_ticks = 0
 
@@ -173,7 +174,7 @@ func clear() -> void:
 
 
 func _make_piece(pos: Vector2, polygon: PackedVector2Array, made_of: String,
-		material: PhysicsMaterial, durability := -1) -> RigidBody2D:
+		material: PhysicsMaterial, durability := -1, role := "") -> RigidBody2D:
 	var made := Materials.of(made_of)
 	var body := RigidBody2D.new()
 	body.position = pos
@@ -201,10 +202,11 @@ func _make_piece(pos: Vector2, polygon: PackedVector2Array, made_of: String,
 	convex.points = polygon
 	shape.shape = convex
 	body.add_child(shape)
-	body.add_child(_visual(polygon, Materials.colour_at(made_of, 0.0), made_of))
+	body.add_child(_visual(polygon, Materials.colour_at(made_of, 0.0), made_of, role))
 
 	body.set_meta("poly", polygon)
 	body.set_meta("material", made_of)
+	body.set_meta("role", role)
 	body.set_meta("durability",
 		durability if durability > 0 else Materials.durability(made_of))
 	body.set_meta("damage", 0)
@@ -219,7 +221,7 @@ func _make_piece(pos: Vector2, polygon: PackedVector2Array, made_of: String,
 ## All of it is child geometry of the face, so wear recolours the whole piece
 ## at once and retirement dims it with a single modulate.
 func _visual(polygon: PackedVector2Array, colour: Color,
-		made_of := Materials.CONCRETE) -> Polygon2D:
+		made_of := Materials.CONCRETE, role := "") -> Polygon2D:
 	var face := Polygon2D.new()
 	face.name = "fill"
 	face.polygon = polygon
@@ -240,7 +242,66 @@ func _visual(polygon: PackedVector2Array, colour: Color,
 			sheen.polygon = _diagonal(polygon, band.x, band.y)
 			sheen.color = Color(1.0, 1.0, 1.0, 0.10)
 			face.add_child(sheen)
+	_add_detail(face, polygon, role, colour)
 	return face
+
+
+## What tells one part of a building from another at a glance: mullions across
+## the glazing, cap and base plates on the columns, a fascia under each floor,
+## and a parapet with plant on the roof.
+##
+## Only whole pieces get it. A fragment is a fragment, and trim drawn across a
+## shard would be trim that survived being broken off.
+func _add_detail(face: Polygon2D, polygon: PackedVector2Array, role: String,
+		colour: Color) -> void:
+	if role == "":
+		return
+	var half := _half_extent(polygon)
+	match role:
+		"glazing":
+			# A mullion and a transom: the frame a curtain wall is made of.
+			_bar(face, Rect2(-1.2, -half.y, 2.4, half.y * 2.0), colour.darkened(0.30))
+			_bar(face, Rect2(-half.x, -1.0, half.x * 2.0, 2.0), colour.darkened(0.30))
+		"column":
+			for edge in [-half.y + 4.0, half.y - 8.0]:
+				_bar(face, Rect2(-half.x - 1.5, edge, half.x * 2.0 + 3.0, 4.0),
+					colour.lightened(0.22))
+			_bar(face, Rect2(-half.x + 1.5, -half.y + 10.0, 2.5, half.y * 2.0 - 22.0),
+				colour.lightened(0.30))
+		"slab", "roof":
+			_bar(face, Rect2(-half.x, half.y - 5.0, half.x * 2.0, 5.0),
+				colour.darkened(0.28))
+			_bar(face, Rect2(-half.x, -half.y, half.x * 2.0, 2.5),
+				colour.lightened(0.28))
+			if role == "roof":
+				# Parapet ends and a plant room, so the top of the building
+				# reads as a roof rather than as one more floor.
+				for side in [-1.0, 1.0]:
+					_bar(face, Rect2(side * half.x - (6.0 if side > 0.0 else 0.0),
+						-half.y - 9.0, 6.0, 9.0), colour.darkened(0.10))
+				_bar(face, Rect2(-26.0, -half.y - 14.0, 52.0, 14.0),
+					colour.darkened(0.18))
+				_bar(face, Rect2(30.0, -half.y - 20.0, 4.0, 20.0),
+					colour.darkened(0.34))
+
+
+func _bar(face: Polygon2D, rect: Rect2, colour: Color) -> void:
+	var bar := Polygon2D.new()
+	bar.name = "trim"
+	bar.polygon = PackedVector2Array([
+		rect.position, Vector2(rect.end.x, rect.position.y),
+		rect.end, Vector2(rect.position.x, rect.end.y)])
+	bar.color = colour
+	face.add_child(bar)
+
+
+static func _half_extent(polygon: PackedVector2Array) -> Vector2:
+	var low := Vector2(INF, INF)
+	var high := Vector2(-INF, -INF)
+	for point in polygon:
+		low = low.min(point)
+		high = high.max(point)
+	return (high - low) * 0.5
 
 
 static func _panel_colour(colour: Color, made_of: String) -> Color:
