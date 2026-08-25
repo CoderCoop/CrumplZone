@@ -117,9 +117,13 @@ static func tower(storeys: int = 3, columns: int = 5, spacing: float = 86.0) -> 
 		# looking for a solution. It needs seven, and a player is not a beam
 		# search, so the depth allows eight.
 		"moves": 8,
-		# What a player actually spends. The solver works in full-strength
-		# uses, so a budget of that many of them is a budget a solution fits
-		# inside — and a player who taps rather than holds, or who chips with
-		# the jackhammer, buys more uses out of the same bar.
-		"power": 8.0 * Tools.cost(Tools.Kind.EXPLOSIVE, 1.0),
+		# Set against the solution the solver actually finds, not against the
+		# search depth, and re-measured whenever the physics changes what a
+		# demolition costs: 210 before weight broke things, 90 when it first
+		# did, 156 once pieces that leave the world stopped being simulated.
+		# At 260 a solver-quality run — five uses costing 126 — finishes with
+		# about half the bar, which is the two-star band. Three stars is left
+		# for playing better than the search does, which is the point of
+		# having a rating at all.
+		"power": 260.0,
 	}

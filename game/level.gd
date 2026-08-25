@@ -33,7 +33,40 @@ var blocks: Array[RigidBody2D] = []
 
 var _rubble: PhysicsMaterial
 
+## Rubble that has come to rest below the line and been retired from the
+## simulation. Still drawn — nothing is deleted — but no longer colliding and
+## no longer in the way of anything.
+var _debris: Array[RigidBody2D] = []
+
+## How often load is sampled, and how long a piece of rubble has to lie still
+## before it is swept up.
+##
+## Moving pieces are read every other tick and settled ones every eighth. A
+## floor slab landing on a pane spikes the load for one to three ticks and is
+## gone, so sampling every fourth tick missed it entirely; every second catches
+## it, and the sustained weight afterwards would break the pane regardless.
+##
+## The interval is not free to lower: reading every tick put the solver's
+## playtest up from 97 seconds to 322, because a collapse has a couple of
+## hundred awake bodies in it and the solver replays the level hundreds of
+## times.
+const STRESS_TICKS := 2
+const RESTING_STRESS_TICKS := 8
+const REST_TICKS := 40
+const REST_SPEED := 8.0
+
+## How far a piece can get before it counts as gone. The ground is wide but
+## not infinite, and a shard thrown past the end of it falls for ever — which
+## is not a curiosity: a level with one piece still accelerating never reports
+## itself settled, so the win never fires and the game sits on "settling…"
+## until it is reloaded. Measured: thirty seconds after a demolition, nine
+## pieces were still falling at 9,100 px/s and climbing.
+const LOST_BELOW := 420.0
+const LOST_BESIDE := 1500.0
+
 var _settled_ticks := 0
+var _stress_tick := 0
+var _resting_tick := 0
 const SETTLE_SPEED := 6.0
 const SETTLE_TICKS := 24
 
@@ -113,6 +146,7 @@ func build(level_spec: Dictionary) -> void:
 
 
 func clear() -> void:
+	_debris = []
 	# The crane first, and by name rather than by freeing the node and hoping.
 	# A rebuild frees every child, which leaves the ball reference pointing at
 	# a freed instance — not null — so the next swing sees "one already in
@@ -135,6 +169,10 @@ func _make_piece(pos: Vector2, polygon: PackedVector2Array, made_of: String,
 	body.physics_material_override = material
 	# Rubble moves fast enough to tunnel through the ground without this.
 	body.continuous_cd = RigidBody2D.CCD_MODE_CAST_SHAPE
+	# Reported so the load a piece is carrying can be read back — see
+	# _stress_pass. Without this the engine resolves contacts and tells nobody.
+	body.contact_monitor = true
+	body.max_contacts_reported = 6
 
 	var shape := CollisionShape2D.new()
 	var convex := ConvexPolygonShape2D.new()
@@ -563,6 +601,122 @@ func clearance() -> float:
 	return highest - spec["height_line"]
 
 
+## What a piece is carrying, and what that does to it.
+##
+## A pane with a floor slab resting on it is under load whether or not anybody
+## hit it, and it should crack and fail — the same way a piece struck hard
+## should. Both are the same measurement: the impulse arriving through its
+## contacts. Sustained weight is a steady trickle of it; a collision is a
+## spike. Anything over the material's tolerance accumulates as damage.
+##
+## Sleeping bodies are skipped, which is not a shortcut: a body only sleeps
+## once its stack has settled and stopped pressing, and a level that stayed
+## unsettled would go on being sampled.
+func _stress_pass() -> void:
+	_stress_tick += 1
+	if _stress_tick < STRESS_TICKS:
+		return
+	_stress_tick = 0
+	var span := float(STRESS_TICKS) / 60.0
+
+	_resting_tick += 1
+	var read_resting := _resting_tick >= RESTING_STRESS_TICKS
+	if read_resting:
+		_resting_tick = 0
+
+	for body in live_blocks().duplicate():
+		if not is_instance_valid(body):
+			continue
+		# A sleeping body still reports what it is carrying — which is the
+		# whole point, because a pane holding up a floor is asleep. Skipping
+		# them was what made this mechanism do nothing at all: every case worth
+		# catching had settled by the time it mattered.
+		if body.sleeping and not read_resting:
+			continue
+		var state := PhysicsServer2D.body_get_direct_state(body.get_rid())
+		if state == null:
+			continue
+		var load := 0.0
+		for i in state.get_contact_count():
+			load += state.get_contact_impulse(i).length()
+		var made_of: String = body.get_meta("material", Materials.CONCRETE)
+		var limit := Materials.stress_limit(made_of)
+		if load <= limit:
+			# Carrying what it was built to carry: let it rest.
+			body.can_sleep = true
+			continue
+		# Overloaded pieces are kept awake, or the thing that is crushing them
+		# settles, the whole stack falls asleep, and a pane goes on holding up
+		# a floor it cannot hold up for ever because nobody is looking.
+		body.can_sleep = false
+		# Overload past tolerance, as a multiple of it: twice the tolerance is
+		# a point of damage a second.
+		var overload := load / limit - 1.0
+		# A resting body is read once every few ticks, so its sample stands in
+		# for all of them.
+		var slice := (float(RESTING_STRESS_TICKS) / 60.0) if body.sleeping else span
+		var carried: float = float(body.get_meta("stress", 0.0)) \
+			+ overload * Materials.STRESS_RATE * slice
+		if carried < 1.0:
+			body.set_meta("stress", carried)
+			continue
+		body.set_meta("stress", carried - floor(carried))
+		damage(body, int(floor(carried)), body.global_position)
+
+
+## Rubble that has come to rest below the line stops being simulated: its
+## collider goes away, it stops being counted, and it stays exactly where it
+## fell as part of the ground.
+##
+## Nothing is deleted — a swept-up shard is still drawn where it landed. What
+## goes is its claim on space and on the engine's attention, which is what
+## turns a hundred glass slivers from a physics bill into scenery. Only pieces
+## already below the line qualify, so this can never change whether a level is
+## cleared: it retires what has already stopped mattering.
+func _sweep_pass() -> void:
+	var line: float = spec.get("height_line", -INF)
+	var floor_y: float = spec.get("floor_y", 540.0)
+	for body in live_blocks().duplicate():
+		if not is_instance_valid(body):
+			continue
+		# Gone over the edge of the world, whatever it is made of.
+		if body.global_position.y > floor_y + LOST_BELOW \
+				or absf(body.global_position.x - centre_x()) > LOST_BESIDE:
+			_retire(body)
+			continue
+		if Fracture.area(body.get_meta("poly")) >= Materials.MIN_AREA * 2.0:
+			continue          # still a piece worth simulating
+		if _top_of(body) < line:
+			continue          # above the line: it still counts
+		if body.linear_velocity.length() > REST_SPEED:
+			body.set_meta("resting", 0)
+			continue
+		var resting: int = int(body.get_meta("resting", 0)) + STRESS_TICKS
+		if resting < REST_TICKS:
+			body.set_meta("resting", resting)
+			continue
+		_retire(body)
+
+
+func _retire(body: RigidBody2D) -> void:
+	blocks.erase(body)
+	body.linear_velocity = Vector2.ZERO
+	body.angular_velocity = 0.0
+	_debris.append(body)
+	body.freeze = true
+	body.set_collision_layer_value(1, false)
+	body.set_collision_mask_value(1, false)
+	body.contact_monitor = false
+	# Dimmed into the road rather than removed, so the street fills up with
+	# what came off the building.
+	body.modulate = Color(0.72, 0.72, 0.74)
+	body.z_index = -1
+
+
+func debris_count() -> int:
+	return _debris.size()
+
+
 ## True once nothing is moving meaningfully any more. Tracked over several
 ## ticks so a piece at the top of a bounce does not read as at rest.
 func tick_settle() -> bool:
@@ -570,6 +724,8 @@ func tick_settle() -> bool:
 	# towards "everything has come to rest" — but nothing can be judged while
 	# it is still on its way in either.
 	_advance_ball()
+	_stress_pass()
+	_sweep_pass()
 	if _ball != null:
 		_settled_ticks = 0
 		return false
