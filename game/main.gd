@@ -26,7 +26,12 @@ const BOTTOM_PAD := BUTTON_HEIGHT + 22.0 + BAR_HEIGHT + 6.0
 ## Reset and help live in the top corner, not in the bottom row: they are
 ## rare, and one of them throws the level away. The bottom bar — the part
 ## under a thumb — is only the three tools.
-const CORNER := Vector2(58.0, 46.0)
+##
+## Square and past the 44 px floor, with a gap wide enough that a thumb cannot
+## press both. They were 58x46 text buttons reading "reset" and "help", which
+## is a word to read at 13 px and a target barely over the minimum.
+const CORNER := Vector2(52.0, 52.0)
+const CORNER_GAP := 10.0
 
 ## How much of the spare vertical space goes above the building rather than
 ## below it. A phone in portrait has far more height than the level needs, and
@@ -101,6 +106,15 @@ func _ready() -> void:
 
 
 func _start() -> void:
+	# Starting a level is the other moment where switching builds is free —
+	# reset and next-level both come through here, and neither has anything
+	# in progress to lose. Between this and the help screen, an update lands
+	# at the next natural break rather than waiting for every tab to close.
+	# Asked for, not waited on: the page reloads a moment later and whatever
+	# happens here is thrown away. Returning early instead would leave the
+	# game with no level at all if the reload never came.
+	if UI.update_ready():
+		UI.apply_update()
 	var spec := Levels.tower()
 	_level.build(spec)
 	_power_full = float(spec["power"])
@@ -131,8 +145,8 @@ func _build_ui() -> void:
 	_status.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(_status)
 
-	_reset = _corner_button("reset", _start)
-	_help = _corner_button("help", _open_intro)
+	_reset = _corner_button(Icons.draw_reset, _start)
+	_help = _corner_button(Icons.draw_help, _open_intro)
 
 	# The power bar sits directly above the tools it is spent by, so the thing
 	# being spent and the thing spending it are in the same glance.
@@ -215,13 +229,23 @@ func _tool_style(selected: bool) -> StyleBoxFlat:
 	return box
 
 
-func _corner_button(text: String, on_press: Callable) -> Button:
+## An icon button, drawn rather than labelled, styled like the tool row so the
+## whole interface reads as one set of controls.
+func _corner_button(icon: Callable, on_press: Callable) -> Button:
 	var button := Button.new()
-	button.text = text
 	button.focus_mode = Control.FOCUS_NONE
-	button.clip_text = true
-	button.add_theme_font_size_override("font_size", 13)
 	button.pressed.connect(on_press)
+	var art := Control.new()
+	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	art.draw.connect(func() -> void:
+		icon.call(art, art.size * 0.5, minf(art.size.y * 0.58, 30.0),
+			Color(0.86, 0.88, 0.92)))
+	button.add_child(art)
+	button.add_theme_stylebox_override("normal", _tool_style(false))
+	button.add_theme_stylebox_override("hover", _tool_style(false))
+	button.add_theme_stylebox_override("pressed", _tool_style(true))
+	button.add_theme_stylebox_override("hover_pressed", _tool_style(true))
 	_root.add_child(button)
 	return button
 
@@ -238,7 +262,7 @@ func _relayout() -> void:
 	_root.size = size
 
 	var width := maxf(size.x - SIDE_MARGIN * 2.0, 40.0)
-	var corners := CORNER.x * 2.0 + 8.0
+	var corners := CORNER.x * 2.0 + CORNER_GAP
 	_status.position = Vector2(SIDE_MARGIN, 8.0)
 	_status.size = Vector2(maxf(width - corners - 8.0, 40.0), TOP_PAD - 8.0)
 	_reset.position = Vector2(size.x - SIDE_MARGIN - corners, 8.0)

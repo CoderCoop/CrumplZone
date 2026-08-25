@@ -1,0 +1,160 @@
+// Proves a published change actually reaches someone who already has the game.
+//
+//   node verify-update.js <serve-dir> <url> <screenshot>
+//
+// This is the check that matters most for a game being changed daily, and it
+// is the one a manual test gets wrong: a fresh browser always sees the new
+// build, so "I loaded it and it was fine" proves nothing about the player who
+// installed it last week.
+//
+// So this plays that player. It loads a build, waits for the service worker to
+// take control, swaps the files on the server for a newer build, and then asks
+// whether the page ends up running the new one — without clearing anything,
+// without a hard refresh, and without closing the tab.
+//
+// Godot's worker is cache-first over the whole app and never calls
+// skipWaiting(), so before the page learned to send it an "update" message
+// this test ended on the old build every time. That is the regression it
+// exists to catch.
+const { chromium } = require('playwright');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+
+const serveDir = process.argv[2];
+const url = process.argv[3];
+const shot = process.argv[4];
+if (!serveDir || !url) {
+  console.error('usage: verify-update.js <serve-dir> <url> [screenshot]');
+  process.exit(2);
+}
+
+const MARK = path.join(serveDir, 'version.txt');
+
+const opts = {
+  args: ['--no-sandbox', '--use-gl=swiftshader', '--enable-unsafe-swiftshader'],
+  viewport: { width: 390, height: 844 },
+  deviceScaleFactor: 2,
+};
+if (process.env.CHROMIUM_PATH) {
+  opts.executablePath = process.env.CHROMIUM_PATH;
+} else {
+  opts.channel = 'chromium';
+}
+
+// Reading the served build back through the page, not off disk: what the
+// player is running is whatever the service worker hands the page, which is
+// exactly the thing in question.
+const served = (page) => page.evaluate(async () => {
+  const r = await fetch('version.txt', { cache: 'no-store' });
+  return (await r.text()).trim();
+});
+
+// A stall here used to look exactly like a slow test, and the shell timeout
+// killed only the wrapper while node carried on. This says where it got to and
+// gives up on its own.
+let stage = 'starting';
+const at = (name) => { stage = name; if (process.env.VERBOSE) console.log(`... ${name}`); };
+const WATCHDOG = Number(process.env.UPDATE_TIMEOUT_MS || 180000);
+setTimeout(() => {
+  console.log(`FAIL  timed out after ${WATCHDOG / 1000}s while: ${stage}`);
+  console.log('VERDICT                               : FAIL');
+  process.exit(1);
+}, WATCHDOG).unref();
+
+(async () => {
+  const checks = [];
+  const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'cz-upd-'));
+  const ctx = await chromium.launchPersistentContext(profile, opts);
+  const page = ctx.pages()[0] || await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+
+  at('loading the first build');
+  fs.writeFileSync(MARK, 'BUILD-ONE');
+  await page.goto(url, { waitUntil: 'load', timeout: 90000 });
+  await page.waitForSelector('canvas', { timeout: 90000 });
+
+  // The worker has to be controlling the page before any of this means
+  // anything — an uncontrolled page just fetches from the network and would
+  // pass this test while offering the player nothing.
+  at('waiting for the worker to take control');
+  const controlled = await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+    for (let i = 0; i < 60 && !navigator.serviceWorker.controller; i += 1) {
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    return !!navigator.serviceWorker.controller;
+  });
+  checks.push(['the worker controls the page', controlled, String(controlled)]);
+
+  at('reading the build the page is on');
+  const before = await served(page);
+  checks.push(['the player is on the old build', before === 'BUILD-ONE', before]);
+
+  // Publish. Only the marker changes, but the worker's own script has to
+  // change too or the browser has no reason to install anything — which is
+  // what a real release does, since the cache version is stamped at export.
+  at('publishing the second build');
+  fs.writeFileSync(MARK, 'BUILD-TWO');
+  const swFile = path.join(serveDir, 'index.service.worker.js');
+  const sw = fs.readFileSync(swFile, 'utf8');
+  fs.writeFileSync(swFile, sw.replace(/const CACHE_VERSION = '[^']*'/,
+    "const CACHE_VERSION = 'verify-update-two'"));
+
+  // Now behave like a player: bring the app back to the foreground and wait.
+  // No cache clearing, no hard refresh, no closing the tab.
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  at('waiting for the page to notice');
+  const noticed = await page.evaluate(async () => {
+    const reg = await navigator.serviceWorker.getRegistration();
+    for (let i = 0; i < 40; i += 1) {
+      await reg.update().catch(() => {});
+      if (window.__cz_update_ready && window.__cz_update_ready()) { return true; }
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    return false;
+  });
+  checks.push(['the page notices the new build', noticed, String(noticed)]);
+
+  let after = before;
+  if (noticed) {
+    at('applying the update and reloading');
+    // The game applies this itself at its next safe moment; drive it directly
+    // so the test measures the delivery and not the game's own timing.
+    // The worker navigates every client, so wait for that navigation rather
+    // than for the call, which returns long before the page changes.
+    await Promise.all([
+      page.waitForNavigation({ timeout: 60000 }).catch(() => {}),
+      page.evaluate(() => window.__cz_apply_update()).catch(() => {}),
+    ]);
+    await page.waitForLoadState('load', { timeout: 60000 }).catch(() => {});
+    for (let i = 0; i < 40; i += 1) {
+      after = await served(page).catch(() => after);
+      if (after === 'BUILD-TWO') { break; }
+      await page.waitForTimeout(500);
+    }
+  }
+  checks.push(['the player ends up on the new build', after === 'BUILD-TWO', after]);
+  checks.push(['no page errors', errors.length === 0,
+    errors.length ? errors.join('; ') : 'none']);
+
+  if (shot) await page.screenshot({ path: shot }).catch(() => {});
+  await ctx.close();
+  fs.rmSync(profile, { recursive: true, force: true });
+
+  console.log('--- an update reaches a player who already has it ---');
+  for (const [name, ok, detail] of checks) {
+    console.log(`${ok ? 'PASS' : 'FAIL'}  ${name.padEnd(32)} ${detail}`);
+  }
+  const ok = checks.every((c) => c[1]);
+  console.log(`VERDICT                               : ${ok ? 'PASS' : 'FAIL'}`);
+  process.exit(ok ? 0 : 1);
+})().catch((err) => {
+  // Without this a rejection ends the process with nothing on stdout, which
+  // reads exactly like a test that hung.
+  console.log(`FAIL  threw while: ${stage}`);
+  console.log(String((err && err.stack) || err).split('\n').slice(0, 4).join('\n'));
+  console.log('VERDICT                               : FAIL');
+  process.exit(1);
+});

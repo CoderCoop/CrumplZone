@@ -57,6 +57,15 @@ jobs:
         with:
           node-version: '22'
 
+      # A second's worth of parsing, before any browser starts. The hooks the
+      # game needs are injected through a quoted string in export_presets.cfg,
+      # where one unescaped double quote ends the string early and leaves the
+      # page with a script tag that never closes — a build that exports,
+      # deploys, serves, and never starts. In a browser that looks like a
+      # canvas which never appears, ninety seconds later.
+      - name: Verify the exported page is well formed
+        run: node tools/verify-page-scripts.js build/web
+
       # The build is only useful if it runs on a host that sends no COOP/COEP
       # headers, which is what Pages is. Threads are off in the export preset
       # for that reason; this is what stops that from silently regressing.
@@ -74,6 +83,14 @@ jobs:
       # install in incognito and a default automation profile is incognito.
       - name: Verify the build installs as an app
         run: tools/verify-pwa.sh
+
+      # And an installed app is only worth having if it can be updated. This
+      # loads the build, publishes a change over the top of it, and checks a
+      # browser that already had the old one ends up on the new one — no cache
+      # clearing, no hard refresh, no closing the tab. It runs on a copy of the
+      # build, because proving it means rewriting the files being served.
+      - name: Verify an update reaches someone who already has it
+        run: tools/verify-update.sh
 
       - uses: actions/upload-artifact@v7
         if: always()

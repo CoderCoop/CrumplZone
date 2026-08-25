@@ -75,6 +75,24 @@ static func report_install_button(visible: bool) -> void:
 			% ("true" if visible else "false"), true)
 
 
+## A newer build has arrived and is waiting to take over.
+##
+## The page watches for it; this only asks. Godot's service worker is
+## cache-first over the whole app, so a player who does not ask keeps the build
+## they first loaded — which matters when the game is being changed daily.
+static func update_ready() -> bool:
+	return _ask("(window.__cz_update_ready && window.__cz_update_ready()) ? 1 : 0")
+
+
+## Switches to the newer build. The page reloads, so nothing after this runs.
+##
+## Called only where losing the current run costs nothing — the help screen and
+## the end of a level — because this throws away a level in progress.
+static func apply_update() -> void:
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("window.__cz_apply_update && window.__cz_apply_update()", true)
+
+
 ## Already running as an installed app rather than in a browser tab.
 static func installed() -> bool:
 	return _ask("(window.__cz_installed && window.__cz_installed()) ? 1 : 0")

@@ -11,6 +11,20 @@ extends RefCounted
 
 const NOTES: Array = [
 	{
+		"version": "0.8.0",
+		"date": "2026-08-25",
+		"lines": [
+			"Rubble that has settled no longer wears away whatever it is "
+			+ "sitting on. Glass under weight still cracks — that part was "
+			+ "meant to happen.",
+			"Reset and help are proper buttons with icons, sized for a thumb.",
+			"The game has its own icon on your home screen instead of the "
+			+ "engine's, and its own loading screen.",
+			"It works offline now, and picks up new versions on its own "
+			+ "without interrupting a level.",
+		],
+	},
+	{
 		"version": "0.7.0",
 		"date": "2026-08-25",
 		"lines": [

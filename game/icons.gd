@@ -90,3 +90,38 @@ static func _explosive(item: CanvasItem, at: Vector2, size: float, colour: Color
 		var angle := PI * 0.25 * float(i * 2)
 		item.draw_line(spark + Vector2(cos(angle), sin(angle)) * 1.6 * unit,
 			spark + Vector2(cos(angle), sin(angle)) * 4.2 * unit, colour, 1.5 * unit)
+
+
+## A circular arrow, for reset. Drawn as an arc with a head on it rather than
+## typed as ↺, which is the character that came out as a tofu box on the first
+## build that shipped it.
+static func draw_reset(item: CanvasItem, at: Vector2, size: float, colour: Color) -> void:
+	var unit := size / 24.0
+	var radius := 8.0 * unit
+	var width := 2.6 * unit
+	# An arc with a gap at the top right, so it reads as going round rather
+	# than as a plain ring.
+	item.draw_arc(at, radius, deg_to_rad(-55.0), deg_to_rad(250.0), 32, colour, width)
+	# The head, at the open end of the arc, pointing the way round it goes.
+	var tip_angle := deg_to_rad(-55.0)
+	var tip := at + Vector2(cos(tip_angle), sin(tip_angle)) * radius
+	item.draw_colored_polygon(PackedVector2Array([
+		tip + Vector2(4.2, -1.2) * unit,
+		tip + Vector2(-1.6, -3.8) * unit,
+		tip + Vector2(-0.6, 2.6) * unit,
+	]), colour)
+
+
+## A question mark, for help — again drawn, not typed. The hook is an arc and
+## a stem; the dot below it is what makes it read as a question mark rather
+## than as a hook at button size.
+static func draw_help(item: CanvasItem, at: Vector2, size: float, colour: Color) -> void:
+	var unit := size / 24.0
+	var width := 2.6 * unit
+	var head := at + Vector2(0.0, -4.5 * unit)
+	# The curl over the top, open at the bottom left.
+	item.draw_arc(head, 4.6 * unit, deg_to_rad(160.0), deg_to_rad(400.0), 24, colour, width)
+	# The stem coming down out of the curl to just above the dot.
+	item.draw_line(at + Vector2(0.6 * unit, -0.6 * unit),
+		at + Vector2(0.6 * unit, 4.0 * unit), colour, width)
+	item.draw_circle(at + Vector2(0.6 * unit, 8.0 * unit), 1.7 * unit, colour)

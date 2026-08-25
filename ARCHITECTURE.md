@@ -175,6 +175,35 @@ the main test gate but must still be reproducible rather than done by hand.
 the offer on screen. The second half of that matters more than it sounds: the
 offer can break in the manifest, in the page's hooks, or in the game noticing,
 and it had broken in the third place while the first two were perfect.
+`verify-update` proves a change reaches someone who already has the game: it
+loads a build, publishes a newer one over the top of it, and checks the page
+ends up running the new one without clearing anything or closing the tab. A
+fresh browser always sees the newest build, so no manual test can answer this.
+
+### Staying current
+
+An exported build is served cache-first by a service worker, which is what
+lets an installed app run offline and is also how an app gets stuck on the
+build it was installed with. Three pieces keep that from happening, and each
+was added because the piece before it turned out not to be enough:
+
+- The page **registers the worker**. Godot only does so when the browser is
+  missing a feature the build needs — with threads off nothing is, so no
+  worker was registered at all and the installable app had no offline support.
+- The page **watches for a newer worker** and publishes `__cz_update_ready()`.
+- The game **applies it at a safe moment** — the help screen, or the start of
+  a level — because switching builds reloads the page, and doing that mid-level
+  would throw the level away.
+
+```mermaid
+flowchart LR
+    release[New build on Pages] --> sw[Browser fetches worker]
+    sw --> installed[New worker installed, waiting]
+    installed --> page["Page sees it<br/>__cz_update_ready()"]
+    page --> game[Game asks at a safe moment]
+    game --> apply["postMessage('update')<br/>skip waiting, claim, reload"]
+    apply --> player[Player is on the new build]
+```
 
 ## How a change reaches players
 
