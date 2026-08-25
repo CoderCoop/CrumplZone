@@ -9,7 +9,9 @@ Edit these defaults in `defaults/` in the dotfiles-ai fork, not here.
 
 Two further modules, **Diagnose before fixing** and **Mobile first**, are local
 to this project and are not from dotfiles-ai. They live at the bottom of this
-file.
+file, along with **Repo config: what the Settings app really applies**, which
+corrects a vendored module rather than adding one — where the two disagree, the
+correction wins, because it is the one with a measurement behind it.
 
 ---
 
@@ -546,3 +548,39 @@ often one-thumbed. Design for that first and let the desktop inherit it.
 - **Check it at real aspect ratios**, portrait included, before calling a UI
   change done — a screenshot at desktop proportions proves nothing about a
   phone.
+
+---
+
+# Repo config: what the Settings app really applies
+
+*Project-local, not from dotfiles-ai. This corrects the **Repo configuration as
+code** module above, which says of the Settings app's key list: "That key list
+is the whole of it." That is not true, and believing it costs a repo either a
+setting it could have had as code or a Terraform migration it did not need.*
+
+**The documented key list is what the app documents, not the limit of what it
+applies. Check, do not assume.**
+
+- The app passes the `repository` section to GitHub's repository API, so keys
+  its docs omit can still work. `allow_auto_merge` is one: undocumented, and
+  applied about a minute after `.github/settings.yml` reached the default
+  branch, with nothing touched in the web UI.
+- Measured here on 2026-08-25, because assuming would have been the whole
+  mistake again: `GET /repos/CoderCoop/CrumplZone` reported
+  `allow_auto_merge: false` before the change and `true` after it, while
+  `allow_squash_merge`, `allow_merge_commit`, `allow_rebase_merge` and
+  `delete_branch_on_merge` already matched the file — which is what showed the
+  section was being applied at all.
+- **Verify either way, because the failure is silent in both directions.** An
+  unsupported key is ignored without complaint; a supported one gives no
+  receipt. `GET /repos/{owner}/{repo}` returns the merge and feature flags, so
+  reading the field back settles it in one call. Do that before concluding a
+  setting needs Terraform or a human with a mouse.
+- What genuinely has no key, and still needs Terraform: Pages configuration,
+  secret scanning, and secret scanning push protection.
+
+**This belongs upstream.** It lives here because this session could not reach
+`mchelen/dotfiles-ai` — a different owner from this repo, and cross-owner adds
+are refused — so it is written where it can be acted on today. Once it is in
+`defaults/` in the fork, delete this section rather than keeping two copies
+that can drift.
