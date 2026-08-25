@@ -10,7 +10,6 @@ extends RefCounted
 
 const CENTRE_X := 400.0
 const FLOOR_Y := 540.0
-const LINE_ABOVE_GROUND := 100.0
 const SLAB_H := 22.0
 
 
@@ -77,7 +76,11 @@ static func generate(level_seed: int) -> Dictionary:
 		"seed": level_seed,
 		"centre_x": CENTRE_X,
 		"floor_y": FLOOR_Y,
-		"height_line": FLOOR_Y - LINE_ABOVE_GROUND,
+		# Computed from this level's own material volume — see
+		# Levels.line_above_ground. A generated level with a constant line is
+		# a level that can be born impossible.
+		"height_line": FLOOR_Y - Levels.line_above_ground(blocks),
+		"power": 8.0 * Tools.cost(Tools.Kind.EXPLOSIVE, 1.0),
 		"blocks": blocks,
 		# Filled in by the solver once the level has been verified: the budget
 		# is the length of a solution that actually exists, plus slack.
