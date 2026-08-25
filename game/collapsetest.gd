@@ -95,17 +95,31 @@ func _start_ball() -> void:
 		blocks.append({
 			"x": 340.0 + i * 60.0, "y": FLOOR_Y - COLUMN.y * 0.5,
 			"w": COLUMN.x, "h": COLUMN.y, "material": Materials.CONCRETE})
-	_level.build({
+	var spec := {
 		"centre_x": 400.0, "floor_y": FLOOR_Y, "height_line": FLOOR_Y - 200.0,
 		"blocks": blocks, "moves": 3,
-	})
+	}
+	var at := Vector2(400.0, FLOOR_Y - COLUMN.y * 0.5)
+
+	# Swing, then rebuild with the ball still in play and swing again without
+	# ticking in between — exactly what the solver does between candidate
+	# sequences. A rebuild frees the ball's node but leaves the reference
+	# pointing at a freed instance rather than at null, and the next swing then
+	# refuses because it believes one is already out there. That cost the first
+	# move of every searched sequence that opened with the ball, silently.
+	_level.build(spec)
+	var first := Tools.apply(Tools.Kind.WRECKING_BALL, _level, at)
+	_level.build(spec)
+	var second := Tools.apply(Tools.Kind.WRECKING_BALL, _level, at)
+	print("ball        swing on a fresh level: %s, again after a rebuild: %s"
+		% [first, second])
+	if not first:
+		_failures.append("the ball refused to swing at a standing building")
+	if not second:
+		_failures.append("the ball would not swing as the first move after a rebuild")
+
 	_pieces_before = _level.live_blocks().size()
 	_damage_seen = 0
-
-	var swung := Tools.apply(Tools.Kind.WRECKING_BALL, _level,
-		Vector2(400.0, FLOOR_Y - COLUMN.y * 0.5))
-	if not swung:
-		_failures.append("the ball refused to swing at a standing building")
 
 	# It has to be a body, with a mass, in the level — not a force applied to
 	# an area and forgotten.

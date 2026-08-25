@@ -113,6 +113,13 @@ func build(level_spec: Dictionary) -> void:
 
 
 func clear() -> void:
+	# The crane first, and by name rather than by freeing the node and hoping.
+	# A rebuild frees every child, which leaves the ball reference pointing at
+	# a freed instance — not null — so the next swing sees "one already in
+	# play" and refuses. The solver rebuilds between every candidate sequence
+	# and applies the first move before it ticks anything, so that refusal
+	# landed on the first move of every sequence that opened with the ball.
+	_clear_ball()
 	for child in get_children():
 		remove_child(child)
 		child.queue_free()
