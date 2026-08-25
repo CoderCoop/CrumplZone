@@ -11,6 +11,19 @@ extends RefCounted
 
 const NOTES: Array = [
 	{
+		"version": "0.4.0",
+		"date": "2026-08-25",
+		"lines": [
+			"The wrecking ball is an actual ball on an actual chain — it "
+			+ "swings, and hits whatever is in the way.",
+			"Its damage is the momentum it is carrying when it lands, so "
+			+ "where in the arc you catch the building matters.",
+			"Glass shatters into uneven slivers; concrete and steel break on "
+			+ "sloped faces.",
+			"A broken column no longer holds up what was above it.",
+		],
+	},
+	{
 		"version": "0.3.0",
 		"date": "2026-08-25",
 		"lines": [

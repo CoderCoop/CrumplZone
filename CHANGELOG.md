@@ -7,7 +7,39 @@ sections are dated.
 
 ## [Unreleased]
 
-Nothing since 0.3.0.
+Nothing since 0.4.0.
+
+## [0.4.0] - 2026-08-25
+
+The tools are objects in the world, and things break the way things break.
+
+### Added
+
+- **The wrecking ball is a real wrecking ball**: a 42 kg body on a chain,
+  released from the top of its arc and swung in from the side you tapped
+  nearer. Tapping picks the point the bottom of the arc passes through; what it
+  meets on the way is up to the building. There is no area of effect and no
+  damage constant — the engine resolves the collisions, and the damage is the
+  momentum the ball is carrying when it lands. Catch something early in the
+  swing and it does less.
+- **Real fractures.** A piece is a shape now, not a rectangle, and breaking one
+  cuts it with a line. Glass comes apart in uneven slivers radiating from the
+  point struck. Concrete and steel part on sloped faces, one or two per break.
+
+### Changed
+
+- **A broken column stops holding things up.** Halving a rectangle down the
+  middle left two rectangles that stacked as well as the original did, so the
+  storey above a cut column carried on standing as if nothing had happened. A
+  fracture now runs at an angle, and broken faces slide over each other far
+  more readily than an intact member does, so the piece above comes off its own
+  stump. Measured: the slab above a cut column used to drop 1 px, and now drops
+  84.
+- **The survey line moved up**, from 100 px above the ground to 135. This is
+  measured rather than chosen: nothing is ever deleted, so a demolished
+  building has to fit under the line as rubble, and pulverised completely this
+  one settles into a pile 119 px deep. The old line was asking for something
+  the material volume made impossible.
 
 ## [0.3.0] - 2026-08-25
 
