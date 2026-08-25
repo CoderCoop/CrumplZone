@@ -7,7 +7,45 @@ sections are dated.
 
 ## [Unreleased]
 
-Nothing since 0.7.0.
+Nothing since 0.8.0.
+
+## [0.8.0] - 2026-08-25
+
+### Fixed
+
+- **Things stop wearing away for holding something up.** A piece carrying a
+  settled heap and a piece being hit by a falling one looked identical to the
+  game, so rubble that had come to rest quietly ground down the floor beneath
+  it. Measured over a full collapse, 40% of all damage from load was being
+  dealt to pieces standing still — concrete carrying 702-813 against a
+  tolerance of 300 while moving at under 3 px/s. Materials now carry far more
+  standing still than they survive being struck with, and what does give way
+  under a steady load gives way slowly. The same collapse now deals 14%, and
+  none of it to concrete.
+- **Glass still cracks under weight**, which was the point of the mechanism
+  and is the one material with no extra margin — a pane really does fail under
+  sustained load, and a pane holding up a floor is meant to.
+
+### Changed
+
+- **Reset and help are icon buttons.** They were words rendered at 13 px in a
+  58x46 target, which is barely over the size a thumb needs. They are now 52x52
+  with a drawn arrow and question mark, spaced so a thumb cannot press both,
+  and styled like the tool row so the controls read as one set.
+- **The game has its own icon.** The installed app, the browser tab and the
+  loading screen were all still showing the stock Godot logo. They now show a
+  tower with its corner knocked out and the ball that did it.
+
+### Added
+
+- **Updates arrive.** An installed app is served from a cache, which is what
+  lets it run offline and also how it gets stuck on the version it was
+  installed with. The game now notices when a newer build is waiting and
+  switches to it at a moment that costs nothing — the help screen, or the start
+  of a level — rather than never. It will not interrupt a level to do it.
+- **Offline play**, which the installable app did not previously have: no
+  service worker was ever being registered, so "install" only ever made a
+  bookmark.
 
 ## [0.7.0] - 2026-08-25
 
