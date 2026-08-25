@@ -19,7 +19,8 @@ const SLAB_H := 22.0
 
 
 ## A curtain-wall office block: steel columns carrying concrete floor slabs,
-## with glass glazing the bays between them.
+## with glass glazing the bays between them, and a reinforced concrete core at
+## ground level that no budget of jackhammer blows will get through.
 ##
 ## The materials are the puzzle. Glass is free to remove and holds nothing up;
 ## the concrete floors are what stands above the line; the steel columns are
@@ -40,13 +41,22 @@ static func tower(storeys: int = 3, columns: int = 5, spacing: float = 86.0) -> 
 	var bay := spacing - COLUMN.x - 22.0
 	var y := FLOOR_Y
 
+	# The ground-floor core is reinforced concrete. Eight jackhammer blows is
+	# more than the whole budget, so it is not a piece you break — it is a
+	# piece you bring the building down around. That is the shape of the
+	# decision the materials exist to create.
+	var core := int(columns / 2)
+
 	for storey in storeys:
 		for i in columns:
+			var made_of: String = Materials.STEEL
+			if storey == 0 and i == core:
+				made_of = Materials.REINFORCED
 			blocks.append({
 				"x": first_x + i * spacing,
 				"y": y - COLUMN.y * 0.5,
 				"w": COLUMN.x, "h": COLUMN.y,
-				"role": "column", "material": Materials.STEEL,
+				"role": "column", "material": made_of,
 			})
 		# Glazing fills the bays. It carries nothing, so taking it out is
 		# cosmetic — which is the point: it teaches that breaking things and

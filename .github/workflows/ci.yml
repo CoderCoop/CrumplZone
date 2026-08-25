@@ -123,9 +123,15 @@ jobs:
           # mechanism, since the symptom only shows up in a real browser.
           run_harness "wake test" res://waketest.tscn
 
+          # Every structural piece has to come apart, every blow that does not
+          # break one has to visibly land, and the durability numbers the intro
+          # screen quotes have to be the ones the game runs on. Retuning a tool
+          # or a material silently breaks all three.
+          run_harness "break test" res://breaktest.tscn
+
           # The hand-built level must stay worth playing: beatable within its
           # move budget, and not beatable in one move. Both are easy to break
           # by retuning a tool, and neither is visible in a diff.
           run_harness "playtest" res://playtest.tscn
 
-          echo "::notice::ci passed — secret scan, GDScript checks, wake test, playtest"
+          echo "::notice::ci passed — secret scan, GDScript checks, wake test, break test, playtest"

@@ -23,12 +23,13 @@ const NAMES := {
 ## what the explosive does to whatever is closest, but precisely and with no
 ## collateral — the scalpel to the explosive's shortcut.
 ##
-## Against tough material one hit is not enough: glass and brick go first time,
-## a concrete slab takes two, a steel column three. That is what durability is
-## for, and it is why the jackhammer is the tool you spend moves on when you
-## know exactly which piece matters.
+## Twelve damage a blow is the unit the 1-100 durability scale in materials.gd
+## is written in: glass and brick go first time, a concrete slab takes two, a
+## steel column three, and reinforced concrete would take nine — more than any
+## level's budget, which is the point. The jackhammer is the tool you spend
+## moves on when you know exactly which piece matters.
 const JACKHAMMER_REACH := 30.0
-const JACKHAMMER_DAMAGE := 2
+const JACKHAMMER_DAMAGE := 12
 
 ## Wrecking ball: a lateral shove through a horizontal band, swung in from
 ## whichever side you clicked nearer. Falls off with distance so it topples the
@@ -38,17 +39,36 @@ const BALL_RANGE := 420.0
 const BALL_FORCE := 780.0
 const BALL_LIFT := 0.18
 ## The ball cracks what it strikes squarely without pulverising it: its job is
-## to topple a building, not to demolish it a piece at a time.
-const BALL_DAMAGE := 1
+## to topple a building, not to demolish it a piece at a time. Six damage —
+## half a jackhammer blow — breaks glass and cracks anything heavier without
+## taking it out.
+const BALL_DAMAGE := 6
 const BALL_DAMAGE_RANGE := 60.0
 
-## Explosive: radial impulse, and blocks very close to the charge are broken
-## apart. Deliberately not strong enough to flatten a building on its own.
+## Explosive: radial impulse, and everything inside the radius takes damage
+## falling off with distance. Deliberately not strong enough to flatten a
+## building on its own.
+##
+## Sixty at the charge point takes out anything but reinforced concrete in one
+## go, and two charges will do that — no piece is invincible, some are just
+## a terrible use of a move.
 const BLAST_RADIUS := 120.0
 const BLAST_FORCE := 640.0
 const BLAST_SHATTER := 30.0
-## Enough to take out anything but steel in one go.
-const BLAST_DAMAGE := 3
+const BLAST_DAMAGE := 60
+
+
+## What one use of a tool does at its strongest point, on the 1-100 durability
+## scale. The explosive falls off with distance, so this is what it does to
+## whatever it is placed on. Used by the readout and the intro, so the numbers
+## a player is shown are the numbers the game runs on.
+static func damage_of(kind: Kind) -> int:
+	match kind:
+		Kind.JACKHAMMER:
+			return JACKHAMMER_DAMAGE
+		Kind.WRECKING_BALL:
+			return BALL_DAMAGE
+	return BLAST_DAMAGE
 
 
 ## Applies a tool at a point. Returns true if it actually did something —
@@ -111,11 +131,13 @@ static func _explosive(level: Level, at: Vector2) -> bool:
 			continue
 		touched = true
 		var falloff := 1.0 - distance / BLAST_RADIUS
+		# Damaged, not deleted: the pieces stay and still have to end up below
+		# the line. Damage falls off with distance, so a charge takes out what
+		# it is placed on and cracks what stands around it.
+		var force: int = BLAST_DAMAGE if distance < BLAST_SHATTER \
+			else int(round(BLAST_DAMAGE * falloff))
+		level.damage(body, force)
 		if distance < BLAST_SHATTER:
-			# Damaged, not deleted: the pieces stay and still have to end up
-			# below the line. Tough material survives a charge that would
-			# shatter glass.
-			level.damage(body, BLAST_DAMAGE)
 			continue
 		# A floor on the distance keeps a charge placed on a block's centre
 		# from producing a near-infinite direction vector.

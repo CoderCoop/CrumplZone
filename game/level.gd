@@ -68,7 +68,7 @@ func clear() -> void:
 
 
 func _make_block(pos: Vector2, size: Vector2, made_of: String,
-		material: PhysicsMaterial, integrity := -1) -> RigidBody2D:
+		material: PhysicsMaterial, durability := -1) -> RigidBody2D:
 	var spec := Materials.of(made_of)
 	var body := RigidBody2D.new()
 	body.position = pos
@@ -81,11 +81,11 @@ func _make_block(pos: Vector2, size: Vector2, made_of: String,
 	rect.size = size
 	shape.shape = rect
 	body.add_child(shape)
-	var left: int = integrity if integrity > 0 else int(spec["integrity"])
-	body.add_child(_visual(size, Materials.colour_at(made_of, left)))
+	body.add_child(_visual(size, Materials.colour_at(made_of, 0.0)))
 	body.set_meta("half", size * 0.5)
 	body.set_meta("material", made_of)
-	body.set_meta("integrity", left)
+	body.set_meta("durability", durability if durability > 0 else Materials.durability(made_of))
+	body.set_meta("damage", 0)
 	add_child(body)
 	return body
 
@@ -108,18 +108,25 @@ func live_blocks() -> Array[RigidBody2D]:
 	return out
 
 
-## Damages a block. When its integrity runs out it comes apart; until then it
-## visibly wears. Returns true if anything happened at all.
+## Damages a block. Once it has taken its durability in damage it comes apart;
+## until then it cracks and darkens. Returns true if anything happened.
 ##
-## This is what makes durability legible: hitting steel twice is a decision the
-## player can see the result of, rather than a silent no-op.
+## Every blow lands visibly. A hit that only decremented a hidden counter is
+## how this game has twice ended up telling a player nothing happened, so wear
+## is drawn — see _repaint — and a blow on rubble that cannot be divided
+## refuses instead of quietly charging a move for it.
 func damage(body: RigidBody2D, amount: int) -> bool:
 	if not is_instance_valid(body) or amount <= 0:
 		return false
-	var left: int = int(body.get_meta("integrity", 1)) - amount
-	if left > 0:
-		body.set_meta("integrity", left)
-		_repaint(body, left)
+	var taken: int = int(body.get_meta("damage", 0)) + amount
+	var durability: int = int(body.get_meta("durability", 1))
+	if taken < durability:
+		# Rubble takes damage but has nothing left to break into, so a blow on
+		# it would be a move spent on a colour change. Refuse it instead.
+		if not _divisible(body):
+			return false
+		body.set_meta("damage", taken)
+		_repaint(body, float(taken) / float(maxi(1, durability)))
 		return true
 	return shatter(body)
 
@@ -128,6 +135,9 @@ func damage(body: RigidBody2D, amount: int) -> bool:
 ## was closest. Glass showers; concrete and steel come apart in slabs.
 ##
 ## Nothing leaves the world: demolition turns big things into smaller things.
+## Every structural piece divides — the only thing that does not is rubble
+## already at the smallest size worth simulating, which is what _divisible
+## reports and what stops a tool from charging for a blow that cannot land.
 func shatter(body: RigidBody2D) -> bool:
 	if not is_instance_valid(body):
 		return false
@@ -171,11 +181,14 @@ func _split(body: RigidBody2D, made_of: String) -> Array[RigidBody2D]:
 
 	destroy(body)
 
+	var toughness: int = maxi(1, int(body.get_meta("durability", 1)) / 2)
 	var made: Array[RigidBody2D] = []
 	for side in [-1.0, 1.0]:
-		# Fragments are rubble: they do not carry the original's toughness.
+		# Half the piece, half the toughness. A fragment of steel is still
+		# steel, but breaking a smaller piece of it is less work — which is why
+		# a column comes apart faster the further it has already come apart.
 		var chunk := _make_block(
-			origin + (offset * side).rotated(facing), piece, made_of, physics, 1)
+			origin + (offset * side).rotated(facing), piece, made_of, physics, toughness)
 		# Tracked, or the win condition never sees the pieces and a chunk left
 		# above the line counts for nothing.
 		blocks.append(chunk)
@@ -189,11 +202,56 @@ func _split(body: RigidBody2D, made_of: String) -> Array[RigidBody2D]:
 	return made
 
 
-func _repaint(body: RigidBody2D, integrity_left: int) -> void:
+## Is there anything left to break this into? False only for rubble already at
+## the smallest size worth simulating.
+func _divisible(body: RigidBody2D) -> bool:
+	var half: Vector2 = body.get_meta("half")
+	return maxf(half.x, half.y) * 2.0 >= Materials.MIN_PIECE * 2.0
+
+
+## Wear, drawn rather than counted: the piece darkens and gains cracks in
+## proportion to the damage it has taken. A player has to be able to see that a
+## blow landed on something that did not break, or the durability model reads
+## as a broken game.
+func _repaint(body: RigidBody2D, wear: float) -> void:
 	var made_of: String = body.get_meta("material", Materials.CONCRETE)
+	var half: Vector2 = body.get_meta("half")
 	for child in body.get_children():
-		if child is Polygon2D:
-			(child as Polygon2D).color = Materials.colour_at(made_of, integrity_left)
+		if child is Polygon2D and not String(child.name).begins_with("crack"):
+			(child as Polygon2D).color = Materials.colour_at(made_of, wear)
+		elif String(child.name).begins_with("crack"):
+			body.remove_child(child)
+			child.queue_free()
+
+	# A crack from the first blow, and more as it nears failing — the point is
+	# that a blow never reads as nothing happening.
+	var cracks := 1 + int(clampf(wear, 0.0, 1.0) * 4.0)
+	for i in cracks:
+		body.add_child(_crack(half, body.get_instance_id() + i, i))
+
+
+## A thin dark split running in from an edge towards the middle of the piece.
+## Deterministic in the body's id, so a crack does not wander every time the
+## piece is repainted, and anchored on the rectangle's own boundary so it never
+## draws outside the block it belongs to.
+func _crack(half: Vector2, salt: int, index: int) -> Polygon2D:
+	var angle := float((salt * 37 + index * 911) % 360) * (PI / 180.0)
+	var out := Vector2(cos(angle), sin(angle))
+	# Distance from the centre to the rectangle's edge along that direction.
+	var span: float = minf(
+		half.x / maxf(absf(out.x), 0.001),
+		half.y / maxf(absf(out.y), 0.001))
+	var start := out * span * 0.98
+	var end := out.rotated(PI * 0.7) * span * 0.28
+	var width: float = clampf(minf(half.x, half.y) * 0.16, 0.7, 2.6)
+	var across := (end - start).orthogonal().normalized() * width
+
+	var crack := Polygon2D.new()
+	crack.name = "crack_%d" % index
+	crack.polygon = PackedVector2Array([
+		start + across, end + across * 0.35, end - across * 0.35, start - across])
+	crack.color = Color(0.06, 0.06, 0.07, 0.75)
+	return crack
 
 
 func destroy(body: RigidBody2D) -> void:
