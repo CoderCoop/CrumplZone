@@ -7,7 +7,17 @@ sections are dated.
 
 ## [Unreleased]
 
-Nothing since 0.5.0.
+Nothing since 0.5.1.
+
+## [0.5.1] - 2026-08-25
+
+### Fixed
+
+- **A held tool now lifts when there is nothing left to break under it**, and
+  says so, instead of going silent. Holding the jackhammer on a pane after it
+  had shattered did nothing at all — no blows, no animation, no message, and
+  no power spent — for as long as you kept holding. Measured on the shipped
+  build: four seconds of that spent 12 power and drew nothing.
 
 ## [0.5.0] - 2026-08-25
 

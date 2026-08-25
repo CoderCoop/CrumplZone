@@ -47,6 +47,8 @@ var _busy := false
 ## the ball and the charge build up and go on release.
 var _holding := false
 var _hold_at := Vector2.ZERO
+## Why the last hold stopped, when it stopped for a reason worth saying.
+var _note := ""
 var _charge := 0.0
 var _blow_timer := 0.0
 ## How long a full hold takes. Long enough that a partial one is a real
@@ -97,6 +99,7 @@ func _start() -> void:
 	_busy = false
 	_holding = false
 	_charge = 0.0
+	_note = ""
 	_relayout()
 	_refresh()
 	queue_redraw()
@@ -244,6 +247,7 @@ func _close_intro() -> void:
 
 
 func _select(kind: Tools.Kind) -> void:
+	_note = ""
 	if _holding:
 		_holding = false
 		_effects.stop_aim()
@@ -284,8 +288,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_hold_at = (event as InputEventScreenTouch).position
 			_hold_at = get_canvas_transform().affine_inverse() * _hold_at
 		# The jackhammer starts working the moment it is put down.
-		if _tool == Tools.Kind.JACKHAMMER:
-			_strike(_hold_at, 1.0)
+		if _tool == Tools.Kind.JACKHAMMER and not _strike(_hold_at, 1.0):
+			_stop_hold("nothing to break there")
 	elif moved:
 		_hold_at = get_global_mouse_position()
 	elif up and _holding:
@@ -306,9 +310,16 @@ func _process(delta: float) -> void:
 		while _blow_timer >= Tools.JACKHAMMER_INTERVAL:
 			_blow_timer -= Tools.JACKHAMMER_INTERVAL
 			if _power < Tools.cost(Tools.Kind.JACKHAMMER):
-				_holding = false
+				_stop_hold("out of power")
 				break
-			_strike(_hold_at, 1.0)
+			# A blow that finds nothing costs nothing, which is right — but
+			# holding on while it silently does nothing is not. Measured on
+			# the shipped build: four seconds of holding on shattered glazing
+			# spent 12 power, drew nothing, and said nothing. Lift the tool
+			# and say why instead.
+			if not _strike(_hold_at, 1.0):
+				_stop_hold("nothing left to break there")
+				break
 	else:
 		_effects.aim(_tool, _hold_at, _charge, _hold_at.x < _level.centre_x())
 	_refresh()
@@ -317,6 +328,7 @@ func _process(delta: float) -> void:
 func _release() -> void:
 	_holding = false
 	_effects.stop_aim()
+	_note = ""
 	if _tool == Tools.Kind.JACKHAMMER:
 		return
 	# A hold that outran the power left buys what is left, not what was asked
@@ -326,20 +338,31 @@ func _release() -> void:
 		wanted -= 0.05
 	if wanted <= 0.0:
 		return
-	_strike(_hold_at, wanted)
+	if not _strike(_hold_at, wanted):
+		_note = "nothing there to catch it"
+		_refresh()
 
 
 ## One application of the current tool. Power is spent only if it did
 ## something, so a misfire into empty sky is free.
-func _strike(at: Vector2, charge: float) -> void:
+func _strike(at: Vector2, charge: float) -> bool:
 	if not Tools.apply(_tool, _level, at, charge):
-		return
+		return false
+	_note = ""
 	_power = maxf(0.0, _power - Tools.cost(_tool, charge))
 	_effects.play(_tool, at)
 	_busy = true
 	_level.reset_settle()
 	_refresh()
 	queue_redraw()
+	return true
+
+
+func _stop_hold(why: String) -> void:
+	_holding = false
+	_effects.stop_aim()
+	_note = why
+	_refresh()
 
 
 func _cheapest() -> float:
@@ -384,7 +407,9 @@ func _refresh() -> void:
 		_bar.value = _power
 	var state := _resolved
 	if state == "":
-		if _holding and _tool != Tools.Kind.JACKHAMMER:
+		if _note != "":
+			state = _note
+		elif _holding and _tool != Tools.Kind.JACKHAMMER:
 			state = "hold to build — %d power" % int(round(Tools.cost(_tool, _charge)))
 		elif _busy:
 			state = "settling…"
