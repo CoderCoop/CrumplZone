@@ -12,21 +12,35 @@ extends Node2D
 
 const JACKHAMMER_TIME := 0.45
 const EXPLOSIVE_TIME := 0.50
-const BALL_TIME := 0.45
+## How long a damage number hangs in the air after the blow that earned it.
+const NUMBER_TIME := 0.70
 
 ## How the jackhammer reads: three blows, and how long the tool body is.
 const JACKHAMMER_BLOWS := 3.0
 const JACKHAMMER_BODY := 46.0
 
-## Where the wrecking ball swings from, relative to the point struck.
-const BALL_ARC := 190.0
-const BALL_RADIUS := 26.0
-
 var _live: Array = []
+var _numbers: Array = []
 
 
-func play(kind: Tools.Kind, at: Vector2, from_left: bool) -> void:
-	_live.append({"kind": kind, "at": at, "t": 0.0, "left": from_left})
+## Tool art, for the tools that are not objects in the world. The wrecking
+## ball has none: it is a real body on a real chain, and drawing a second one
+## over it would be a picture of a tool competing with the tool.
+func play(kind: Tools.Kind, at: Vector2) -> void:
+	if kind == Tools.Kind.WRECKING_BALL:
+		return
+	_live.append({"kind": kind, "at": at, "t": 0.0})
+	queue_redraw()
+
+
+## Damage, floating up from wherever it actually landed. The ball decides that
+## point by hitting something, so this is driven by Level's struck signal
+## rather than by where the player tapped.
+func number(at: Vector2, amount: int) -> void:
+	# One blow can land on several pieces at once — a charge, or a ball
+	# ploughing through a bay — and numbers printed at the same height on top
+	# of each other read as one wrong number. Stack them instead.
+	_numbers.append({"at": at, "amount": amount, "t": 0.0, "row": _numbers.size()})
 	queue_redraw()
 
 
@@ -51,11 +65,14 @@ func _draw_damage(at: Vector2, amount: int, progress: float) -> void:
 
 
 func _process(delta: float) -> void:
-	if _live.is_empty():
+	if _live.is_empty() and _numbers.is_empty():
 		return
 	for effect in _live:
 		effect["t"] += delta
+	for number_shown in _numbers:
+		number_shown["t"] += delta
 	_live = _live.filter(func(e): return e["t"] < _duration(e["kind"]))
+	_numbers = _numbers.filter(func(n): return n["t"] < NUMBER_TIME)
 	queue_redraw()
 
 
@@ -63,9 +80,7 @@ func _duration(kind: Tools.Kind) -> float:
 	match kind:
 		Tools.Kind.JACKHAMMER:
 			return JACKHAMMER_TIME
-		Tools.Kind.EXPLOSIVE:
-			return EXPLOSIVE_TIME
-	return BALL_TIME
+	return EXPLOSIVE_TIME
 
 
 func _draw() -> void:
@@ -74,12 +89,14 @@ func _draw() -> void:
 		match effect["kind"]:
 			Tools.Kind.JACKHAMMER:
 				_draw_jackhammer(effect["at"], progress)
-			Tools.Kind.WRECKING_BALL:
-				_draw_ball(effect["at"], progress, effect["left"])
 			Tools.Kind.EXPLOSIVE:
 				_draw_explosive(effect["at"], progress)
-		# Last, so the number is never drawn under the tool that made it.
-		_draw_damage(effect["at"], Tools.damage_of(effect["kind"]), progress)
+	# Last, so a number is never drawn under the tool art that earned it.
+	for number_shown in _numbers:
+		_draw_damage(
+			number_shown["at"] - Vector2(0.0, float(number_shown["row"]) * 22.0),
+			int(number_shown["amount"]),
+			clampf(number_shown["t"] / NUMBER_TIME, 0.0, 1.0))
 
 
 ## The tool itself, hammering. Three blows into the point tapped, with the
@@ -110,26 +127,6 @@ func _draw_jackhammer(at: Vector2, progress: float) -> void:
 		var inner := Vector2.RIGHT.rotated(angle) * (ring * 0.65)
 		var outer := Vector2.RIGHT.rotated(angle) * (ring + 16.0 * progress)
 		draw_line(at + inner, at + outer, Color(1.0, 0.93, 0.72, fade * hit), 2.5)
-
-
-## The ball swings in along an arc and stops where it struck.
-func _draw_ball(at: Vector2, progress: float, from_left: bool) -> void:
-	var side := -1.0 if from_left else 1.0
-	# Eased so it accelerates into the hit rather than gliding at one speed.
-	var swing := 1.0 - pow(1.0 - progress, 3.0)
-	var angle := lerpf(PI * 0.55, 0.0, swing)
-	var pivot := at + Vector2(side * BALL_ARC * 0.35, -BALL_ARC)
-	var ball := pivot + Vector2(side * sin(angle) * BALL_ARC * 0.9, cos(angle) * BALL_ARC)
-	var fade: float = 1.0 if progress < 0.75 else 1.0 - (progress - 0.75) / 0.25
-
-	draw_line(pivot, ball, Color(0.55, 0.57, 0.60, fade), 3.0)
-	draw_circle(ball, BALL_RADIUS, Color(0.22, 0.24, 0.28, fade))
-	draw_arc(ball, BALL_RADIUS, 0.0, TAU, 28, Color(0.62, 0.65, 0.70, fade), 2.0, true)
-	# A flash at the point of contact once the swing lands.
-	if progress > 0.62:
-		var flash := (progress - 0.62) / 0.38
-		draw_arc(at, 10.0 + flash * 40.0, 0.0, TAU, 28,
-			Color(1.0, 0.85, 0.55, (1.0 - flash) * 0.8), 3.0, true)
 
 
 ## A blast front expanding to the radius the charge actually reaches.

@@ -8,11 +8,19 @@ extends RefCounted
 const CENTRE_X := 400.0
 const FLOOR_Y := 540.0
 
-## The height line sits about a block-and-a-half above the ground. Low enough
-## that a standing column always breaks it, high enough that rubble lying flat
-## usually does not — so the level asks you to bring the building down, not to
-## pulverise every piece.
-const LINE_ABOVE_GROUND := 100.0
+## Where the survey line sits, and this number is measured rather than chosen.
+##
+## Nothing is ever deleted, so a demolished building has to fit under the line
+## as rubble. Pulverised completely — eleven charges, no budget — this one
+## settles into a pile 119 px deep spread over 1150 px of street, so a line at
+## the old 100 px was asking for something the material volume makes
+## impossible: the solver could not find a solution at any depth, and the
+## reason was arithmetic rather than tactics.
+##
+## 135 clears that floor with room for the solver's margin, and still means
+## what the line is for: a standing ground-floor stump passes, and anything
+## above it does not.
+const LINE_ABOVE_GROUND := 135.0
 
 const COLUMN := Vector2(22.0, 76.0)
 const SLAB_H := 22.0
@@ -82,5 +90,7 @@ static func tower(storeys: int = 3, columns: int = 5, spacing: float = 86.0) -> 
 		"floor_y": FLOOR_Y,
 		"height_line": FLOOR_Y - LINE_ABOVE_GROUND,
 		"blocks": blocks,
-		"moves": 7,
+		# The solver needs seven of these, and a player is not a beam search.
+		# The charter's rule is budget = a solution that exists, plus slack.
+		"moves": 8,
 	}

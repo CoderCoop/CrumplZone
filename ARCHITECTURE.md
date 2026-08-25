@@ -20,6 +20,7 @@ graph TD
         backdrop["backdrop.gd<br/>sky, skyline, street"]
         level["level.gd<br/>structure, physics, the rule"]
         materials["materials.gd<br/>durability and colour"]
+        fracture["fracture.gd<br/>how a shape comes apart"]
         tools["tools.gd<br/>the three verbs"]
         levels["levels.gd<br/>hand-built specs"]
         generator["generator.gd<br/>seeded specs"]
@@ -30,6 +31,7 @@ graph TD
         playtest["playtest.gd<br/>hand-built level difficulty"]
         waketest["waketest.gd<br/>settled bodies get woken"]
         breaktest["breaktest.gd<br/>everything breakable breaks"]
+        collapsetest["collapsetest.gd<br/>broken columns stop carrying"]
         verifylv["verify_levels.gd<br/>generate-and-verify measurement"]
     end
 
@@ -70,6 +72,9 @@ graph TD
     waketest -->|gates| ci
     breaktest -->|drives| level
     breaktest -->|gates| ci
+    collapsetest -->|drives| level
+    collapsetest -->|gates| ci
+    fracture -->|cuts a piece in two| level
     verifylv -->|gates| ci
     main -->|exported as WASM| pages
     pages --> verify
@@ -94,10 +99,22 @@ matters:
   It is the reason a structure can be read before it is touched: glass is
   obviously the weak part and the core is obviously not worth your moves,
   without a legend.
+- **`fracture.gd`** is pure geometry: it cuts a convex polygon with a straight
+  line and keeps both halves convex, so a fragment can carry a real collider
+  rather than an approximation of one. It has two patterns, because two
+  materials break in genuinely different ways — brittle material comes apart in
+  slivers radiating from the point struck, and structural material parts on one
+  or two sloped faces. That slope is a physics decision, not a cosmetic one: a
+  face only slides when its angle exceeds `atan(friction)`, so a shallow break
+  locks together and a broken column carries its load as if it were whole.
+  `collapsetest.gd` is what holds that honest.
 - **`tools.gd`** holds the three verbs. Each is a different way of acting on a
   structure rather than a damage number: the jackhammer shatters the one piece
-  you point at, the wrecking ball shoves a horizontal band sideways, the
-  explosive pushes radially and shatters what is very close. All cost one move,
+  you point at, the explosive pushes radially and damages by distance, and the
+  wrecking ball is not a tool function at all — it asks `level.gd` for a real
+  42 kg body on a pinned chain, released from the top of its arc, and the
+  engine decides the rest. Its damage comes out of the momentum it is carrying
+  when it lands rather than from a constant. All cost one move,
   and none of them delete anything — a block that vanished never read as
   physics. What they cost in damage meets what a material absorbs, which is
   where durability turns into a decision.
@@ -188,9 +205,22 @@ stateDiagram-v2
 ```
 
 Play is turn-based: the simulation runs to rest between moves, so the player
-always acts on a settled structure. `level.gd` watches body velocities to
-decide when the world has settled, then counts blocks whose *extent* — not
+always acts on a settled structure. The wrecking ball is part of that: it is a
+real body on a pinned chain rather than a force applied to an area, so a move
+that swings it is not finished until the ball has swung, landed, been lifted
+clear, and the building has stopped moving. `level.gd` reports the world
+unsettled for as long as the ball is in play, which is what stops a move being
+judged before its tool has arrived. `level.gd` watches body velocities to
+decide when the world has settled, then counts pieces whose *outline* — not
 centre — still reaches above the line.
+
+Where that line sits is measured, not chosen. Nothing is ever deleted, so a
+demolished building has to fit underneath it as rubble: pulverise the hand-built
+level completely and it settles into a pile 119 px deep, which is why the line
+sits at 135 and not at the 100 it started at. A level whose line is below its
+own rubble is unsolvable for reasons no amount of tactics can fix, and the
+symptom — a beam search that plateaus at every depth — looks exactly like a
+level that is merely hard.
 
 A tool that finds nothing to act on costs no move. Spending a move on a
 misclick would punish imprecision, which the charter's second pillar says not

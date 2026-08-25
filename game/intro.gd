@@ -159,8 +159,12 @@ func _how_to_play() -> VBoxContainer:
 		"%d damage to the one piece you point at, and nothing else"
 			% Tools.JACKHAMMER_DAMAGE))
 	box.add_child(_tool_line("2", "Wrecking ball", Color(0.55, 0.57, 0.60),
-		"swings in from the side you tapped nearer and shoves a whole storey "
-		+ "over, cracking what it strikes (%d damage)" % Tools.BALL_DAMAGE))
+		("a real %d kg ball on a chain, swung in from the side you tapped "
+		+ "nearer. Tapping picks the point the bottom of its arc passes "
+		+ "through; what it hits on the way is up to the building. Damage is "
+		+ "its momentum when it lands — about %d at full swing, less if it "
+		+ "catches something early")
+			% [int(Level.BALL_MASS), Tools.damage_of(Tools.Kind.WRECKING_BALL)]))
 	box.add_child(_tool_line("3", "Explosive", ACCENT,
 		("%d damage where you place it, less further out, and throws "
 		+ "everything nearby outwards") % Tools.BLAST_DAMAGE))

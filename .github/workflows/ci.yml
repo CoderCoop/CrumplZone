@@ -129,9 +129,16 @@ jobs:
           # or a material silently breaks all three.
           run_harness "break test" res://breaktest.tscn
 
+          # Two physical claims that a screenshot cannot settle: a column
+          # broken in half stops carrying what was above it, and the wrecking
+          # ball is a body with mass that damages what it hits and then
+          # leaves. Both are easy to break by retuning friction or a fracture
+          # angle, and neither is visible in a diff.
+          run_harness "collapse test" res://collapsetest.tscn
+
           # The hand-built level must stay worth playing: beatable within its
           # move budget, and not beatable in one move. Both are easy to break
           # by retuning a tool, and neither is visible in a diff.
           run_harness "playtest" res://playtest.tscn
 
-          echo "::notice::ci passed — secret scan, GDScript checks, wake test, break test, playtest"
+          echo "::notice::ci passed — secret scan, GDScript checks, wake test, break test, collapse test, playtest"

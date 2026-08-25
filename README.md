@@ -13,15 +13,17 @@ columns carrying concrete floor slabs, glass glazing the bays — and three
 tools:
 
 - **Jackhammer** — shatters the one piece you point at, and nothing else.
-- **Wrecking ball** — swings in from the side you tapped nearer and shoves a
-  horizontal band sideways.
+- **Wrecking ball** — a real 42 kg ball on a chain, swung in from the side you
+  tapped nearer. It hits what is in the way, and its damage is the momentum it
+  is carrying when it lands.
 - **Explosive** — pushes everything nearby outwards, shatters what is closest.
 
 What things are made of is the puzzle. Every piece has a durability from 1 to
 100 — glass 1, brick 12, concrete 24, steel 36, the reinforced core 100 — and
 one jackhammer blow is 12 of it. Damaged pieces crack and darken, so the
-building shows its wear, and everything comes apart into pieces once its
-durability runs out. Nothing is ever deleted: demolition turns big things into
+building shows its wear, and everything comes apart once its durability runs
+out — glass into uneven slivers, concrete and steel on sloped faces that the
+piece above slides off rather than stands on. Nothing is ever deleted: demolition turns big things into
 smaller things, and every piece still has to end up below the line.
 
 The reinforced core at ground level takes nine blows, which is more than you

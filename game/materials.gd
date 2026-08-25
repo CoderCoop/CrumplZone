@@ -28,24 +28,28 @@ const REINFORCED := "reinforced"
 ##                    charges will still do it, which is the point: no piece is
 ##                    invincible, some are just a terrible use of a move.
 ##
-## `pieces` is how many fragments it makes when it does come apart — glass
-## showers, a concrete slab breaks into slabs. Nothing is ever deleted.
+## `pieces` is how many fragments it makes when it does come apart, and
+## `brittle` says how: a brittle material shatters in slivers radiating from
+## the point struck, the way a pane of glass does, while everything else parts
+## on one or two sloped fracture faces. Nothing is ever deleted.
 const SPEC := {
 	GLASS: {
 		"durability": 1,
-		"pieces": 4,
+		"pieces": 6,
+		"brittle": true,
 		"colour": Color(0.44, 0.62, 0.71, 0.80),
 		"density": 0.0006,
 	},
 	BRICK: {
 		"durability": 12,
-		"pieces": 4,
+		"pieces": 5,
+		"brittle": true,
 		"colour": Color(0.60, 0.32, 0.26),
 		"density": 0.0010,
 	},
 	CONCRETE: {
 		"durability": 24,
-		"pieces": 2,
+		"pieces": 3,
 		"colour": Color(0.66, 0.67, 0.69),
 		"density": 0.0013,
 	},
@@ -63,10 +67,15 @@ const SPEC := {
 	},
 }
 
-## Smallest piece worth having. Below this a fragment is rubble: it still has
-## to end up below the line, but nothing divides it further, and a tool that
-## finds only rubble refuses rather than charging a move for nothing.
-const MIN_PIECE := 9.0
+## Smallest piece worth simulating, as an area. Below twice this a fragment is
+## rubble: it still has to end up below the line, but nothing divides it
+## further, and a tool that finds only rubble refuses rather than charging a
+## move for nothing.
+##
+## An area rather than a length, because fragments stopped being rectangles —
+## a long thin sliver and a small square can have the same width and be worth
+## very different amounts of simulation.
+const MIN_AREA := 120.0
 
 
 static func of(name: String) -> Dictionary:

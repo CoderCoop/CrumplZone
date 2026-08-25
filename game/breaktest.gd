@@ -123,10 +123,11 @@ func _check_budget_proof() -> void:
 
 func _check_rubble() -> void:
 	var made_of := Materials.STEEL
-	var size := Materials.MIN_PIECE * 1.5      # below the point where it divides
+	# Below twice the smallest area worth simulating, so nothing divides it.
+	var size := sqrt(Materials.MIN_AREA * 2.0) * 0.85
 	_build_one(made_of, Vector2(size, size))
 	var acted := Tools.apply(Tools.Kind.JACKHAMMER, _level, _centre_of(size))
-	print("rubble      %.0f px steel → acted=%s, %d piece"
+	print("rubble      %.0f px square of steel → acted=%s, %d piece"
 		% [size, acted, _level.live_blocks().size()])
 	if acted:
 		_failures.append("rubble: charged a move for a blow that cannot divide it")
@@ -165,6 +166,5 @@ func _crack_count(body: RigidBody2D) -> int:
 func _area() -> float:
 	var total := 0.0
 	for body in _level.live_blocks():
-		var half: Vector2 = body.get_meta("half")
-		total += half.x * 2.0 * half.y * 2.0
+		total += Fracture.area(body.get_meta("poly"))
 	return total
