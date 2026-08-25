@@ -93,13 +93,25 @@ func _count_asleep() -> int:
 	return n
 
 
-## A slab near the bottom: something with weight resting on it.
+## A slab near the bottom: something with weight resting on it. Pieces are
+## polygons rather than rectangles now, so "wider than it is tall" comes from
+## the outline's own bounding box.
 func _lowest_slab() -> RigidBody2D:
 	var best: RigidBody2D = null
 	for body in _level.live_blocks():
-		var half: Vector2 = body.get_meta("half")
-		if half.x < half.y:
-			continue          # a pillar, not a slab
+		var extent := _extent_of(body)
+		if extent.x < extent.y:
+			continue          # a column, not a slab
 		if best == null or body.global_position.y > best.global_position.y:
 			best = body
 	return best
+
+
+func _extent_of(body: RigidBody2D) -> Vector2:
+	var polygon: PackedVector2Array = body.get_meta("poly")
+	var low := Vector2(INF, INF)
+	var high := Vector2(-INF, -INF)
+	for point in polygon:
+		low = low.min(point)
+		high = high.max(point)
+	return high - low
