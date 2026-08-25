@@ -154,20 +154,29 @@ func _how_to_play() -> VBoxContainer:
 	box.add_theme_constant_override("separation", 4)
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
-	box.add_child(_label("The tools", HEADING_SIZE, BRIGHT))
+	box.add_child(_label("The tools — hold to use", HEADING_SIZE, BRIGHT))
 	box.add_child(_tool_line("1", "Jackhammer", Materials.of(Materials.CONCRETE)["colour"],
-		"%d damage to the one piece you point at, and nothing else"
-			% Tools.JACKHAMMER_DAMAGE))
+		("keeps chipping for as long as you hold it — %d damage a blow to the "
+		+ "one piece you are on, %d power each")
+			% [Tools.JACKHAMMER_DAMAGE, int(Tools.JACKHAMMER_POWER)]))
 	box.add_child(_tool_line("2", "Wrecking ball", Color(0.55, 0.57, 0.60),
-		("a real %d kg ball on a chain, swung in from the side you tapped "
-		+ "nearer. Tapping picks the point the bottom of its arc passes "
-		+ "through; what it hits on the way is up to the building. Damage is "
-		+ "its momentum when it lands — about %d at full swing, less if it "
-		+ "catches something early")
-			% [int(Level.BALL_MASS), Tools.damage_of(Tools.Kind.WRECKING_BALL)]))
+		("hold to haul a real %d kg ball further back, let go to swing it in. "
+		+ "Damage is the momentum it arrives with, so a longer haul hits "
+		+ "harder — up to %d power")
+			% [int(Level.BALL_MASS), int(Tools.cost(Tools.Kind.WRECKING_BALL, 1.0))]))
 	box.add_child(_tool_line("3", "Explosive", ACCENT,
-		("%d damage where you place it, less further out, and throws "
-		+ "everything nearby outwards") % Tools.BLAST_DAMAGE))
+		("hold to pack more in, let go to blow it. Up to %d damage where you "
+		+ "place it and less further out, for up to %d power")
+			% [Tools.BLAST_DAMAGE, int(Tools.cost(Tools.Kind.EXPLOSIVE, 1.0))]))
+
+	box.add_child(_spacer(6))
+	box.add_child(_label("Power", HEADING_SIZE, BRIGHT))
+	box.add_child(_label(
+		"The bar above the tools is everything you get. Every use takes a bite "
+		+ "out of it, and how big a bite is up to how long you hold. A tap is "
+		+ "cheap and weak; a full hold is neither.", BODY_SIZE, DIM, true))
+	box.add_child(_label(
+		"A tool that finds nothing to act on costs you nothing.", BODY_SIZE, DIM, true))
 
 	box.add_child(_spacer(6))
 	box.add_child(_label("Durability, 1 to 100", HEADING_SIZE, BRIGHT))
@@ -189,17 +198,14 @@ func _how_to_play() -> VBoxContainer:
 	box.add_child(_spacer(6))
 	box.add_child(_label("Worth knowing", HEADING_SIZE, BRIGHT))
 	box.add_child(_label(
-		"Every tool costs one move — they differ in what they do, not what "
-		+ "they cost.", BODY_SIZE, DIM, true))
-	box.add_child(_label(
-		"A tool that finds nothing to act on costs you nothing.", BODY_SIZE, DIM, true))
-	box.add_child(_label(
 		"Nothing is ever deleted — demolition makes big things into smaller "
 		+ "things, and every piece still has to end up below the line.",
 		BODY_SIZE, DIM, true))
 	box.add_child(_spacer(6))
-	box.add_child(_label("Tap to use the selected tool. On a keyboard, 1/2/3 "
-		+ "switch tools and R starts over.", BODY_SIZE, DIM, true))
+	box.add_child(_label("Hold anywhere on the building to use the selected "
+		+ "tool, and slide before letting go to change your mind about where. "
+		+ "On a keyboard, 1/2/3 switch tools and R starts over.",
+		BODY_SIZE, DIM, true))
 	return box
 
 

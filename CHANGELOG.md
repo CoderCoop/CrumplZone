@@ -7,7 +7,40 @@ sections are dated.
 
 ## [Unreleased]
 
-Nothing since 0.4.0.
+Nothing since 0.5.0.
+
+## [0.5.0] - 2026-08-25
+
+Tools are held rather than tapped, and what you spend is a bar rather than a
+count of moves.
+
+### Added
+
+- **A power bar**, sitting directly above the tools that spend it. Every use
+  takes a bite out of it and how big a bite is up to how long you hold: a tap
+  is cheap and weak, a full hold is neither. When the bar runs out, so does the
+  level.
+- **Hold to use.** The jackhammer keeps chipping for as long as you hold it,
+  a blow every fifth of a second. The wrecking ball hauls further back the
+  longer you hold and swings when you let go — a longer haul is a faster swing
+  and more damage, because the charge is spent on the arc rather than on a
+  multiplier. The explosive packs more in and reaches further.
+- **An aim preview while you hold**: where the ball would be hauled to and the
+  arc it would take, or how far the blast would reach. Sliding your thumb
+  before letting go moves the target, so you can change your mind without
+  spending anything.
+
+### Changed
+
+- **Moves are gone.** Eight moves became a bar worth eight full-strength uses,
+  and how you divide it is yours — around forty jackhammer blows, or eight
+  charges, or any mixture.
+- **The survey line is computed from each level's own material volume** rather
+  than being a constant. Nothing is ever deleted, so the rubble has to fit
+  under the line; a level whose line sits below its own pile is unsolvable for
+  reasons no tactics can fix, and it looks exactly like a level that is merely
+  hard. This matters most for generated levels, which could previously be born
+  impossible with no way to tell.
 
 ## [0.4.0] - 2026-08-25
 

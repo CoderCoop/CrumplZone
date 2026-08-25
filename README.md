@@ -34,8 +34,13 @@ The game opens on a screen explaining all of this, with the current version and
 what changed in it; the `help` button reopens it mid-level.
 
 Pick a tool from the row along the bottom — or the `1`/`2`/`3` keys on a
-keyboard — then tap the building to use it; `reset` (or `R`) starts over. Each
-costs one move; you get seven, and the level can be cleared in six. A tool that
+keyboard — then **hold** on the building to use it; `reset` (or `R`) starts
+over. Holding is the whole interface: the jackhammer keeps chipping while you
+hold it, and the ball and the charge build up while held and go when you let
+go, so how much you spend is how long you hold.
+
+What you spend is the power bar above the tools — worth about eight
+full-strength uses, or forty jackhammer blows, or any mixture. A tool that
 finds nothing to act on costs nothing.
 
 It is built for a phone first: the camera frames the whole building in
