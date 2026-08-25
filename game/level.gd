@@ -133,7 +133,7 @@ func build(level_spec: Dictionary) -> void:
 	ground_shape.shape = ground_rect
 	ground.add_child(ground_shape)
 	ground.add_child(_visual(Fracture.rectangle(Vector2(2400.0, 48.0)),
-		Color(0.20, 0.22, 0.26)))
+		Color(0.20, 0.22, 0.26), Materials.CONCRETE))
 	add_child(ground)
 
 	for b in spec["blocks"]:
@@ -179,7 +179,7 @@ func _make_piece(pos: Vector2, polygon: PackedVector2Array, made_of: String,
 	convex.points = polygon
 	shape.shape = convex
 	body.add_child(shape)
-	body.add_child(_visual(polygon, Materials.colour_at(made_of, 0.0)))
+	body.add_child(_visual(polygon, Materials.colour_at(made_of, 0.0), made_of))
 
 	body.set_meta("poly", polygon)
 	body.set_meta("material", made_of)
@@ -190,11 +190,68 @@ func _make_piece(pos: Vector2, polygon: PackedVector2Array, made_of: String,
 	return body
 
 
-func _visual(polygon: PackedVector2Array, colour: Color) -> Polygon2D:
-	var poly := Polygon2D.new()
-	poly.polygon = polygon
-	poly.color = colour
-	return poly
+## A piece as something built rather than as a coloured rectangle: the face,
+## an inset panel that reads as a bevelled edge, and for glazing a frame with
+## light sliding off it.
+##
+## All of it is child geometry of the face, so wear recolours the whole piece
+## at once and retirement dims it with a single modulate.
+func _visual(polygon: PackedVector2Array, colour: Color,
+		made_of := Materials.CONCRETE) -> Polygon2D:
+	var face := Polygon2D.new()
+	face.name = "fill"
+	face.polygon = polygon
+	face.color = colour
+
+	var panel := Polygon2D.new()
+	panel.name = "bevel"
+	panel.polygon = _inset(polygon, 0.82)
+	panel.color = _panel_colour(colour, made_of)
+	face.add_child(panel)
+
+	if made_of == Materials.GLASS:
+		# Two diagonal bands of reflected sky. Cheap, and the thing that makes
+		# glass read as glass rather than as blue concrete.
+		for band in [Vector2(-0.55, 0.15), Vector2(0.05, 0.30)]:
+			var sheen := Polygon2D.new()
+			sheen.name = "sheen"
+			sheen.polygon = _diagonal(polygon, band.x, band.y)
+			sheen.color = Color(1.0, 1.0, 1.0, 0.10)
+			face.add_child(sheen)
+	return face
+
+
+static func _panel_colour(colour: Color, made_of: String) -> Color:
+	if made_of == Materials.GLASS:
+		return colour.darkened(0.22)      # the room behind the glazing
+	return colour.lightened(0.09)
+
+
+## The polygon shrunk towards its own middle. Convex in, convex out.
+static func _inset(polygon: PackedVector2Array, by: float) -> PackedVector2Array:
+	var middle := Fracture.centroid(polygon)
+	var out := PackedVector2Array()
+	for point in polygon:
+		out.append(middle + (point - middle) * by)
+	return out
+
+
+## A diagonal band across the piece, clipped to it — a stripe of reflection.
+static func _diagonal(polygon: PackedVector2Array, from: float,
+		width: float) -> PackedVector2Array:
+	var middle := Fracture.centroid(polygon)
+	var reach := Fracture.reach(polygon) * 1.5
+	var along := Vector2(1.0, -1.0).normalized()
+	var across := along.orthogonal()
+	var start := middle + across * reach * from
+	var band := PackedVector2Array([
+		start - along * reach, start - along * reach + across * reach * width,
+		start + along * reach + across * reach * width, start + along * reach])
+	# Trim it to the piece so a sheen never hangs off the edge of a shard.
+	var clipped := polygon
+	clipped = Fracture.clip(clipped, start, across)
+	clipped = Fracture.clip(clipped, start + across * reach * width, -across)
+	return clipped if clipped.size() >= 3 else band
 
 
 func live_blocks() -> Array[RigidBody2D]:
@@ -308,12 +365,17 @@ func _divisible(body: RigidBody2D) -> bool:
 func _repaint(body: RigidBody2D, wear: float) -> void:
 	var made_of: String = body.get_meta("material", Materials.CONCRETE)
 	var polygon: PackedVector2Array = body.get_meta("poly")
+	var base := Materials.colour_at(made_of, wear)
 	for child in body.get_children():
 		if String(child.name).begins_with("crack"):
 			body.remove_child(child)
 			child.queue_free()
 		elif child is Polygon2D:
-			(child as Polygon2D).color = Materials.colour_at(made_of, wear)
+			var face := child as Polygon2D
+			face.color = base
+			for part in face.get_children():
+				if part is Polygon2D and String(part.name) == "bevel":
+					(part as Polygon2D).color = _panel_colour(base, made_of)
 
 	# A crack from the first blow, and more as it nears failing — the point is
 	# that a blow never reads as nothing happening.
