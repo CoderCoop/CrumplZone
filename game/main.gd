@@ -61,6 +61,7 @@ func _ready() -> void:
 	add_child(_backdrop)
 
 	_level = Level.new()
+	_level.struck.connect(_on_struck)
 	add_child(_level)
 
 	_effects = Effects.new()
@@ -240,12 +241,18 @@ func _use(at: Vector2) -> void:
 	# says not to do.
 	if not Tools.apply(_tool, _level, at):
 		return
-	_effects.play(_tool, at, at.x < _level.centre_x())
+	_effects.play(_tool, at)
 	_moves_left -= 1
 	_busy = true
 	_level.reset_settle()
 	_refresh()
 	queue_redraw()
+
+
+## Damage lands where the tool actually reached, which for the wrecking ball is
+## wherever its swing took it rather than where the tap was.
+func _on_struck(at: Vector2, amount: int) -> void:
+	_effects.number(at, amount)
 
 
 func _physics_process(_delta: float) -> void:

@@ -13,7 +13,9 @@ extends Node2D
 
 signal finished(result: Dictionary)
 
-const MAX_TICKS_PER_MOVE := 260
+## Long enough for the slowest move: a wrecking ball has to swing in, land,
+## be lifted clear, and let the building finish falling — all inside one move.
+const MAX_TICKS_PER_MOVE := 380
 const SETTLE_GRID := 90.0
 
 ## How many candidate sequences survive each round. Beam rather than

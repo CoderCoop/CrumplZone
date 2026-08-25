@@ -31,19 +31,13 @@ const NAMES := {
 const JACKHAMMER_REACH := 30.0
 const JACKHAMMER_DAMAGE := 12
 
-## Wrecking ball: a lateral shove through a horizontal band, swung in from
-## whichever side you clicked nearer. Falls off with distance so it topples the
-## near side rather than shunting the whole building sideways.
-const BALL_BAND := 70.0
-const BALL_RANGE := 420.0
-const BALL_FORCE := 780.0
-const BALL_LIFT := 0.18
-## The ball cracks what it strikes squarely without pulverising it: its job is
-## to topple a building, not to demolish it a piece at a time. Six damage —
-## half a jackhammer blow — breaks glass and cracks anything heavier without
-## taking it out.
-const BALL_DAMAGE := 6
-const BALL_DAMAGE_RANGE := 60.0
+## Wrecking ball: an actual mass on an actual chain. Tapping picks the point
+## the bottom of its arc passes through; it is released from the side you
+## tapped nearer and does whatever its momentum does when it arrives.
+##
+## There is no force applied to an area here and no damage number: the engine
+## resolves the collisions, and the damage comes out of the momentum the ball
+## is carrying at the moment it lands — see Level.swing.
 
 ## Explosive: radial impulse, and everything inside the radius takes damage
 ## falling off with distance. Deliberately not strong enough to flatten a
@@ -67,7 +61,11 @@ static func damage_of(kind: Kind) -> int:
 		Kind.JACKHAMMER:
 			return JACKHAMMER_DAMAGE
 		Kind.WRECKING_BALL:
-			return BALL_DAMAGE
+			# What the ball carries at the bottom of its arc, from the swing
+			# itself rather than from a constant: mass times sqrt(2 g L (1-cos)).
+			var speed := sqrt(2.0 * 980.0 * Level.BALL_CHAIN
+				* (1.0 - cos(Level.BALL_LIFTS[0])))
+			return int(round(Level.BALL_MASS * speed / Level.BALL_MOMENTUM_PER_DAMAGE))
 	return BLAST_DAMAGE
 
 
@@ -94,30 +92,13 @@ static func _jackhammer(level: Level, at: Vector2) -> bool:
 	var target: RigidBody2D = level.block_at(at, JACKHAMMER_REACH)
 	if target == null:
 		return false
-	return level.damage(target, JACKHAMMER_DAMAGE)
+	return level.damage(target, JACKHAMMER_DAMAGE, at)
 
 
 static func _wrecking_ball(level: Level, at: Vector2) -> bool:
-	# Swing in from the side the click is nearer to, so the ball travels
-	# towards the structure rather than away from it.
-	var centre := level.centre_x()
-	var direction := 1.0 if at.x < centre else -1.0
-	var hit := false
-	for body in level.live_blocks().duplicate():
-		if not is_instance_valid(body):
-			continue
-		if absf(body.global_position.y - at.y) > BALL_BAND:
-			continue
-		var reach := absf(body.global_position.x - at.x)
-		if reach > BALL_RANGE:
-			continue
-		var falloff := 1.0 - reach / BALL_RANGE
-		var push := Vector2(direction, -BALL_LIFT).normalized()
-		body.apply_impulse(push * BALL_FORCE * falloff * body.mass)
-		hit = true
-		if reach < BALL_DAMAGE_RANGE:
-			level.damage(body, BALL_DAMAGE)
-	return hit
+	# Swung in from the side the tap is nearer to, so the ball travels towards
+	# the structure rather than away from it.
+	return level.swing(at, at.x < level.centre_x())
 
 
 static func _explosive(level: Level, at: Vector2) -> bool:
@@ -136,7 +117,7 @@ static func _explosive(level: Level, at: Vector2) -> bool:
 		# it is placed on and cracks what stands around it.
 		var force: int = BLAST_DAMAGE if distance < BLAST_SHATTER \
 			else int(round(BLAST_DAMAGE * falloff))
-		level.damage(body, force)
+		level.damage(body, force, at)
 		if distance < BLAST_SHATTER:
 			continue
 		# A floor on the distance keeps a charge placed on a block's centre
