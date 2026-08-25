@@ -22,6 +22,7 @@ const ACCENT := Color(0.95, 0.45, 0.35)
 
 const MARGIN := 16.0
 const PLAY_HEIGHT := 52.0
+const INSTALL_HEIGHT := 46.0
 const TAB_HEIGHT := 44.0
 
 var _root: Control
@@ -29,6 +30,8 @@ var _shade: ColorRect
 var _column: VBoxContainer
 var _scroll: ScrollContainer
 var _play: Button
+var _install: Button
+var _install_note: Label
 var _how: VBoxContainer
 var _news: VBoxContainer
 var _how_button: Button
@@ -74,6 +77,16 @@ func _ready() -> void:
 	_column.add_child(_how)
 	_column.add_child(_news)
 
+	# Offered rather than advertised: the button only exists when the browser
+	# has an install prompt in hand for it.
+	_install = Button.new()
+	_install.text = "Install as an app"
+	_install.focus_mode = Control.FOCUS_NONE
+	_install.add_theme_font_size_override("font_size", 16)
+	_install.pressed.connect(_on_install)
+	_install.visible = false
+	_root.add_child(_install)
+
 	_play = Button.new()
 	_play.text = "Play"
 	_play.focus_mode = Control.FOCUS_NONE
@@ -82,12 +95,32 @@ func _ready() -> void:
 	_root.add_child(_play)
 
 	_show_how(true)
+	_refresh_install()
 	relayout()
 	get_viewport().size_changed.connect(relayout)
 
 
 ## Sized by hand for the same reason main.gd does it: an anchor preset applied
 ## to a container before it has laid out keeps its zero size.
+## The install button appears when the browser offers one, and the note takes
+## its place on iOS, where there is no prompt to fire and the only way in is
+## Share → Add to Home Screen.
+func _refresh_install() -> void:
+	if _install == null:
+		return
+	_install.visible = UI.can_install()
+	if _install_note != null:
+		_install_note.visible = not _install.visible and not UI.installed()
+
+
+func _on_install() -> void:
+	UI.install()
+	# The browser takes it from here; the button goes once the prompt is spent.
+	await get_tree().create_timer(0.5).timeout
+	_refresh_install()
+	relayout()
+
+
 func relayout() -> void:
 	var k := UI.units_per_css(get_viewport())
 	var size := get_viewport().get_visible_rect().size / k
@@ -98,11 +131,15 @@ func relayout() -> void:
 	_shade.size = size
 
 	var width := maxf(size.x - MARGIN * 2.0, 60.0)
-	var reserved := PLAY_HEIGHT + MARGIN * 2.0
+	var install_room := (INSTALL_HEIGHT + 8.0) if _install != null and _install.visible else 0.0
+	var reserved := PLAY_HEIGHT + install_room + MARGIN * 2.0
 	_scroll.position = Vector2(MARGIN, MARGIN)
 	_scroll.size = Vector2(width, maxf(size.y - MARGIN - reserved, 80.0))
 	_play.position = Vector2(MARGIN, size.y - PLAY_HEIGHT - MARGIN)
 	_play.size = Vector2(width, PLAY_HEIGHT)
+	if _install != null:
+		_install.position = Vector2(MARGIN, _play.position.y - INSTALL_HEIGHT - 8.0)
+		_install.size = Vector2(width, INSTALL_HEIGHT)
 
 
 func _title_row() -> HBoxContainer:
@@ -201,6 +238,15 @@ func _how_to_play() -> VBoxContainer:
 		"Nothing is ever deleted — demolition makes big things into smaller "
 		+ "things, and every piece still has to end up below the line.",
 		BODY_SIZE, DIM, true))
+	box.add_child(_spacer(6))
+	box.add_child(_spacer(6))
+	box.add_child(_label("Installing", HEADING_SIZE, BRIGHT))
+	_install_note = _label(
+		"This runs as an app offline. Where your browser offers it there is an "
+		+ "Install button below; on an iPhone use Share → Add to Home Screen.",
+		BODY_SIZE, DIM, true)
+	box.add_child(_install_note)
+
 	box.add_child(_spacer(6))
 	box.add_child(_label("Hold anywhere on the building to use the selected "
 		+ "tool, and slide before letting go to change your mind about where. "
