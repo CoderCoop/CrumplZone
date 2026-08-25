@@ -782,10 +782,21 @@ func _stress_pass() -> void:
 		if state == null:
 			continue
 		var load := 0.0
+		# Whether anything in this contact is actually moving decides which
+		# tolerance applies: a piece being struck and a piece being leaned on
+		# report the same impulse, and judging them alike is what made rubble
+		# grind down the floor it had settled on.
+		var struck := (body as RigidBody2D).linear_velocity.length() > REST_SPEED
 		for i in state.get_contact_count():
 			load += state.get_contact_impulse(i).length()
+			if not struck:
+				var other := state.get_contact_collider_object(i)
+				if other is RigidBody2D \
+						and (other as RigidBody2D).linear_velocity.length() > REST_SPEED:
+					struck = true
 		var made_of: String = body.get_meta("material", Materials.CONCRETE)
-		var limit := Materials.stress_limit(made_of)
+		var limit := Materials.stress_limit(made_of) if struck \
+			else Materials.rest_limit(made_of)
 		if load <= limit:
 			# Carrying what it was built to carry: let it rest.
 			body.can_sleep = true
@@ -800,8 +811,10 @@ func _stress_pass() -> void:
 		# A resting body is read once every few ticks, so its sample stands in
 		# for all of them.
 		var slice := (float(RESTING_STRESS_TICKS) / 60.0) if body.sleeping else span
+		var rate := Materials.STRESS_RATE if struck \
+			else Materials.STRESS_RATE * Materials.REST_RATE
 		var carried: float = float(body.get_meta("stress", 0.0)) \
-			+ overload * Materials.STRESS_RATE * slice
+			+ overload * rate * slice
 		if carried < 1.0:
 			body.set_meta("stress", carried)
 			continue

@@ -21,6 +21,11 @@ const STAND_TICKS := 400        # six and a half seconds of standing still
 const FALL := 40.0
 const LOAD_TICKS := 400
 
+## Long enough for a dropped pile to land and stop moving, then long enough
+## again for anything that grinds down under a steady load to show it.
+const REST_SETTLE := 300
+const REST_HOLD := 420
+
 var _level: Level
 var _failures: Array[String] = []
 var _phase := "standing"
@@ -32,10 +37,17 @@ var _swept_before := 0
 var _standing_before := 0
 var _slab: RigidBody2D
 var _slab_y := 0.0
+var _rest_damage := 0
+var _rest_watching := false
+var _rest_floor: RigidBody2D
+var _rest_peak := 0.0
 
 
 func _ready() -> void:
 	_level = Level.new()
+	_level.struck.connect(func(_at: Vector2, amount: int) -> void:
+		if _rest_watching:
+			_rest_damage += amount)
 	add_child(_level)
 	_level.build(Levels.tower())
 	_pieces_before = _level.live_blocks().size()
@@ -73,6 +85,25 @@ func _physics_process(_delta: float) -> void:
 			if _ticks < 240:
 				return
 			_finish_dust()
+			_phase = "resting"
+			_ticks = 0
+			_start_resting()
+		"resting":
+			if _ticks == REST_SETTLE:
+				# Everything has landed. Damage from here on is damage taken
+				# for standing still, which is the thing being measured.
+				_rest_damage = 0
+				_rest_watching = true
+			if _rest_watching and is_instance_valid(_rest_floor):
+				var st := PhysicsServer2D.body_get_direct_state(_rest_floor.get_rid())
+				if st != null:
+					var l := 0.0
+					for i in st.get_contact_count():
+						l += st.get_contact_impulse(i).length()
+					_rest_peak = maxf(_rest_peak, l)
+			if _ticks < REST_SETTLE + REST_HOLD:
+				return
+			_finish_resting()
 			_report()
 			_phase = "done"
 
@@ -186,12 +217,61 @@ func _finish_dust() -> void:
 			"a slab rested on glass slivers: it only fell %.0f px" % dropped)
 
 
+# --- 5. a piece does not grind down for holding something up ---------------
+
+## Measured before this phase existed: over one full collapse of the tower,
+## 40% of all stress damage was dealt to pieces that were standing still, the
+## bulk of it concrete carrying 702-813 against a tolerance of 300 at under
+## 3 px/s. That is a heap that has settled, not a blow, and a floor should
+## carry it rather than being worn away by it.
+func _start_resting() -> void:
+	var blocks: Array = [
+		{"x": 340.0, "y": FLOOR_Y - 30.0, "w": 24.0, "h": 60.0,
+			"material": Materials.STEEL},
+		{"x": 460.0, "y": FLOOR_Y - 30.0, "w": 24.0, "h": 60.0,
+			"material": Materials.STEEL},
+		{"x": 400.0, "y": FLOOR_Y - 71.0, "w": 180.0, "h": 22.0,
+			"material": Materials.CONCRETE},
+	]
+	# A pile dropped onto the floor from just above it: enough weight to be
+	# well past what the floor is rated for, landing gently enough that this
+	# is a resting load and not an impact test.
+	for i in 18:
+		blocks.append({
+			"x": 340.0 + float(i % 3) * 60.0,
+			"y": FLOOR_Y - 110.0 - float(i / 3) * 34.0,
+			"w": 52.0, "h": 30.0, "material": Materials.CONCRETE,
+		})
+	_level.build({
+		"centre_x": 400.0, "floor_y": FLOOR_Y, "height_line": FLOOR_Y - 400.0,
+		"power": 100.0, "moves": 1, "blocks": blocks,
+	})
+	_rest_floor = _level.live_blocks()[2]
+	_rest_damage = 0
+	_rest_watching = false
+
+
+func _finish_resting() -> void:
+	_rest_watching = false
+	var whole := is_instance_valid(_rest_floor)
+	print("resting     a loaded floor left alone for %.1fs: %d damage, floor %s, peak load %.0f vs limit %.0f"
+		% [float(REST_HOLD) / 60.0, _rest_damage,
+			"intact" if whole else "broke up", _rest_peak,
+			Materials.stress_limit(Materials.CONCRETE)])
+	if _rest_damage > 0:
+		_failures.append("a settled pile did %d damage to what it was resting on"
+			% _rest_damage)
+	if not whole:
+		_failures.append("a floor broke up under a load that had stopped moving")
+
+
 func _report() -> void:
 	print("")
 	print("expected : an untouched building does not break itself, a floor")
 	print("           landing on glass breaks it, rubble that has come to rest")
-	print("           below the line stops being simulated, and glass ground to")
-	print("           slivers holds nothing up")
+	print("           below the line stops being simulated, glass ground to")
+	print("           slivers holds nothing up, and a settled pile does not")
+	print("           wear away what it is sitting on")
 	if _failures.is_empty():
 		print("VERDICT  : PASS")
 		get_tree().quit(0)

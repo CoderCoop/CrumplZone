@@ -100,6 +100,40 @@ const STRESS := {
 ## than leaving it cracked and standing, which is what a rate of 1 did.
 const STRESS_RATE := 3.0
 
+## How much more a piece carries standing still than it survives being hit
+## with, as a multiple of its tolerance.
+##
+## The tolerance above is one number doing two jobs, and it was doing the
+## second one badly: the same threshold judged a slab landing on a pane and a
+## heap of rubble resting on a floor. Measured over a full collapse, 40% of all
+## stress damage was dealt to pieces that were standing still — concrete
+## carrying 702-813 against a limit of 300 while moving at under 3 px/s, which
+## is a pile that has settled, not a blow.
+##
+## The split is per material rather than global because it is a real
+## difference. Concrete and steel carry a steady load far better than they
+## take a shock, so they get a wide margin. Glass does not: a pane under
+## sustained weight really does fail, and a pane holding up a floor is
+## supposed to crack. Its margin is 1.0 — no change at all.
+const REST_TOLERANCE := {
+	GLASS: 1.0,
+	BRICK: 2.0,
+	CONCRETE: 3.0,
+	STEEL: 3.0,
+	REINFORCED: 3.0,
+}
+
+## And when a resting piece is overloaded past even that, it gives way slowly:
+## a quarter of the rate of something being struck. Grossly overloaded rubble
+## still fails, which is the point of the mechanism — it just stops grinding
+## pieces down for standing there.
+const REST_RATE := 0.25
+
+
+## Tolerance for a piece with nothing moving against it.
+static func rest_limit(name: String) -> float:
+	return stress_limit(name) * float(REST_TOLERANCE.get(name, 3.0))
+
 
 static func stress_limit(name: String) -> float:
 	return float(STRESS.get(name, STRESS[CONCRETE]))
