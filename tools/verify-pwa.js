@@ -14,6 +14,11 @@
 //     every time, so the button never appeared on a build that was perfectly
 //     installable. The game now re-checks, and publishes whether the button is
 //     on screen — which is the only way to see inside a game drawn on a canvas.
+//   * Playwright's default headless browser is `chromium-headless-shell`, which
+//     never fires `beforeinstallprompt` at all. That failed the whole check on
+//     CI while the build was fine — reproduced here by pointing CHROMIUM_PATH
+//     at the shell, which gives the identical `hooks=true canInstall=false`.
+//     So this asks for the full Chromium build explicitly.
 const { chromium } = require('playwright');
 const fs = require('fs');
 const os = require('os');
@@ -28,12 +33,19 @@ if (!url) {
 
 const args = ['--no-sandbox', '--use-gl=swiftshader', '--enable-unsafe-swiftshader'];
 const opts = { args, viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 };
-if (process.env.CHROMIUM_PATH) opts.executablePath = process.env.CHROMIUM_PATH;
+if (process.env.CHROMIUM_PATH) {
+  opts.executablePath = process.env.CHROMIUM_PATH;
+} else {
+  // Without this, headless means the shell, and the shell cannot install apps.
+  opts.channel = 'chromium';
+}
 
 (async () => {
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'cz-pwa-'));
   const ctx = await chromium.launchPersistentContext(profile, opts);
   const page = ctx.pages()[0] || await ctx.newPage();
+  const browser = ctx.browser();
+  const build = browser ? browser.version() : 'unknown';
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
 
@@ -80,6 +92,7 @@ if (process.env.CHROMIUM_PATH) opts.executablePath = process.env.CHROMIUM_PATH;
   ];
 
   console.log('--- installable as an app ---');
+  console.log(`browser             : ${build}  ${opts.executablePath || 'channel:' + opts.channel}`);
   for (const [name, ok, detail] of checks) {
     console.log(`${ok ? 'PASS' : 'FAIL'}  ${name.padEnd(28)} ${detail}`);
   }
