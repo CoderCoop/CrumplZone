@@ -11,6 +11,14 @@ extends RefCounted
 
 const NOTES: Array = [
 	{
+		"version": "0.5.1",
+		"date": "2026-08-25",
+		"lines": [
+			"Holding a tool over nothing now lifts it and tells you, instead "
+			+ "of quietly doing nothing.",
+		],
+	},
+	{
 		"version": "0.5.0",
 		"date": "2026-08-25",
 		"lines": [
