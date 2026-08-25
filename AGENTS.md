@@ -535,6 +535,13 @@ often one-thumbed. Design for that first and let the desktop inherit it.
 - **Touch targets are at least 44x44 px** of *real* screen, and spaced far
   enough apart that a thumb cannot hit two at once. A control that works with a
   mouse cursor is not evidence that it works with a thumb.
+- **Every control is a button with an icon, not a word.** That goes for the
+  incidental ones — reset, help, close, back — and not only for the controls
+  the game is played with. A text label is something to read at a size chosen
+  to make it fit, which is how a control ends up 13 px tall and barely over the
+  target floor; an icon is the same shape at any size and needs no translating.
+  Draw the icon as vector art rather than typing a glyph, because a font the
+  build does not ship renders as a tofu box — which has happened here twice.
 - **Keep controls in thumb reach.** The bottom third of a portrait screen is
   comfortable; the top corners are not. Put the things played with at the
   bottom, and information at the top.
