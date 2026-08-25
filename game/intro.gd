@@ -156,21 +156,31 @@ func _how_to_play() -> VBoxContainer:
 
 	box.add_child(_label("The tools", HEADING_SIZE, BRIGHT))
 	box.add_child(_tool_line("1", "Jackhammer", Materials.of(Materials.CONCRETE)["colour"],
-		"shatters the one piece you point at, and nothing else — tough "
-		+ "material takes more than one go"))
+		"%d damage to the one piece you point at, and nothing else"
+			% Tools.JACKHAMMER_DAMAGE))
 	box.add_child(_tool_line("2", "Wrecking ball", Color(0.55, 0.57, 0.60),
-		"swings in from the side you tapped nearer and shoves a whole storey over"))
+		"swings in from the side you tapped nearer and shoves a whole storey "
+		+ "over, cracking what it strikes (%d damage)" % Tools.BALL_DAMAGE))
 	box.add_child(_tool_line("3", "Explosive", ACCENT,
-		"throws everything nearby outwards and shatters whatever is closest"))
+		("%d damage where you place it, less further out, and throws "
+		+ "everything nearby outwards") % Tools.BLAST_DAMAGE))
 
 	box.add_child(_spacer(6))
-	box.add_child(_label("What it's made of", HEADING_SIZE, BRIGHT))
+	box.add_child(_label("Durability, 1 to 100", HEADING_SIZE, BRIGHT))
+	box.add_child(_label(
+		"Every piece takes damage until it runs out of durability, then breaks "
+		+ "apart. Cracks show how close it is. Nothing is invincible — some "
+		+ "things are just a bad use of a move.", BODY_SIZE, DIM, true))
 	box.add_child(_material_line(Materials.GLASS, "Glass",
-		"breaks first, holds nothing up"))
+		"holds nothing up"))
+	box.add_child(_material_line(Materials.BRICK, "Brick",
+		"infill, not structure"))
 	box.add_child(_material_line(Materials.CONCRETE, "Concrete floors",
 		"what has to end up below the line"))
 	box.add_child(_material_line(Materials.STEEL, "Steel columns",
-		"what actually carries the building"))
+		"what carries the building"))
+	box.add_child(_material_line(Materials.REINFORCED, "Reinforced core",
+		"bring the building down around it"))
 
 	box.add_child(_spacer(6))
 	box.add_child(_label("Worth knowing", HEADING_SIZE, BRIGHT))
@@ -218,10 +228,12 @@ func _tool_line(key: String, name: String, swatch: Color, what: String) -> VBoxC
 	return box
 
 
+## Durability first, because it is the number the decision turns on, then what
+## that means in jackhammer blows — the unit a player actually spends.
 func _material_line(made_of: String, name: String, what: String) -> HBoxContainer:
-	var hits: int = int(Materials.of(made_of)["integrity"])
-	return _swatch_row("%s — %s (%d hit%s)"
-		% [name, what, hits, "" if hits == 1 else "s"],
+	var hits := Materials.hits(made_of, Tools.JACKHAMMER_DAMAGE)
+	return _swatch_row("%s %d — %s, %d blow%s"
+		% [name, Materials.durability(made_of), what, hits, "" if hits == 1 else "s"],
 		Materials.of(made_of)["colour"])
 
 

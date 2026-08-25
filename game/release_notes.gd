@@ -11,6 +11,19 @@ extends RefCounted
 
 const NOTES: Array = [
 	{
+		"version": "0.3.0",
+		"date": "2026-08-25",
+		"lines": [
+			"Every piece has a durability from 1 to 100 — glass 1, concrete 24, "
+			+ "steel 36, the reinforced core 100.",
+			"One jackhammer blow is 12 of it, a charge is 60.",
+			"Damaged pieces crack and darken, and the damage floats up from "
+			+ "the impact, so you can see what a blow did.",
+			"Everything breaks apart into pieces when its durability runs out. "
+			+ "The reinforced core outlasts your whole budget — go around it.",
+		],
+	},
+	{
 		"version": "0.2.0",
 		"date": "2026-08-24",
 		"lines": [
