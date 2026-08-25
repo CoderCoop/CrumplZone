@@ -31,6 +31,34 @@ static func units_per_css(viewport: Viewport) -> float:
 	return device_pixel_ratio() / stretch
 
 
+## Can the browser offer to install this as an app? True only where the
+## browser has fired the install prompt event and it has not been used yet —
+## so never on a desktop that has already installed it, and never on iOS
+## Safari, which has no such event and needs Share → Add to Home Screen.
+static func can_install() -> bool:
+	if not OS.has_feature("web"):
+		return false
+	var value: Variant = JavaScriptBridge.eval(
+		"(window.__cz_can_install && window.__cz_can_install()) || false", true)
+	return typeof(value) == TYPE_BOOL and bool(value)
+
+
+## Asks the browser to show its install prompt. The browser decides what that
+## looks like; all this can do is ask, and only in response to a tap.
+static func install() -> void:
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("window.__cz_install && window.__cz_install()", true)
+
+
+## Already running as an installed app rather than in a browser tab.
+static func installed() -> bool:
+	if not OS.has_feature("web"):
+		return false
+	var value: Variant = JavaScriptBridge.eval(
+		"(window.__cz_installed && window.__cz_installed()) || false", true)
+	return typeof(value) == TYPE_BOOL and bool(value)
+
+
 ## Physical pixels per CSS pixel. 1.0 anywhere that cannot say — a desktop
 ## export, the headless harnesses — which is the right answer there.
 static func device_pixel_ratio() -> float:

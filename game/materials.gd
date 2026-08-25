@@ -67,6 +67,44 @@ const SPEC := {
 	},
 }
 
+## How much contact load a piece carries before it starts to suffer, in the
+## units the physics engine reports contact impulses in.
+##
+## Measured, not chosen, and the margin is narrow on purpose. In a settled,
+## untouched tower the worst load on a pane is 29; a pane with a floor slab
+## resting on it carries 58, and the moment that slab lands it spikes past a
+## thousand. A tolerance between 29 and 58 is a pane that holds up a wall
+## happily and fails under a floor — which is the point, and there is no wider
+## gap available to sit in.
+##
+## The other materials keep roughly the same ratio to what they carry standing:
+## steel columns hold 634 and tolerate 1000, the reinforced core holds 702 and
+## tolerates 1400.
+##
+## There is a second guard under these numbers: stresstest.gd stands the
+## building up untouched for six seconds and fails if a single piece so much as
+## takes damage. A stress table tuned too low turns every level into one that
+## collapses before it is played, and the failure is otherwise silent — the
+## solver would just report the level unsolvable.
+const STRESS := {
+	GLASS: 40.0,
+	BRICK: 200.0,
+	CONCRETE: 300.0,
+	STEEL: 1000.0,
+	REINFORCED: 1400.0,
+}
+
+## How fast overload turns into damage: three points a second at twice a
+## material's tolerance. Calibrated so that the spike from a floor slab landing
+## on a pane — 1271 against a tolerance of 90 — takes it out on the blow rather
+## than leaving it cracked and standing, which is what a rate of 1 did.
+const STRESS_RATE := 3.0
+
+
+static func stress_limit(name: String) -> float:
+	return float(STRESS.get(name, STRESS[CONCRETE]))
+
+
 ## Smallest piece worth simulating, as an area. Below twice this a fragment is
 ## rubble: it still has to end up below the line, but nothing divides it
 ## further, and a tool that finds only rubble refuses rather than charging a

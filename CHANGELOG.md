@@ -7,7 +7,55 @@ sections are dated.
 
 ## [Unreleased]
 
-Nothing since 0.5.1.
+Nothing since 0.6.0.
+
+## [0.6.0] - 2026-08-25
+
+Weight breaks things, levels end properly, and the city looks like a city.
+
+### Added
+
+- **Load breaks things.** A piece carrying more than it can bear cracks and
+  fails, whether the weight arrived slowly or at speed. Glazing under a floor
+  slab goes; a column struck hard enough goes. The numbers are measured rather
+  than chosen: an untouched pane in this building carries 29, one with a floor
+  resting on it carries 58, and one being landed on sees over a thousand.
+- **A proper end to a level**, with a rating out of three. Clearing at all
+  earns one star, a quarter of the bar left earns two, and more than half earns
+  three — so the rating measures how well you played rather than whether you
+  finished. Losing gets the same screen and says what is still standing.
+- **The power bar shows what a hold is about to cost** before you let go: the
+  segment about to be spent turns red while the rest stays amber.
+- **Install it as an app from the help screen**, where the browser offers that.
+  On an iPhone the same section says to use Share → Add to Home Screen, since
+  Safari has no install prompt to offer.
+- **Rubble gets swept up.** Slivers that come to rest below the line stop
+  colliding and settle into the street as scenery. Nothing is deleted — they
+  are still exactly where they fell — but they stop taking up space, which is
+  what keeps a demolished building from turning into a hundred slivers of
+  gravel jostling forever.
+
+### Changed
+
+- **Tool buttons are icons now** — a breaker, a ball on a chain, a lit charge —
+  and bigger, at 66 px. The readout above still names whichever is selected.
+- **The city behind the site has three layers**, with setbacks, spires and water
+  tanks on the roofs, lit windows in warm and cool, haze where it meets the
+  ground, and street lights throwing pools of light on the road. Pieces of the
+  building have bevelled edges, and glazing has a frame and light sliding
+  across it.
+- **The power bar is 200** rather than 240. Once weight started breaking
+  things, the level went from a seven-use solution to a three-use one, and the
+  old bar made three stars a formality.
+
+### Fixed
+
+- **A level could sit on "settling…" for ever and never end.** Pieces thrown
+  past the end of the ground fell endlessly, and a level with anything still
+  moving never reports itself settled — so the win never fired. Pieces that
+  leave the world are now retired where they went, and there is a time limit on
+  settling as a backstop. Measured: thirty seconds after a demolition, nine
+  shards were still falling at 9,100 px/s and accelerating.
 
 ## [0.5.1] - 2026-08-25
 

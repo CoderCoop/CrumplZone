@@ -15,6 +15,8 @@ graph TD
         main["main.gd<br/>input, tool choice, readout"]
         ui["ui.gd<br/>CSS pixels → viewport units"]
         intro["intro.gd<br/>guide, version, release notes"]
+        results["results.gd<br/>end of level, stars"]
+        icons["icons.gd<br/>drawn tool icons"]
         notes["release_notes.gd<br/>player-facing changes"]
         effects["effects.gd<br/>what the tool just did"]
         backdrop["backdrop.gd<br/>sky, skyline, street"]
@@ -31,6 +33,7 @@ graph TD
         playtest["playtest.gd<br/>hand-built level difficulty"]
         waketest["waketest.gd<br/>settled bodies get woken"]
         breaktest["breaktest.gd<br/>everything breakable breaks"]
+        stresstest["stresstest.gd<br/>weight breaks the right things"]
         collapsetest["collapsetest.gd<br/>broken columns stop carrying"]
         verifylv["verify_levels.gd<br/>generate-and-verify measurement"]
     end
@@ -54,6 +57,9 @@ graph TD
     notes --> intro
     ui --> main
     ui --> intro
+    ui --> results
+    icons --> main
+    main --> results
     main --> effects
     main --> backdrop
     main --> level
@@ -72,6 +78,8 @@ graph TD
     waketest -->|gates| ci
     breaktest -->|drives| level
     breaktest -->|gates| ci
+    stresstest -->|drives| level
+    stresstest -->|gates| ci
     collapsetest -->|drives| level
     collapsetest -->|gates| ci
     fracture -->|cuts a piece in two| level
@@ -136,6 +144,11 @@ matters:
   `AGENTS.md` are written in — into the viewport units Godot lays out in. Every
   screen is built in CSS pixels and its layer scaled by that factor, which is
   what makes a 44 px touch target 44 px on a phone as well as on a laptop.
+- **`results.gd`** ends a level: cleared or out of power, what is still
+  standing, and a rating out of three drawn from how much of the bar was left.
+  **`icons.gd`** draws the tool icons — vector art rather than font glyphs,
+  because the two symbols this project did try to type both rendered as tofu
+  boxes on the builds that shipped them.
 - **`effects.gd`** draws what a tool just did, and **`backdrop.gd`** draws the
   sky, the skyline and the street. Both are strictly cosmetic: they own no
   bodies and apply no forces, because the solver replays this game thousands of
@@ -203,6 +216,21 @@ stateDiagram-v2
     Cleared --> [*]
     Failed --> [*]
 ```
+
+Weight is part of the demolition, not just the tools. Every piece reports what
+its contacts are pushing through it, and anything over the material's tolerance
+accumulates as damage — so a pane under a floor slab cracks and fails, and a
+piece struck hard enough fails on the blow. The tolerances are measured against
+a real building rather than chosen (see `materials.gd`), and `stresstest.gd`
+stands an untouched tower up for six seconds and fails if a single piece so
+much as takes damage, because a table tuned slightly too low would quietly turn
+every level into one that collapses before it is played.
+
+Rubble that comes to rest below the line is retired: its collider goes, it
+stops being counted, and it stays where it fell as part of the street. So does
+anything thrown clean out of the world — which is a correctness fix rather than
+a tidy-up, because a level with one piece still accelerating never reports
+itself settled, and a level that never settles never ends.
 
 Play is paced by a power bar rather than by a count of moves: every use of a
 tool takes a bite out of it, sized by how long the tool was held. Holding is

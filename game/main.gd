@@ -51,9 +51,16 @@ var _hold_at := Vector2.ZERO
 var _note := ""
 var _charge := 0.0
 var _blow_timer := 0.0
+var _settling_ticks := 0
 ## How long a full hold takes. Long enough that a partial one is a real
 ## choice, short enough that nobody is waiting on a progress bar.
 const CHARGE_TIME := 1.1
+
+## Longest a level may sit settling before it is judged anyway. Measured: a
+## full demolition takes about 20 seconds to come to rest once the pieces that
+## left the world are retired, so this sits well past that and only ever fires
+## if something is genuinely stuck.
+const SETTLE_LIMIT := 1800
 
 var _layer: CanvasLayer
 var _root: Control
@@ -62,7 +69,10 @@ var _reset: Button
 var _help: Button
 var _status: Label
 var _bar: ProgressBar
+var _pending: ProgressBar
+var _results: Results
 var _buttons: Array[Button] = []
+var _art: Array[Control] = []
 var _intro: Intro
 var _view := Rect2(-400.0, -400.0, 1600.0, 1200.0)
 
@@ -137,7 +147,22 @@ func _build_ui() -> void:
 	var fill := StyleBoxFlat.new()
 	fill.bg_color = Color(0.95, 0.72, 0.28)
 	fill.set_corner_radius_all(4)
-	_bar.add_theme_stylebox_override("background", trough)
+	# Two bars in the same place. The one underneath shows the power you have;
+	# the one on top shows what would be left after letting go, so the gap
+	# between them is what this hold is about to cost — visible while there is
+	# still time to hold on longer or let go sooner.
+	var pending := StyleBoxFlat.new()
+	pending.bg_color = Color(0.93, 0.36, 0.28)
+	pending.set_corner_radius_all(4)
+	_pending = ProgressBar.new()
+	_pending.show_percentage = false
+	_pending.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_pending.add_theme_stylebox_override("background", trough)
+	_pending.add_theme_stylebox_override("fill", pending)
+	_root.add_child(_pending)
+
+	var clear_box := StyleBoxEmpty.new()
+	_bar.add_theme_stylebox_override("background", clear_box)
 	_bar.add_theme_stylebox_override("fill", fill)
 	_root.add_child(_bar)
 
@@ -150,18 +175,44 @@ func _build_ui() -> void:
 	for i in Tools.ORDER.size():
 		var kind: Tools.Kind = Tools.ORDER[i]
 		var button := Button.new()
-		button.text = Tools.NAMES[kind]
 		button.focus_mode = Control.FOCUS_NONE
 		button.toggle_mode = true
-		# Clipped, so a long tool name cannot widen the row past the screen.
-		# Unclipped, the row measured 423 px on a 390 px phone and the last
-		# button hung off the edge.
-		button.clip_text = true
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		button.add_theme_font_size_override("font_size", 15)
+		# Icons rather than names. A name is a word to read; a hammer, a ball
+		# on a chain and a lit charge are what the tools are. The readout above
+		# still names whichever is selected, so nothing is lost by not printing
+		# all three at all times — and the row can never be too narrow for its
+		# own labels again.
+		var art := Control.new()
+		art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		art.draw.connect(func() -> void:
+			var selected: bool = Tools.ORDER[i] == _tool
+			Icons.draw_tool(art, kind, art.size * 0.5, minf(art.size.y * 0.62, 34.0),
+				Color(0.12, 0.12, 0.14) if selected else Color(0.86, 0.88, 0.92)))
+		button.add_child(art)
+		_art.append(art)
+		# Selection has to read at a glance and without hover, which a phone
+		# does not have: the chosen tool is filled and outlined in the same
+		# amber as the power it spends.
+		button.add_theme_stylebox_override("normal", _tool_style(false))
+		button.add_theme_stylebox_override("hover", _tool_style(false))
+		button.add_theme_stylebox_override("pressed", _tool_style(true))
+		button.add_theme_stylebox_override("hover_pressed", _tool_style(true))
+		button.add_theme_color_override("font_pressed_color", Color(0.10, 0.10, 0.12))
+		button.add_theme_color_override("font_hover_pressed_color", Color(0.10, 0.10, 0.12))
 		button.pressed.connect(func() -> void: _select(kind))
 		_row.add_child(button)
 		_buttons.append(button)
+
+
+func _tool_style(selected: bool) -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color(0.95, 0.72, 0.28) if selected else Color(0.17, 0.18, 0.22)
+	box.set_corner_radius_all(8)
+	box.set_border_width_all(2)
+	box.border_color = Color(1.0, 0.86, 0.52) if selected else Color(0.26, 0.28, 0.33)
+	return box
 
 
 func _corner_button(text: String, on_press: Callable) -> Button:
@@ -196,6 +247,8 @@ func _relayout() -> void:
 	_help.size = CORNER
 	_bar.position = Vector2(SIDE_MARGIN, size.y - BOTTOM_PAD - BAR_HEIGHT - 6.0)
 	_bar.size = Vector2(width, BAR_HEIGHT)
+	_pending.position = _bar.position
+	_pending.size = _bar.size
 	_row.position = Vector2(SIDE_MARGIN, size.y - BOTTOM_PAD)
 	_row.size = Vector2(width, BUTTON_HEIGHT)
 
@@ -267,7 +320,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_select(Tools.ORDER[index])
 			return
 
-	if _intro != null or _resolved != "":
+	if _intro != null or _results != null or _resolved != "":
 		return
 
 	var down: bool = (event is InputEventMouseButton and event.pressed
@@ -365,6 +418,16 @@ func _stop_hold(why: String) -> void:
 	_refresh()
 
 
+## What the hold in progress would cost if it ended now. Zero when nothing is
+## being held.
+func _pending_cost() -> float:
+	if not _holding or _resolved != "":
+		return 0.0
+	if _tool == Tools.Kind.JACKHAMMER:
+		return Tools.cost(Tools.Kind.JACKHAMMER)      # the next blow
+	return Tools.cost(_tool, _charge)
+
+
 func _cheapest() -> float:
 	return minf(Tools.cost(Tools.Kind.JACKHAMMER), Tools.cost(_tool, 0.0))
 
@@ -378,9 +441,20 @@ func _on_struck(at: Vector2, amount: int) -> void:
 func _physics_process(_delta: float) -> void:
 	if _resolved != "":
 		return
+	# A settling world that never settles would hang the level for ever with
+	# no way out but a reload. The level retires pieces that leave the world,
+	# which is the real fix; this is the belt to that pair of braces.
+	if _busy:
+		_settling_ticks += 1
+		if _settling_ticks > SETTLE_LIMIT:
+			_settling_ticks = 0
+			_busy = false
+			_judge()
+			return
 	if _level.tick_settle():
 		if _busy:
 			_busy = false
+			_settling_ticks = 0
 			_judge()
 		elif _level.cleared():
 			_judge()
@@ -391,20 +465,47 @@ func _physics_process(_delta: float) -> void:
 func _judge() -> void:
 	if _level.cleared():
 		_resolved = "CLEARED with %d%% of the bar left" % int(round(_power / _power_full * 100.0))
+		_show_results(true)
 	elif _power < _cheapest():
 		var left := _level.standing()
 		_resolved = "OUT OF POWER — %d piece%s still above the line" \
 			% [left, "" if left == 1 else "s"]
+		_show_results(false)
+
+
+func _show_results(won: bool) -> void:
+	if _results != null:
+		return
+	_holding = false
+	_effects.stop_aim()
+	_results = Results.new()
+	_results.cleared = won
+	_results.power_left = _power
+	_results.power_full = _power_full
+	_results.standing = _level.standing()
+	_results.again_pressed.connect(_restart)
+	add_child(_results)
+
+
+func _restart() -> void:
+	if _results != null:
+		_results.queue_free()
+		_results = null
+	_start()
 
 
 func _refresh() -> void:
 	for i in _buttons.size():
 		_buttons[i].button_pressed = (Tools.ORDER[i] == _tool)
+		if i < _art.size():
+			_art[i].queue_redraw()
 	if _status == null:
 		return
 	if _bar != null:
 		_bar.max_value = maxf(1.0, _power_full)
-		_bar.value = _power
+		_pending.max_value = _bar.max_value
+		_pending.value = _power
+		_bar.value = maxf(0.0, _power - _pending_cost())
 	var state := _resolved
 	if state == "":
 		if _note != "":

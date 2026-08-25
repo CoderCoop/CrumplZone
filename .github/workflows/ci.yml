@@ -129,6 +129,12 @@ jobs:
           # or a material silently breaks all three.
           run_harness "break test" res://breaktest.tscn
 
+          # Weight has to break the right things and only the right things. A
+          # stress table tuned slightly too low turns every level into one that
+          # collapses before it is played, and the failure is silent — the
+          # solver would simply report the level unsolvable.
+          run_harness "stress test" res://stresstest.tscn
+
           # Two physical claims that a screenshot cannot settle: a column
           # broken in half stops carrying what was above it, and the wrecking
           # ball is a body with mass that damages what it hits and then
@@ -141,4 +147,4 @@ jobs:
           # by retuning a tool, and neither is visible in a diff.
           run_harness "playtest" res://playtest.tscn
 
-          echo "::notice::ci passed — secret scan, GDScript checks, wake test, break test, collapse test, playtest"
+          echo "::notice::ci passed — secret scan, GDScript checks, wake test, break test, stress test, collapse test, playtest"

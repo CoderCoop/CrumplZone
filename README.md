@@ -39,6 +39,13 @@ over. Holding is the whole interface: the jackhammer keeps chipping while you
 hold it, and the ball and the charge build up while held and go when you let
 go, so how much you spend is how long you hold.
 
+Weight is a tool too: a floor slab landing on glazing breaks it, and anything
+hit hard enough breaks whether or not you aimed at it. Rubble that comes to
+rest below the line settles into the street and stops getting in the way.
+
+Clearing the level rates you out of three stars on how much of the bar you had
+left, so the game is about doing it well rather than doing it at all.
+
 What you spend is the power bar above the tools — worth about eight
 full-strength uses, or forty jackhammer blows, or any mixture. A tool that
 finds nothing to act on costs nothing.
