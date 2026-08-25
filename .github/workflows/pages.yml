@@ -75,6 +75,14 @@ jobs:
       - name: Verify the build installs as an app
         run: tools/verify-pwa.sh
 
+      # And an installed app is only worth having if it can be updated. This
+      # loads the build, publishes a change over the top of it, and checks a
+      # browser that already had the old one ends up on the new one — no cache
+      # clearing, no hard refresh, no closing the tab. It runs on a copy of the
+      # build, because proving it means rewriting the files being served.
+      - name: Verify an update reaches someone who already has it
+        run: tools/verify-update.sh
+
       - uses: actions/upload-artifact@v7
         if: always()
         with:

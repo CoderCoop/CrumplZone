@@ -118,6 +118,12 @@ func _process(_delta: float) -> void:
 		return
 	_install_poll = INSTALL_POLL
 	_refresh_install()
+	# The help screen is the one place where switching builds costs nothing:
+	# there is no level in progress to throw away. Taking it here is what makes
+	# an update land on the next time the game is opened rather than whenever
+	# the player happens to close every tab.
+	if UI.update_ready():
+		UI.apply_update()
 
 
 func _refresh_install() -> void:
