@@ -21,6 +21,7 @@ const JACKHAMMER_BODY := 46.0
 
 var _live: Array = []
 var _numbers: Array = []
+var _aim: Dictionary = {}
 
 
 ## Tool art, for the tools that are not objects in the world. The wrecking
@@ -33,13 +34,34 @@ func play(kind: Tools.Kind, at: Vector2) -> void:
 	queue_redraw()
 
 
+## What a held tool would do if released now. The point of a hold is choosing
+## how much to spend, which is only a choice if the difference is visible
+## before letting go.
+func aim(kind: Tools.Kind, at: Vector2, charge: float, from_left: bool) -> void:
+	_aim = {"kind": kind, "at": at, "charge": charge, "left": from_left}
+	queue_redraw()
+
+
+func stop_aim() -> void:
+	_aim = {}
+	queue_redraw()
+
+
 ## Damage, floating up from wherever it actually landed. The ball decides that
 ## point by hitting something, so this is driven by Level's struck signal
 ## rather than by where the player tapped.
 func number(at: Vector2, amount: int) -> void:
-	# One blow can land on several pieces at once — a charge, or a ball
-	# ploughing through a bay — and numbers printed at the same height on top
-	# of each other read as one wrong number. Stack them instead.
+	# A held jackhammer lands a blow every fifth of a second on the same spot,
+	# and separate numbers there overprint into an unreadable smear. Blows in
+	# the same place add up into one number that climbs instead.
+	for shown in _numbers:
+		if shown["at"].distance_to(at) < 26.0 and shown["t"] < NUMBER_TIME * 0.7:
+			shown["amount"] = int(shown["amount"]) + amount
+			shown["t"] = 0.0
+			queue_redraw()
+			return
+	# Several pieces struck at once — a charge, or a ball ploughing through a
+	# bay — get their own numbers, stacked so they do not overprint either.
 	_numbers.append({"at": at, "amount": amount, "t": 0.0, "row": _numbers.size()})
 	queue_redraw()
 
@@ -65,6 +87,8 @@ func _draw_damage(at: Vector2, amount: int, progress: float) -> void:
 
 
 func _process(delta: float) -> void:
+	if not _aim.is_empty():
+		queue_redraw()
 	if _live.is_empty() and _numbers.is_empty():
 		return
 	for effect in _live:
@@ -84,6 +108,8 @@ func _duration(kind: Tools.Kind) -> float:
 
 
 func _draw() -> void:
+	if not _aim.is_empty():
+		_draw_aim()
 	for effect in _live:
 		var progress: float = clampf(effect["t"] / _duration(effect["kind"]), 0.0, 1.0)
 		match effect["kind"]:
@@ -97,6 +123,29 @@ func _draw() -> void:
 			number_shown["at"] - Vector2(0.0, float(number_shown["row"]) * 22.0),
 			int(number_shown["amount"]),
 			clampf(number_shown["t"] / NUMBER_TIME, 0.0, 1.0))
+
+
+## The charge as it builds: how far the ball would be hauled back, or how far
+## the blast would reach. Drawn as the thing itself rather than as a meter,
+## because what a player wants to know is where it lands.
+func _draw_aim() -> void:
+	var at: Vector2 = _aim["at"]
+	var strength := Tools.strength(float(_aim["charge"]))
+	if _aim["kind"] == Tools.Kind.EXPLOSIVE:
+		var radius := Tools.BLAST_RADIUS * strength
+		draw_circle(at, radius, Color(1.0, 0.55, 0.20, 0.10))
+		draw_arc(at, radius, 0.0, TAU, 40, Color(1.0, 0.72, 0.32, 0.75), 2.0, true)
+		return
+
+	# The ball: where the crane would haul it to, and the arc it would take.
+	var side := -1.0 if _aim["left"] else 1.0
+	var pivot := at + Vector2(0.0, -Level.BALL_CHAIN)
+	var lift: float = Level.BALL_LIFTS[0] * clampf(strength, 0.2, 1.0)
+	var start := pivot + Vector2(side * sin(lift), cos(lift)) * Level.BALL_CHAIN
+	draw_line(pivot, start, Color(0.55, 0.57, 0.60, 0.55), 2.0)
+	draw_arc(start, Level.BALL_RADIUS, 0.0, TAU, 20, Color(0.72, 0.75, 0.80, 0.8), 2.0, true)
+	draw_arc(pivot, Level.BALL_CHAIN, PI * 0.5, PI * 0.5 + side * lift, 24,
+		Color(0.72, 0.75, 0.80, 0.30), 2.0, true)
 
 
 ## The tool itself, hammering. Three blows into the point tapped, with the
