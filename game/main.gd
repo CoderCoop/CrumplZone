@@ -110,9 +110,11 @@ func _start() -> void:
 	# reset and next-level both come through here, and neither has anything
 	# in progress to lose. Between this and the help screen, an update lands
 	# at the next natural break rather than waiting for every tab to close.
+	# Asked for, not waited on: the page reloads a moment later and whatever
+	# happens here is thrown away. Returning early instead would leave the
+	# game with no level at all if the reload never came.
 	if UI.update_ready():
 		UI.apply_update()
-		return
 	var spec := Levels.tower()
 	_level.build(spec)
 	_power_full = float(spec["power"])
