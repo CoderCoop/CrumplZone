@@ -20,7 +20,8 @@ const TOOL_KEYS := [KEY_1, KEY_2, KEY_3]
 const BUTTON_HEIGHT := 56.0
 const SIDE_MARGIN := 10.0
 const TOP_PAD := 84.0
-const BOTTOM_PAD := BUTTON_HEIGHT + 22.0
+const BAR_HEIGHT := 14.0
+const BOTTOM_PAD := BUTTON_HEIGHT + 22.0 + BAR_HEIGHT + 6.0
 
 ## Reset and help live in the top corner, not in the bottom row: they are
 ## rare, and one of them throws the level away. The bottom bar — the part
@@ -37,9 +38,20 @@ var _effects: Effects
 var _backdrop: Backdrop
 var _camera: Camera2D
 var _tool: Tools.Kind = Tools.Kind.JACKHAMMER
-var _moves_left := 0
+var _power := 0.0
+var _power_full := 0.0
 var _resolved := ""
 var _busy := false
+
+## Holding is how a tool is used. The jackhammer keeps chipping while held;
+## the ball and the charge build up and go on release.
+var _holding := false
+var _hold_at := Vector2.ZERO
+var _charge := 0.0
+var _blow_timer := 0.0
+## How long a full hold takes. Long enough that a partial one is a real
+## choice, short enough that nobody is waiting on a progress bar.
+const CHARGE_TIME := 1.1
 
 var _layer: CanvasLayer
 var _root: Control
@@ -47,6 +59,7 @@ var _row: HBoxContainer
 var _reset: Button
 var _help: Button
 var _status: Label
+var _bar: ProgressBar
 var _buttons: Array[Button] = []
 var _intro: Intro
 var _view := Rect2(-400.0, -400.0, 1600.0, 1200.0)
@@ -78,9 +91,12 @@ func _ready() -> void:
 func _start() -> void:
 	var spec := Levels.tower()
 	_level.build(spec)
-	_moves_left = spec["moves"]
+	_power_full = float(spec["power"])
+	_power = _power_full
 	_resolved = ""
 	_busy = false
+	_holding = false
+	_charge = 0.0
 	_relayout()
 	_refresh()
 	queue_redraw()
@@ -104,6 +120,23 @@ func _build_ui() -> void:
 
 	_reset = _corner_button("reset", _start)
 	_help = _corner_button("help", _open_intro)
+
+	# The power bar sits directly above the tools it is spent by, so the thing
+	# being spent and the thing spending it are in the same glance.
+	_bar = ProgressBar.new()
+	_bar.show_percentage = false
+	_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Styled rather than themed: the default bar is grey on grey, and this is
+	# the one readout a player watches while their thumb is down.
+	var trough := StyleBoxFlat.new()
+	trough.bg_color = Color(0.16, 0.17, 0.21)
+	trough.set_corner_radius_all(4)
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = Color(0.95, 0.72, 0.28)
+	fill.set_corner_radius_all(4)
+	_bar.add_theme_stylebox_override("background", trough)
+	_bar.add_theme_stylebox_override("fill", fill)
+	_root.add_child(_bar)
 
 	# Controls at the bottom, where a thumb reaches, stretched across whatever
 	# width the screen turns out to be.
@@ -158,6 +191,8 @@ func _relayout() -> void:
 	_reset.size = CORNER
 	_help.position = Vector2(size.x - SIDE_MARGIN - CORNER.x, 8.0)
 	_help.size = CORNER
+	_bar.position = Vector2(SIDE_MARGIN, size.y - BOTTOM_PAD - BAR_HEIGHT - 6.0)
+	_bar.size = Vector2(width, BAR_HEIGHT)
 	_row.position = Vector2(SIDE_MARGIN, size.y - BOTTOM_PAD)
 	_row.size = Vector2(width, BUTTON_HEIGHT)
 
@@ -209,6 +244,9 @@ func _close_intro() -> void:
 
 
 func _select(kind: Tools.Kind) -> void:
+	if _holding:
+		_holding = false
+		_effects.stop_aim()
 	_tool = kind
 	_refresh()
 
@@ -225,28 +263,87 @@ func _unhandled_input(event: InputEvent) -> void:
 			_select(Tools.ORDER[index])
 			return
 
-	if _intro != null or _busy or _resolved != "" or _moves_left <= 0:
+	if _intro != null or _resolved != "":
 		return
 
-	var pressed: bool = (event is InputEventMouseButton and event.pressed
+	var down: bool = (event is InputEventMouseButton and event.pressed
 			and event.button_index == MOUSE_BUTTON_LEFT) \
 		or (event is InputEventScreenTouch and event.pressed)
-	if pressed:
-		_use(get_global_mouse_position())
+	var up: bool = (event is InputEventMouseButton and not event.pressed
+			and event.button_index == MOUSE_BUTTON_LEFT) \
+		or (event is InputEventScreenTouch and not event.pressed)
+	var moved: bool = (event is InputEventMouseMotion and _holding) \
+		or (event is InputEventScreenDrag and _holding)
+
+	if down and _power >= _cheapest():
+		_holding = true
+		_charge = 0.0
+		_blow_timer = 0.0
+		_hold_at = get_global_mouse_position()
+		if event is InputEventScreenTouch:
+			_hold_at = (event as InputEventScreenTouch).position
+			_hold_at = get_canvas_transform().affine_inverse() * _hold_at
+		# The jackhammer starts working the moment it is put down.
+		if _tool == Tools.Kind.JACKHAMMER:
+			_strike(_hold_at, 1.0)
+	elif moved:
+		_hold_at = get_global_mouse_position()
+	elif up and _holding:
+		_release()
 
 
-func _use(at: Vector2) -> void:
-	# A tool that found nothing to act on costs nothing. Spending a move on a
-	# misclick would punish imprecision, which the charter's second pillar
-	# says not to do.
-	if not Tools.apply(_tool, _level, at):
+## Aiming keeps working while held, so a thumb can slide onto the right piece
+## rather than having to land on it.
+func _process(delta: float) -> void:
+	if not _holding:
 		return
+	if _resolved != "":
+		_holding = false
+		return
+	_charge = minf(1.0, _charge + delta / CHARGE_TIME)
+	if _tool == Tools.Kind.JACKHAMMER:
+		_blow_timer += delta
+		while _blow_timer >= Tools.JACKHAMMER_INTERVAL:
+			_blow_timer -= Tools.JACKHAMMER_INTERVAL
+			if _power < Tools.cost(Tools.Kind.JACKHAMMER):
+				_holding = false
+				break
+			_strike(_hold_at, 1.0)
+	else:
+		_effects.aim(_tool, _hold_at, _charge, _hold_at.x < _level.centre_x())
+	_refresh()
+
+
+func _release() -> void:
+	_holding = false
+	_effects.stop_aim()
+	if _tool == Tools.Kind.JACKHAMMER:
+		return
+	# A hold that outran the power left buys what is left, not what was asked
+	# for: the bar is the limit, and it is visible the whole time.
+	var wanted := _charge
+	while wanted > 0.0 and Tools.cost(_tool, wanted) > _power:
+		wanted -= 0.05
+	if wanted <= 0.0:
+		return
+	_strike(_hold_at, wanted)
+
+
+## One application of the current tool. Power is spent only if it did
+## something, so a misfire into empty sky is free.
+func _strike(at: Vector2, charge: float) -> void:
+	if not Tools.apply(_tool, _level, at, charge):
+		return
+	_power = maxf(0.0, _power - Tools.cost(_tool, charge))
 	_effects.play(_tool, at)
-	_moves_left -= 1
 	_busy = true
 	_level.reset_settle()
 	_refresh()
 	queue_redraw()
+
+
+func _cheapest() -> float:
+	return minf(Tools.cost(Tools.Kind.JACKHAMMER), Tools.cost(_tool, 0.0))
 
 
 ## Damage lands where the tool actually reached, which for the wrecking ball is
@@ -270,11 +367,10 @@ func _physics_process(_delta: float) -> void:
 
 func _judge() -> void:
 	if _level.cleared():
-		var spare := _moves_left
-		_resolved = "CLEARED with %d move%s to spare" % [spare, "" if spare == 1 else "s"]
-	elif _moves_left <= 0:
+		_resolved = "CLEARED with %d%% of the bar left" % int(round(_power / _power_full * 100.0))
+	elif _power < _cheapest():
 		var left := _level.standing()
-		_resolved = "OUT OF MOVES — %d piece%s still above the line" \
+		_resolved = "OUT OF POWER — %d piece%s still above the line" \
 			% [left, "" if left == 1 else "s"]
 
 
@@ -283,10 +379,18 @@ func _refresh() -> void:
 		_buttons[i].button_pressed = (Tools.ORDER[i] == _tool)
 	if _status == null:
 		return
+	if _bar != null:
+		_bar.max_value = maxf(1.0, _power_full)
+		_bar.value = _power
 	var state := _resolved
 	if state == "":
-		state = "settling…" if _busy else "%d above the line" % _level.standing()
-	_status.text = "moves %d   ·   %s\n%s" % [_moves_left, Tools.NAMES[_tool], state]
+		if _holding and _tool != Tools.Kind.JACKHAMMER:
+			state = "hold to build — %d power" % int(round(Tools.cost(_tool, _charge)))
+		elif _busy:
+			state = "settling…"
+		else:
+			state = "%d above the line" % _level.standing()
+	_status.text = "power %d   ·   %s\n%s" % [int(round(_power)), Tools.NAMES[_tool], state]
 
 
 func _draw() -> void:

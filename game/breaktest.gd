@@ -34,6 +34,7 @@ func _ready() -> void:
 		_check(made_of)
 	_check_budget_proof()
 	_check_rubble()
+	_check_charge()
 
 	print("")
 	print("expected : each material breaks in the number of blows its")
@@ -131,6 +132,43 @@ func _check_rubble() -> void:
 		% [size, acted, _level.live_blocks().size()])
 	if acted:
 		_failures.append("rubble: charged a move for a blow that cannot divide it")
+
+
+## Holding longer has to buy more. The charge scales what a tool delivers and
+## what it costs, and both have to move in the same direction — a hold that
+## costs more and does less is worse than no hold at all.
+func _check_charge() -> void:
+	var tap := Tools.cost(Tools.Kind.EXPLOSIVE, 0.0)
+	var full := Tools.cost(Tools.Kind.EXPLOSIVE, 1.0)
+	var weak := Tools.strength(0.0)
+	var strong := Tools.strength(1.0)
+	print("charge      a tap costs %.0f for %.0f%% of the tool, a full hold %.0f for %.0f%%"
+		% [tap, weak * 100.0, full, strong * 100.0])
+	if not (tap < full):
+		_failures.append("a full hold costs no more than a tap")
+	if not (weak < strong):
+		_failures.append("a full hold delivers no more than a tap")
+	if weak <= 0.0:
+		_failures.append("a tap delivers nothing at all")
+
+	# And it has to show up in the world, not just in the numbers: a tapped
+	# charge must leave more standing than a held one.
+	var wall: Array = []
+	for i in 3:
+		wall.append({"x": 360.0 + i * 40.0, "y": 540.0 - 30.0,
+			"w": 30.0, "h": 60.0, "material": Materials.CONCRETE})
+	var results := {}
+	for charge in [0.0, 1.0]:
+		_level.build({
+			"centre_x": 400.0, "floor_y": 540.0, "height_line": 440.0,
+			"blocks": wall.duplicate(true), "moves": 1, "power": 100.0,
+		})
+		Tools.apply(Tools.Kind.EXPLOSIVE, _level, Vector2(400.0, 510.0), charge)
+		results[charge] = _level.live_blocks().size()
+	print("charge      a tapped charge leaves %d pieces, a held one %d"
+		% [results[0.0], results[1.0]])
+	if results[1.0] <= results[0.0]:
+		_failures.append("holding the charge broke no more than tapping it")
 
 
 func _build_one(made_of: String, size: Vector2) -> void:

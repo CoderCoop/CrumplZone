@@ -325,7 +325,7 @@ func destroy(body: RigidBody2D) -> void:
 ##
 ## Returns false when there is nothing within reach of the arc. You cannot
 ## swing at empty sky, and a move is not spent trying.
-func swing(at: Vector2, from_left: bool) -> bool:
+func swing(at: Vector2, from_left: bool, strength := 1.0) -> bool:
 	if _ball != null:
 		return false
 	if _nearest_distance(at) > BALL_CHAIN * 0.5:
@@ -338,7 +338,10 @@ func swing(at: Vector2, from_left: bool) -> bool:
 	var start := Vector2.ZERO
 	var clear := false
 	for lift in BALL_LIFTS:
-		start = pivot_at + Vector2(side * sin(lift), cos(lift)) * BALL_CHAIN
+		# How far back the crane hauled it before the player let go. A short
+		# hold is a short swing and arrives with less behind it.
+		var hauled: float = lift * clampf(strength, 0.2, 1.0)
+		start = pivot_at + Vector2(side * sin(hauled), cos(hauled)) * BALL_CHAIN
 		if block_at(start, BALL_RADIUS + 6.0) == null:
 			clear = true
 			break

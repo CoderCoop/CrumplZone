@@ -8,19 +8,42 @@ extends RefCounted
 const CENTRE_X := 400.0
 const FLOOR_Y := 540.0
 
-## Where the survey line sits, and this number is measured rather than chosen.
+## How far a demolished building spreads beyond its own footprint, how densely
+## broken pieces pack, and how much clearance the line keeps above the pile.
 ##
-## Nothing is ever deleted, so a demolished building has to fit under the line
-## as rubble. Pulverised completely — eleven charges, no budget — this one
-## settles into a pile 119 px deep spread over 1150 px of street, so a line at
-## the old 100 px was asking for something the material volume makes
-## impossible: the solver could not find a solution at any depth, and the
-## reason was arithmetic rather than tactics.
+## These three turn a level's material volume into a survey line, which has to
+## be computed rather than chosen: nothing is ever deleted, so the rubble has
+## to fit underneath the line, and a level whose line sits below its own pile
+## is unsolvable for reasons no tactics can fix. The symptom is a beam search
+## that plateaus at every depth, which reads exactly like a level that is
+## merely hard — so a generator that picked a constant would produce
+## impossible levels and no way to tell.
 ##
-## 135 clears that floor with room for the solver's margin, and still means
-## what the line is for: a standing ground-floor stump passes, and anything
-## above it does not.
-const LINE_ABOVE_GROUND := 135.0
+## Calibrated against a measurement, not a guess: pulverised completely, the
+## tower below has 78,912 px² of material and settles into a pile 119 px deep
+## across about 1150 px of street. These numbers reproduce that within a few
+## pixels and then keep a fifth of it as clearance.
+const SPREAD := 350.0        # how far debris travels past each edge
+const PACKING := 0.62        # how much of that area broken pieces actually fill
+const CLEARANCE := 1.2       # how much room the line keeps above the pile
+const LINE_MIN := 90.0
+
+
+## The line for a set of blocks: high enough that the rubble fits under it, low
+## enough that anything still standing breaks it.
+static func line_above_ground(blocks: Array) -> float:
+	var area := 0.0
+	var left := INF
+	var right := -INF
+	for b in blocks:
+		area += float(b["w"]) * float(b["h"])
+		left = minf(left, float(b["x"]) - float(b["w"]) * 0.5)
+		right = maxf(right, float(b["x"]) + float(b["w"]) * 0.5)
+	if area <= 0.0:
+		return LINE_MIN
+	var spread: float = maxf(right - left, 1.0) + SPREAD * 2.0
+	return maxf(LINE_MIN, area / (spread * PACKING) * CLEARANCE)
+
 
 const COLUMN := Vector2(22.0, 76.0)
 const SLAB_H := 22.0
@@ -88,9 +111,15 @@ static func tower(storeys: int = 3, columns: int = 5, spacing: float = 86.0) -> 
 	return {
 		"centre_x": CENTRE_X,
 		"floor_y": FLOOR_Y,
-		"height_line": FLOOR_Y - LINE_ABOVE_GROUND,
+		"height_line": FLOOR_Y - line_above_ground(blocks),
 		"blocks": blocks,
-		# The solver needs seven of these, and a player is not a beam search.
-		# The charter's rule is budget = a solution that exists, plus slack.
+		# `moves` is the solver's search depth: how many tool uses it may chain
+		# looking for a solution. It needs seven, and a player is not a beam
+		# search, so the depth allows eight.
 		"moves": 8,
+		# What a player actually spends. The solver works in full-strength
+		# uses, so a budget of that many of them is a budget a solution fits
+		# inside — and a player who taps rather than holds, or who chips with
+		# the jackhammer, buys more uses out of the same bar.
+		"power": 8.0 * Tools.cost(Tools.Kind.EXPLOSIVE, 1.0),
 	}

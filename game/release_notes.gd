@@ -11,6 +11,19 @@ extends RefCounted
 
 const NOTES: Array = [
 	{
+		"version": "0.5.0",
+		"date": "2026-08-25",
+		"lines": [
+			"Hold to use a tool instead of tapping it. The jackhammer keeps "
+			+ "chipping while you hold.",
+			"The ball hauls further back the longer you hold, and swings when "
+			+ "you let go — a longer haul hits harder.",
+			"Moves are gone: there is a power bar now, and how you spend it is "
+			+ "up to you.",
+			"Holding shows you where it would land before you commit.",
+		],
+	},
+	{
 		"version": "0.4.0",
 		"date": "2026-08-25",
 		"lines": [

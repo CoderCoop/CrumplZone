@@ -204,8 +204,16 @@ stateDiagram-v2
     Failed --> [*]
 ```
 
-Play is turn-based: the simulation runs to rest between moves, so the player
-always acts on a settled structure. The wrecking ball is part of that: it is a
+Play is paced by a power bar rather than by a count of moves: every use of a
+tool takes a bite out of it, sized by how long the tool was held. Holding is
+the whole interface — the jackhammer repeats while held, and the ball and the
+charge build up and go on release — so the player decides how much to spend on
+each use rather than every use costing the same.
+
+The solver still works in whole, full-strength uses, which is the most
+expensive way to play. That keeps its search discrete and, more usefully, means
+a solution it finds is affordable however the player chooses to spend: tapping
+or chipping buys *more* uses out of the same bar, never fewer. The wrecking ball is part of that: it is a
 real body on a pinned chain rather than a force applied to an area, so a move
 that swings it is not finished until the ball has swung, landed, been lifted
 clear, and the building has stopped moving. `level.gd` reports the world
@@ -214,7 +222,8 @@ judged before its tool has arrived. `level.gd` watches body velocities to
 decide when the world has settled, then counts pieces whose *outline* — not
 centre — still reaches above the line.
 
-Where that line sits is measured, not chosen. Nothing is ever deleted, so a
+Where that line sits is computed from the level's own material volume, by
+`Levels.line_above_ground` — not chosen, and not a constant. Nothing is ever deleted, so a
 demolished building has to fit underneath it as rubble: pulverise the hand-built
 level completely and it settles into a pile 119 px deep, which is why the line
 sits at 135 and not at the 100 it started at. A level whose line is below its
