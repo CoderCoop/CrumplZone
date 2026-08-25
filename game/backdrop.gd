@@ -10,30 +10,42 @@ extends Node2D
 ## does not reshuffle itself every time a level is rebuilt — which, given the
 ## solver rebuilds a level thousands of times, would be both distracting and a
 ## waste of the frames it takes to draw.
+##
+## Three depths, drawn far to near, each paler and softer than the one in front
+## of it. That is the whole trick behind a city that looks like a city: haze
+## with distance, detail with proximity.
 
 const SEED := 8412
 
-const SKY_TOP := Color(0.09, 0.11, 0.19)
-const SKY_HORIZON := Color(0.45, 0.29, 0.26)
-const CITY_FAR := Color(0.14, 0.16, 0.24)
-const CITY_NEAR := Color(0.10, 0.12, 0.18)
-const LIT_WINDOW := Color(1.0, 0.83, 0.48, 0.75)
+const SKY_TOP := Color(0.07, 0.09, 0.17)
+const SKY_HORIZON := Color(0.48, 0.31, 0.27)
+const HAZE := Color(0.42, 0.30, 0.31)
+
+const FAR := Color(0.19, 0.20, 0.29)
+const MID := Color(0.13, 0.15, 0.22)
+const NEAR := Color(0.08, 0.10, 0.15)
+
+const WARM_WINDOW := Color(1.0, 0.82, 0.45, 0.85)
+const COOL_WINDOW := Color(0.62, 0.82, 1.0, 0.55)
+const BEACON := Color(1.0, 0.32, 0.28, 0.9)
+
 const ROAD := Color(0.16, 0.17, 0.19)
 const PAVEMENT := Color(0.22, 0.23, 0.26)
 const KERB := Color(0.34, 0.35, 0.38)
 const LANE := Color(0.62, 0.60, 0.42, 0.55)
 const HOARDING := Color(0.72, 0.55, 0.16)
+const LAMP := Color(1.0, 0.86, 0.55)
 
 var floor_y := 540.0
 var extent := Rect2(-200.0, -400.0, 1400.0, 1200.0)
 
-var _far: Array = []
-var _near: Array = []
+var _layers: Array = []
+var _lamps: Array = []
 
 
 func _ready() -> void:
 	z_index = -100
-	_build_skyline()
+	_build_city()
 
 
 ## Paints whatever the camera can see. main.gd works out that rectangle after
@@ -42,40 +54,57 @@ func _ready() -> void:
 ## like a bug.
 func cover(world: Rect2) -> void:
 	extent = world
-	_build_skyline()
+	_build_city()
 	queue_redraw()
 
 
-func _build_skyline() -> void:
+func _build_city() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = SEED
-	_far = []
-	_near = []
-	var x := extent.position.x
+	# base_offset is how far above the road each layer's feet sit; the further
+	# away, the higher and the hazier.
+	_layers = [
+		_row(rng, 150.0, 120.0, 320.0, 54.0, 130.0, FAR, 0.55),
+		_row(rng, 96.0, 90.0, 240.0, 46.0, 108.0, MID, 0.35),
+		_row(rng, 52.0, 60.0, 170.0, 62.0, 150.0, NEAR, 0.22),
+	]
+	_lamps = []
+	var x := extent.position.x + 60.0
 	while x < extent.end.x:
-		var w := rng.randf_range(46.0, 104.0)
-		var h := rng.randf_range(90.0, 260.0)
-		_far.append({"x": x, "w": w, "h": h, "lit": rng.randf()})
-		x += w + rng.randf_range(6.0, 26.0)
-	x = extent.position.x - 30.0
-	while x < extent.end.x:
-		var w := rng.randf_range(60.0, 130.0)
-		var h := rng.randf_range(50.0, 150.0)
-		_near.append({"x": x, "w": w, "h": h, "lit": rng.randf()})
-		x += w + rng.randf_range(14.0, 40.0)
+		_lamps.append(x)
+		x += 220.0
+
+
+func _row(rng: RandomNumberGenerator, base: float, low: float, high: float,
+		thin: float, wide: float, colour: Color, lit_share: float) -> Dictionary:
+	var blocks: Array = []
+	var x := extent.position.x - 40.0
+	while x < extent.end.x + 40.0:
+		var w := rng.randf_range(thin, wide)
+		var h := rng.randf_range(low, high)
+		blocks.append({
+			"x": x, "w": w, "h": h,
+			"lit": rng.randf() < lit_share,
+			# What sits on the roof: nothing, a setback, a spire or a tank.
+			"top": rng.randi_range(0, 3),
+			"warm": rng.randf() < 0.7,
+			"beacon": rng.randf() < 0.18,
+		})
+		x += w + rng.randf_range(4.0, 22.0)
+	return {"base": base, "colour": colour, "blocks": blocks}
 
 
 func _draw() -> void:
 	_draw_sky()
-	_draw_city(_far, CITY_FAR, 118.0, 0.55)
-	_draw_city(_near, CITY_NEAR, 64.0, 0.35)
+	for layer in _layers:
+		_draw_row(layer)
 	_draw_ground()
 
 
-## Banded rather than a shader: a dozen rectangles is enough for a dusk
-## gradient and costs nothing on a phone.
+## Banded rather than a shader: a couple of dozen rectangles is enough for a
+## dusk gradient and costs nothing on a phone.
 func _draw_sky() -> void:
-	const BANDS := 18
+	const BANDS := 26
 	var top := extent.position.y
 	var height := floor_y - top
 	for i in BANDS:
@@ -83,27 +112,57 @@ func _draw_sky() -> void:
 		var band := Rect2(
 			extent.position.x, top + height * float(i) / BANDS,
 			extent.size.x, height / BANDS + 1.0)
-		draw_rect(band, SKY_TOP.lerp(SKY_HORIZON, pow(t, 2.2)))
+		draw_rect(band, SKY_TOP.lerp(SKY_HORIZON, pow(t, 2.4)))
 
 
-func _draw_city(blocks: Array, colour: Color, base_offset: float, window_odds: float) -> void:
-	var base := floor_y - base_offset
-	for b in blocks:
-		draw_rect(Rect2(b["x"], base - b["h"], b["w"], b["h"]), colour)
-		# A few lit windows, so the skyline reads as buildings rather than as
-		# a bar chart.
-		if b["lit"] > window_odds:
-			continue
-		var rows := int(b["h"] / 22.0)
-		var cols := int(b["w"] / 18.0)
-		for r in rows:
-			for c in cols:
-				# Deterministic scatter: no RNG call, just a hash of the cell.
-				if (int(b["x"]) + r * 7 + c * 13) % 5 != 0:
-					continue
-				draw_rect(Rect2(
-					b["x"] + 6.0 + c * 18.0, base - b["h"] + 8.0 + r * 22.0,
-					6.0, 9.0), LIT_WINDOW)
+func _draw_row(layer: Dictionary) -> void:
+	var base: float = floor_y - float(layer["base"])
+	var colour: Color = layer["colour"]
+	for b in layer["blocks"]:
+		var x: float = b["x"]
+		var w: float = b["w"]
+		var h: float = b["h"]
+		draw_rect(Rect2(x, base - h, w, h), colour)
+		_draw_roof(b, x, base - h, w, colour)
+		if b["lit"]:
+			_draw_windows(b, x, base - h, w, h)
+
+
+## Roofs are what stop a skyline reading as a bar chart: a setback, a spire, a
+## water tank, or nothing at all.
+func _draw_roof(b: Dictionary, x: float, top: float, w: float, colour: Color) -> void:
+	match int(b["top"]):
+		1:      # setback: a smaller storey on top
+			draw_rect(Rect2(x + w * 0.2, top - w * 0.28, w * 0.6, w * 0.28), colour)
+		2:      # spire
+			var spire := x + w * 0.5
+			draw_rect(Rect2(spire - 2.0, top - w * 0.75, 4.0, w * 0.75), colour)
+			if b["beacon"]:
+				draw_circle(Vector2(spire, top - w * 0.75), 2.5, BEACON)
+		3:      # water tank on legs
+			var tank := Rect2(x + w * 0.32, top - 22.0, w * 0.36, 14.0)
+			draw_rect(tank, colour)
+			draw_rect(Rect2(tank.position.x + 2.0, tank.end.y, 3.0, 8.0), colour)
+			draw_rect(Rect2(tank.end.x - 5.0, tank.end.y, 3.0, 8.0), colour)
+
+
+## Lit windows in a grid, deterministic from the building's own position so the
+## same tower always lights the same rooms.
+func _draw_windows(b: Dictionary, x: float, top: float, w: float, h: float) -> void:
+	var colour: Color = WARM_WINDOW if b["warm"] else COOL_WINDOW
+	var step := 16.0
+	var rows := int(h / 20.0)
+	var cols := int(w / step)
+	for r in rows:
+		for c in cols:
+			var cell := int(x) * 7 + r * 31 + c * 13
+			if cell % 5 != 0:
+				continue
+			var lit := colour
+			# A few rooms brighter than the rest, so the grid is not uniform.
+			if cell % 15 == 0:
+				lit = colour.lightened(0.25)
+			draw_rect(Rect2(x + 5.0 + c * step, top + 9.0 + r * 20.0, 5.0, 8.0), lit)
 
 
 ## The street the site sits on. Everything here is below the level's own
@@ -114,7 +173,10 @@ func _draw_ground() -> void:
 	var width := extent.size.x
 	var bottom := extent.end.y
 
-	# Pavement, then the kerb edge, then asphalt.
+	# A band of haze where the city meets the ground, so the skyline sits in
+	# the air rather than on the pavement.
+	draw_rect(Rect2(left, floor_y - 60.0, width, 60.0), Color(HAZE.r, HAZE.g, HAZE.b, 0.18))
+
 	draw_rect(Rect2(left, floor_y, width, bottom - floor_y), PAVEMENT)
 	draw_rect(Rect2(left, floor_y + 92.0, width, maxf(bottom - floor_y - 92.0, 0.0)), ROAD)
 	draw_rect(Rect2(left, floor_y + 88.0, width, 4.0), KERB)
@@ -128,6 +190,26 @@ func _draw_ground() -> void:
 			Vector2(stripe, band.end.y), Vector2(stripe + 16.0, band.position.y),
 			HOARDING, 6.0)
 		stripe += 30.0
+
+	# Street lights: a post standing at the kerb with its head clear of the
+	# hoarding, and a pool of light on the road under it. The glow is three
+	# nested cones rather than one, because a single flat trapezoid at low
+	# alpha reads as a grey shape painted on the road rather than as light.
+	for x in _lamps:
+		var foot := floor_y + 96.0
+		var head := Vector2(float(x) + 14.0, foot - 88.0)
+		draw_rect(Rect2(float(x) - 1.5, head.y, 3.0, 88.0), Color(0.31, 0.32, 0.36))
+		draw_rect(Rect2(float(x) - 1.5, head.y - 2.0, 16.0, 3.0), Color(0.31, 0.32, 0.36))
+		for step in 3:
+			var spread := 26.0 + float(step) * 22.0
+			var fade := 0.10 - float(step) * 0.03
+			draw_colored_polygon(PackedVector2Array([
+				head + Vector2(-5.0, 2.0), head + Vector2(5.0, 2.0),
+				Vector2(head.x + spread, foot + 26.0),
+				Vector2(head.x - spread, foot + 26.0)]),
+				Color(1.0, 0.86, 0.55, fade))
+		draw_circle(head, 11.0, Color(1.0, 0.86, 0.55, 0.16))
+		draw_circle(head, 4.0, LAMP)
 
 	# Lane markings, so the asphalt reads as a road rather than as a gap at the
 	# bottom of the screen.
