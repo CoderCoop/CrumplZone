@@ -170,6 +170,11 @@ charter's generate-and-verify design.
 
 **`tools/`** holds checks that are too slow or too browser-shaped to live in
 the main test gate but must still be reproducible rather than done by hand.
+`verify-web-export` proves the build runs where Pages serves it;
+`verify-pwa` proves a browser will offer to install it *and* that the game puts
+the offer on screen. The second half of that matters more than it sounds: the
+offer can break in the manifest, in the page's hooks, or in the game noticing,
+and it had broken in the third place while the first two were perfect.
 
 ## How a change reaches players
 

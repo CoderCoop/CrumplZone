@@ -11,6 +11,19 @@ extends RefCounted
 
 const NOTES: Array = [
 	{
+		"version": "0.7.0",
+		"date": "2026-08-25",
+		"lines": [
+			"The Install button works now — it never appeared before, on a "
+			+ "build that was perfectly installable.",
+			"Glass broken down to slivers drops to the ground and holds "
+			+ "nothing up.",
+			"The building has proper architecture: capped columns, floor "
+			+ "fascias, mullioned glazing, a parapet and a plant room.",
+			"Clearer tool icons.",
+		],
+	},
+	{
 		"version": "0.6.0",
 		"date": "2026-08-25",
 		"lines": [

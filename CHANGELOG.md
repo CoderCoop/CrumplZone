@@ -7,7 +7,31 @@ sections are dated.
 
 ## [Unreleased]
 
-Nothing since 0.6.0.
+Nothing since 0.7.0.
+
+## [0.7.0] - 2026-08-25
+
+### Fixed
+
+- **The Install button now actually appears.** It never did, for two reasons
+  that both had to be found by measuring. The browser fires its install offer a
+  moment *after* the page loads, and the help screen asked once at startup and
+  never again — so the answer was always "no". And a JavaScript `true` did not
+  survive the trip across the bridge into the game, so even a well-timed answer
+  read as false. The game now re-checks, and asks in a form that survives.
+- **Glass ground down to slivers holds nothing up.** The smallest shards drop
+  through whatever they are in and settle on the ground; nothing rests on them.
+  A floor slab propped on a heap of broken glass was as wrong as it sounds —
+  measured, one now falls 79 px straight through.
+
+### Changed
+
+- **The building has architecture.** Columns carry cap and base plates,
+  floor slabs have a fascia under them and a lip on top, glazing is divided by
+  a mullion and a transom, and the roof has a parapet and a plant room.
+- **New tool icons.** A breaker with a T-handle and chisel, a ball on a chain
+  of links hung from a hook, and a bundle of dynamite with a lit fuse. The old
+  jackhammer read as a nail.
 
 ## [0.6.0] - 2026-08-25
 
