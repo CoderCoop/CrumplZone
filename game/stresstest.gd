@@ -16,6 +16,9 @@ extends Node2D
 
 const FLOOR_Y := 540.0
 const STAND_TICKS := 400        # six and a half seconds of standing still
+## How far something has to drop before "it was not being held up" is a fair
+## description of what happened. Settling onto a stump moves a few px.
+const FALL := 40.0
 const LOAD_TICKS := 400
 
 var _level: Level
@@ -27,6 +30,8 @@ var _pane: RigidBody2D
 var _pane_broke_at := -1
 var _swept_before := 0
 var _standing_before := 0
+var _slab: RigidBody2D
+var _slab_y := 0.0
 
 
 func _ready() -> void:
@@ -61,6 +66,13 @@ func _physics_process(_delta: float) -> void:
 			if _ticks < 300:
 				return
 			_finish_sweep()
+			_phase = "dust"
+			_ticks = 0
+			_start_dust()
+		"dust":
+			if _ticks < 240:
+				return
+			_finish_dust()
 			_report()
 			_phase = "done"
 
@@ -136,11 +148,50 @@ func _finish_sweep() -> void:
 			_failures.append("a live piece went missing")
 
 
+# --- 4. glass ground to slivers cannot hold anything up -------------------
+
+func _start_dust() -> void:
+	# A slab held up on nothing but a heap of the smallest glass slivers. It
+	# has no business staying up there.
+	var blocks: Array = []
+	var size := sqrt(Materials.MIN_AREA * 2.0) * 0.8
+	for i in 6:
+		blocks.append({
+			"x": 380.0 + float(i % 3) * size, "y": FLOOR_Y - 20.0 - float(i / 3) * size,
+			"w": size, "h": size, "material": Materials.GLASS})
+	blocks.append({
+		"x": 400.0, "y": FLOOR_Y - 90.0, "w": 120.0, "h": 22.0,
+		"material": Materials.CONCRETE})
+	_level.build({
+		"centre_x": 400.0, "floor_y": FLOOR_Y, "height_line": FLOOR_Y - 400.0,
+		"power": 100.0, "moves": 1, "blocks": blocks,
+	})
+	_slab = _level.live_blocks()[6]
+	_slab_y = _slab.global_position.y
+
+
+func _finish_dust() -> void:
+	var dropped := (_slab.global_position.y - _slab_y) if is_instance_valid(_slab) else 9999.0
+	var shards := 0
+	var resting_high := 0
+	for body in _level.live_blocks():
+		if bool(body.get_meta("dust", false)):
+			shards += 1
+			if body.global_position.y < FLOOR_Y - 40.0:
+				resting_high += 1
+	print("dust        slab on a heap of slivers fell %.0f px; %d shards left, %d of them still up high"
+		% [dropped, shards, resting_high])
+	if dropped < FALL:
+		_failures.append(
+			"a slab rested on glass slivers: it only fell %.0f px" % dropped)
+
+
 func _report() -> void:
 	print("")
 	print("expected : an untouched building does not break itself, a floor")
-	print("           landing on glass breaks it, and rubble that has come to")
-	print("           rest below the line stops being simulated")
+	print("           landing on glass breaks it, rubble that has come to rest")
+	print("           below the line stops being simulated, and glass ground to")
+	print("           slivers holds nothing up")
 	if _failures.is_empty():
 		print("VERDICT  : PASS")
 		get_tree().quit(0)

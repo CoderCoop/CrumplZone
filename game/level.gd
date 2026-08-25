@@ -64,6 +64,16 @@ const REST_SPEED := 8.0
 const LOST_BELOW := 420.0
 const LOST_BESIDE := 1500.0
 
+## Collision layers. Structure and ground interact with each other; dust —
+## glass ground down to its smallest shard — interacts with the ground alone,
+## so it falls through whatever it is sitting in and nothing can rest on it.
+## A pane broken into slivers has stopped being able to hold anything up, and
+## a heap of slivers propping up a floor slab looked exactly as wrong as it
+## sounds.
+const LAYER_STRUCTURE := 1
+const LAYER_DUST := 2
+const LAYER_GROUND := 3
+
 var _settled_ticks := 0
 var _stress_tick := 0
 var _resting_tick := 0
@@ -127,6 +137,8 @@ func build(level_spec: Dictionary) -> void:
 	var ground := StaticBody2D.new()
 	ground.name = "Ground"
 	ground.position = Vector2(spec.get("centre_x", 480.0), spec["floor_y"] + 24.0)
+	ground.set_collision_layer_value(LAYER_STRUCTURE, false)
+	ground.set_collision_layer_value(LAYER_GROUND, true)
 	var ground_shape := CollisionShape2D.new()
 	var ground_rect := RectangleShape2D.new()
 	ground_rect.size = Vector2(2400.0, 48.0)
@@ -173,6 +185,16 @@ func _make_piece(pos: Vector2, polygon: PackedVector2Array, made_of: String,
 	# _stress_pass. Without this the engine resolves contacts and tells nobody.
 	body.contact_monitor = true
 	body.max_contacts_reported = 6
+
+	# Dust falls to the ground and stops mattering to anything else.
+	var dust := made_of == Materials.GLASS \
+		and Fracture.area(polygon) < Materials.MIN_AREA * 2.0
+	body.set_collision_layer_value(LAYER_STRUCTURE, not dust)
+	body.set_collision_layer_value(LAYER_DUST, dust)
+	body.set_collision_mask_value(LAYER_STRUCTURE, not dust)
+	body.set_collision_mask_value(LAYER_GROUND, true)
+	if dust:
+		body.set_meta("dust", true)
 
 	var shape := CollisionShape2D.new()
 	var convex := ConvexPolygonShape2D.new()
@@ -766,8 +788,10 @@ func _retire(body: RigidBody2D) -> void:
 	body.angular_velocity = 0.0
 	_debris.append(body)
 	body.freeze = true
-	body.set_collision_layer_value(1, false)
-	body.set_collision_mask_value(1, false)
+	body.set_collision_layer_value(LAYER_STRUCTURE, false)
+	body.set_collision_layer_value(LAYER_DUST, false)
+	body.set_collision_mask_value(LAYER_STRUCTURE, false)
+	body.set_collision_mask_value(LAYER_GROUND, false)
 	body.contact_monitor = false
 	# Dimmed into the road rather than removed, so the street fills up with
 	# what came off the building.
