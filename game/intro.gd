@@ -23,6 +23,8 @@ const ACCENT := Color(0.95, 0.45, 0.35)
 const MARGIN := 16.0
 const PLAY_HEIGHT := 52.0
 const INSTALL_HEIGHT := 46.0
+## How often to ask the browser whether it is offering an install yet.
+const INSTALL_POLL := 0.4
 const TAB_HEIGHT := 44.0
 
 var _root: Control
@@ -32,6 +34,7 @@ var _scroll: ScrollContainer
 var _play: Button
 var _install: Button
 var _install_note: Label
+var _install_poll := 0.0
 var _how: VBoxContainer
 var _news: VBoxContainer
 var _how_button: Button
@@ -105,12 +108,29 @@ func _ready() -> void:
 ## The install button appears when the browser offers one, and the note takes
 ## its place on iOS, where there is no prompt to fire and the only way in is
 ## Share → Add to Home Screen.
+## Re-checked rather than read once. The browser fires its install event a
+## moment after the page loads — after this screen has already been built — so
+## asking once at startup answered "no" every time and the button never
+## appeared, on a build that was perfectly installable.
+func _process(_delta: float) -> void:
+	_install_poll -= _delta
+	if _install_poll > 0.0:
+		return
+	_install_poll = INSTALL_POLL
+	_refresh_install()
+
+
 func _refresh_install() -> void:
 	if _install == null:
 		return
-	_install.visible = UI.can_install()
+	var offered := UI.can_install()
+	if offered == _install.visible:
+		return
+	_install.visible = offered
 	if _install_note != null:
-		_install_note.visible = not _install.visible and not UI.installed()
+		_install_note.visible = not offered and not UI.installed()
+	UI.report_install_button(offered)
+	relayout()
 
 
 func _on_install() -> void:

@@ -104,7 +104,9 @@ static func tower(storeys: int = 3, columns: int = 5, spacing: float = 86.0) -> 
 			"x": CENTRE_X,
 			"y": y - SLAB_H * 0.5,
 			"w": slab_w, "h": SLAB_H,
-			"role": "slab", "material": Materials.CONCRETE,
+			# The topmost floor is the roof, and gets a parapet and plant on it.
+			"role": "roof" if storey == storeys - 1 else "slab",
+			"material": Materials.CONCRETE,
 		})
 		y -= SLAB_H
 

@@ -66,6 +66,15 @@ jobs:
           npx playwright install --with-deps chromium
           tools/verify-web-export.sh
 
+      # And it is only installable if a browser says so. The game has an
+      # Install button that only appears when the browser offers one, which
+      # means the offer can break in three places — the manifest, the hooks in
+      # the page, and the game noticing. This checks all three against a real
+      # browser, in a persistent profile, because Chrome refuses to offer an
+      # install in incognito and a default automation profile is incognito.
+      - name: Verify the build installs as an app
+        run: tools/verify-pwa.sh
+
       - uses: actions/upload-artifact@v7
         if: always()
         with:
