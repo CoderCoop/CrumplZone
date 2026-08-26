@@ -11,6 +11,15 @@ extends RefCounted
 
 const NOTES: Array = [
 	{
+		"version": "0.9.1",
+		"date": "2026-08-26",
+		"lines": [
+			"If you installed this to your home screen, it now picks up new "
+			+ "versions on its own. It used to download them and then wait "
+			+ "for you to close the app completely before switching over.",
+		],
+	},
+	{
 		"version": "0.9.0",
 		"date": "2026-08-26",
 		"lines": [
