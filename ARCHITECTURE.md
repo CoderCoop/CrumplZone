@@ -24,17 +24,19 @@ graph TD
         materials["materials.gd<br/>durability and colour"]
         fracture["fracture.gd<br/>how a shape comes apart"]
         tools["tools.gd<br/>the three verbs"]
-        levels["levels.gd<br/>hand-built specs"]
+        levels["levels.gd<br/>hand-built specs<br/>lines, pile, power"]
+        architecture["architecture.gd<br/>real structural systems"]
         generator["generator.gd<br/>seeded specs"]
         solver["solver.gd<br/>searches for a solution"]
     end
 
     subgraph checks["Checked, not shipped"]
-        partest["partest.gd<br/>par and solvability<br/>for all three difficulties"]
+        partest["partest.gd<br/>solvability and depth<br/>for all three difficulties"]
         waketest["waketest.gd<br/>settled bodies get woken"]
         breaktest["breaktest.gd<br/>everything breakable breaks"]
         stresstest["stresstest.gd<br/>weight breaks the right things"]
         collapsetest["collapsetest.gd<br/>broken columns stop carrying"]
+        gentest["gentest.gd<br/>generated levels stand up<br/>and stay winnable"]
         verifylv["verify_levels.gd<br/>generate-and-verify measurement"]
     end
 
@@ -68,9 +70,10 @@ graph TD
     materials -->|swatches and hit counts| intro
     levels -->|level spec| level
     tools -->|acts on| level
+    architecture -->|blocks for one system| generator
     generator -->|level spec| solver
+    levels -->|lines, pile, power| generator
     solver -->|drives headlessly| level
-    solver -->|budget = solution + slack| levels
     partest -->|drives headlessly| level
     verifylv -->|drives| solver
     partest -->|gates| ci
@@ -83,6 +86,8 @@ graph TD
     collapsetest -->|drives| level
     collapsetest -->|gates| ci
     fracture -->|cuts a piece in two| level
+    gentest -->|drives| generator
+    gentest -->|gates| ci
     verifylv -->|gates| ci
     main -->|exported as WASM| pages
     pages --> verify
@@ -126,9 +131,22 @@ matters:
   and none of them delete anything — a block that vanished never read as
   physics. What they cost in damage meets what a material absorbs, which is
   where durability turns into a decision.
+- **`architecture.gd`** holds the structural systems, one function each, taken
+  from how buildings are really put together: a glazed steel frame, a
+  large-panel block, a flat-slab frame, a stacked chimney, a portal-framed
+  shed, and load-bearing masonry. They are here rather than in the generator
+  because the difference between them is the game — each stands up for a
+  different reason, so each has a different load path to attack, and a tool
+  that works on one is the wrong tool for another. A system is only listed in
+  `GENERATED` once it stands still on its own; masonry is written and held
+  back, because it settles 15 px untouched where the others settle under 2.
 - **`levels.gd`** produces hand-built level specs — plain dictionaries of
-  blocks. **`generator.gd`** produces the same shape from a seed, varying
-  storeys, bays, spacing, pillar widths and which interior pillars are missing.
+  blocks — and, in `finish()`, attaches everything that follows from the shape
+  of a building: how much rubble it will leave, where the three lines go, and
+  how much power bar it gets. Authored and generated levels both come through
+  it, so they are rated the same way. **`generator.gd`** picks a system, an era
+  and a setting from a seed; the era substitutes materials without touching the
+  load path, and the setting decides which city stands behind it.
   Neither decides whether a level is any good.
 - **`solver.gd`** does. It searches a level's move space by playing it: build,
   apply a candidate move, simulate to rest, score what is left, beam-search
@@ -180,38 +198,54 @@ loads a build, publishes a newer one over the top of it, and checks the page
 ends up running the new one without clearing anything or closing the tab. A
 fresh browser always sees the newest build, so no manual test can answer this.
 
-### Difficulty, par, and the rating
+### Difficulty, the lines, and the rating
 
-A level is a shape; everything numeric about it is measured from that shape or
-from a solution, never chosen by hand:
+A level is a shape; everything numeric about it is measured from that shape,
+never chosen by hand:
 
-- **The survey line** comes from the building's material volume, because
-  nothing is ever deleted and the rubble has to fit under the line.
-- **Par** is what the solver's best solution for that level costs in power.
-- **The power bar** is a multiple of par, set well clear of it, so finishing is
-  the floor rather than the challenge.
-- **The rating** is the run's spend against par: three stars for within 15% of
-  the best known solution, two for within 55%, one for clearing it at all.
+- **The pile** is how high the rubble would sit if the building were pulverised
+  completely — estimated from its material volume and how far that system's
+  debris spreads, with a safety factor, since nothing is ever deleted.
+- **Three lines** follow from the pile. The third-star line sits just above it,
+  so three stars means taking a building to very near the flattest it can
+  physically be left. The winning line sits well clear, so bringing a building
+  down is never the hard part. The second sits midway. All three are capped
+  under a share of the building's own height, and then the pile wins, or a wide
+  low building would be won before it was touched.
+- **The power bar** is a multiple of the building's material area, sized to be
+  enough rather than to be exact.
+- **The rating** is how many lines everything is under when the dust settles.
 
-Rating against par rather than against a fraction of the bar is what makes
-"three stars is hard" true on every level instead of on the one that happened
-to be tuned. A fraction of the bar means something different on each level and
-nothing at all on a level nobody has measured — which is the situation any
-generated level starts in.
+This replaced rating against par — what the solver's best solution costs. Par
+was correct and unmaintainable: it had to be re-measured with the solver
+every time the physics changed what a demolition costs, which happened twice
+in one day. Lines derived from the pile hold their meaning through a physics
+change, are drawn on the level so the player can see what they are aiming at,
+and work on a generated level nobody has ever solved.
 
-`partest.gd` is what keeps this honest: it runs the solver over all three
-difficulties and fails if a par has drifted from what a solution really costs,
-if a level cannot be solved within its depth, or if one use clears it.
+Getting under the first line ends the level only if you want it to. The result
+screen offers the choice: bank it, or go back with the power still in the bar
+and try for the next line.
+
+`gentest.gd` gates the generated side: it samples a dozen seeds and fails if
+any building damages itself or sags while standing untouched, or if the pile
+estimate comes in under what the level really leaves — which would put the
+third line under reachable and make three stars impossible. `partest.gd` still
+runs the solver over the three authored difficulties, and `oneshottest.gd`
+fails if any single use of any tool clears the hard level on its own.
 
 ```mermaid
 flowchart LR
     shape[Building shape] --> volume[Material volume]
-    volume --> line[Survey line]
+    shape --> system[Structural system]
+    volume --> pile[Estimated pile height]
+    system --> pile
+    pile --> lines[Three lines: win, 2 star, 3 star]
+    volume --> bar[Power bar]
+    lines --> stars[Stars: lines everything is under]
+    lines --> gentest[gentest gates generated levels in CI]
     shape --> solver[Solver searches]
-    solver --> par[Par: cost of best solution]
-    par --> bar[Power bar = par x multiplier]
-    par --> stars[Stars: spend vs par]
-    par --> partest[partest gates all three in CI]
+    solver --> partest[partest gates the authored three]
 ```
 
 ### Staying current
