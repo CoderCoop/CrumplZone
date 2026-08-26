@@ -32,7 +32,7 @@ var _done := false
 
 
 func _ready() -> void:
-	_spec = Levels.tower()
+	_spec = Levels.level(Levels.MEDIUM)
 	_level = Level.new()
 	add_child(_level)
 	_level.build(_spec)
