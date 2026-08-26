@@ -171,7 +171,7 @@ static func _panel(rng: RandomNumberGenerator) -> Array:
 	var wide := rng.randi_range(3, 4)
 	var panel_w := rng.randf_range(84.0, 100.0)
 	var panel_h := rng.randf_range(58.0, 70.0)
-	var floor_h := 18.0
+	var floor_h := 14.0
 	var blocks: Array = []
 	var span := float(wide) * panel_w
 	var first := -span * 0.5 + panel_w * 0.5

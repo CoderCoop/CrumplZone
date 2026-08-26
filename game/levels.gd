@@ -61,6 +61,15 @@ const SPREAD_PER_HEIGHT := {
 	"curtain_wall": 2.04,
 }
 const SPREAD_DEFAULT := 0.95
+
+## Padding on the whole estimate, on top of the per-system spreads.
+##
+## Those spreads were calibrated against buildings that have since changed —
+## masonry grew a lintel course, the car park lost a ramp — and the moment they
+## did, three seeds produced more rubble than they were estimated to, the worst
+## by a fifth. Chasing the constants each time the architecture moves is a
+## losing game, and being wrong the other way only makes a level easier.
+const ESTIMATE_SAFETY := 1.35
 const PACKING := 0.62
 const LINE_MIN := 90.0
 
@@ -89,7 +98,7 @@ static func estimate_pile(blocks: Array, kind := "") -> float:
 	var height: float = maxf(bottom - top, 1.0)
 	var per_height: float = float(SPREAD_PER_HEIGHT.get(kind, SPREAD_DEFAULT))
 	var spread: float = maxf(right - left, 1.0) + height * per_height * 2.0
-	return area / (spread * PACKING)
+	return area / (spread * PACKING) * ESTIMATE_SAFETY
 
 
 const COLUMN := Vector2(22.0, 76.0)

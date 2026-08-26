@@ -128,7 +128,13 @@ const STRESS_RATE := 3.0
 ## supposed to crack. Its margin is 1.0 — no change at all.
 const REST_TOLERANCE := {
 	GLASS: 1.0,
-	BRICK: 2.0,
+	# Brick carries a great deal standing and shatters when struck, which is
+	# the whole character of the material and the reason load-bearing masonry
+	# was built at all. Its margin was set when brick was only ever infill in
+	# a frame; as the structure of a warehouse it was crushing its own piers
+	# and lintels untouched — measured, 14 piers and 11 lintels on one seed.
+	# The impact tolerance is untouched, so it still shatters when hit.
+	BRICK: 3.5,
 	CONCRETE: 3.0,
 	STEEL: 3.0,
 	REINFORCED: 3.0,
