@@ -163,10 +163,20 @@ static func _masonry(rng: RandomNumberGenerator) -> Array:
 				opening + pier * 0.9, LINTEL_H, "lintel", Materials.BRICK))
 		# Timber floor spanning between the walls, which is what a warehouse
 		# of this age actually had.
+		# The floor goes in the openings, not across the whole plan, and the
+		# storey above stands on the lintels rather than on the timber.
+		#
+		# It was a full-width slab with the next storey's piers standing on it,
+		# which put the entire building above onto the joists — measured, they
+		# were the last thing in this system still breaking untouched. In a
+		# warehouse the walls carry the building and the joists carry the
+		# floor; getting that the wrong way round is the whole difference
+		# between a load-bearing wall and a frame.
 		y -= storey_h + LINTEL_H
-		blocks.append(_block(0.0, y - floor_h * 0.5, span - pier, floor_h,
-			"joist", Materials.TIMBER))
-		y -= floor_h
+		for i in bays:
+			var mid := first + pier * 0.5 + opening * 0.5 + float(i) * (opening + pier)
+			blocks.append(_block(mid, y - floor_h * 0.5, opening + pier * 0.4,
+				floor_h, "joist", Materials.TIMBER))
 
 	# A brick parapet, the detail that makes the top read as a warehouse.
 	blocks.append(_block(0.0, y - 14.0, span, 28.0, "parapet", Materials.BRICK))
