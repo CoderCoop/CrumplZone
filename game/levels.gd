@@ -82,17 +82,27 @@ const TITLES := {
 static func level(difficulty: String) -> Dictionary:
 	match difficulty:
 		EASY:
-			# Two storeys, four columns, and no reinforced core: everything
+			# Three storeys, four columns, and no reinforced core: everything
 			# here can be cut, so it is about the order rather than about
 			# working around something you cannot break.
-			return _finish(tower(2, 4, 86.0, false), difficulty, 96.0)
+			#
+			# It was two storeys, and that made it a level one well-placed
+			# charge cleared outright — measured, a single use left nothing
+			# standing. A level cleared by one tap is not an easy puzzle, it
+			# is no puzzle, so it gained a storey rather than losing the point.
+			return _finish(tower(3, 4, 86.0, false), difficulty, 8, 132.0)
 		HARD:
-			# Four storeys, six columns, and two reinforced columns rather
-			# than one — a wider base to bring down and less of it that a
-			# tool will go through.
-			return _finish(tower(4, 6, 82.0, true, 2), difficulty, 300.0)
+			# Four storeys and two reinforced columns: taller than medium, and
+			# with more of the ground floor that a tool will not go through.
+			#
+			# Six columns wide was tried and taken back. At 48 blocks the beam
+			# search found no solution within eight uses, which says nothing
+			# about whether one exists — only that a level this wide costs
+			# more search than it is worth gating CI on. Five columns and a
+			# deeper search is the same idea for a level that can be verified.
+			return _finish(tower(4, 5, 84.0, true, 2), difficulty, 10, 300.0)
 		_:
-			return _finish(tower(3, 5, 86.0, true), difficulty, 216.0)
+			return _finish(tower(3, 5, 86.0, true), difficulty, 8, 192.0)
 
 
 ## Attaches the numbers that depend on a measured solution rather than on the
@@ -101,8 +111,10 @@ static func level(difficulty: String) -> Dictionary:
 ## `par` is what the solver's best solution costs. The power bar is set well
 ## clear of it so finishing is never the hard part; the rating is what makes it
 ## a puzzle, and the rating is measured against par.
-static func _finish(spec: Dictionary, difficulty: String, par: float) -> Dictionary:
+static func _finish(spec: Dictionary, difficulty: String, depth: int,
+		par: float) -> Dictionary:
 	spec["difficulty"] = difficulty
+	spec["moves"] = depth
 	spec["par"] = par
 	spec["power"] = par * POWER_OVER_PAR
 	return spec
