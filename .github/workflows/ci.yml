@@ -162,6 +162,11 @@ jobs:
 
           # Cheap, and it catches the failure that reads as "merely hard":
           # a level whose own rubble will not fit under its own line.
+          # Generated levels: every system stands up untouched, and the pile
+          # estimate is never below what a level really leaves — the failure
+          # that puts the lowest line inside the rubble.
+          run_harness "generation test" res://gentest.tscn
+
           run_harness "line test" res://linetest.tscn
 
           # partest supersedes the old single-level playtest: it runs the same
@@ -169,4 +174,4 @@ jobs:
           # level's par against what a solution really costs.
           run_harness "par test" res://partest.tscn
 
-          echo "::notice::ci passed — secret scan, GDScript checks, wake test, break test, stress test, collapse test, crack test, hull test, replay test, stand test, one shot test, line test, par test"
+          echo "::notice::ci passed — secret scan, GDScript checks, wake test, break test, stress test, collapse test, crack test, hull test, replay test, stand test, one shot test, generation test, line test, par test"
