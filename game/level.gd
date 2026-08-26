@@ -284,9 +284,17 @@ func _visual(polygon: PackedVector2Array, colour: Color,
 	return face
 
 
-## What tells one part of a building from another at a glance: mullions across
-## the glazing, cap and base plates on the columns, a fascia under each floor,
-## and a parapet with plant on the roof.
+## What tells one part of a building from another at a glance, and one kind of
+## building from another: mullions across the glazing, drop heads on flat-slab
+## columns, profiled ribs on shed sheeting, coursing on brick.
+##
+## Each system reads by the thing that is actually distinctive about it in
+## life, because that is also the thing that tells the player how it stands
+## up. Flat-slab columns flare into the slab because that is where a flat slab
+## fails, by punching through. Panels have joints all the way round because
+## they are separate units bearing on each other. Sheeting is ribbed and
+## obviously thin, because it holds nothing up and should not look like it
+## does.
 ##
 ## Only whole pieces get it. A fragment is a fragment, and trim drawn across a
 ## shard would be trim that survived being broken off.
@@ -321,6 +329,118 @@ func _add_detail(face: Polygon2D, polygon: PackedVector2Array, role: String,
 					colour.darkened(0.18))
 				_bar(face, Rect2(30.0, -half.y - 20.0, 4.0, 20.0),
 					colour.darkened(0.34))
+		"post":
+			# A flat slab has no beams, so the column flares into the slab in a
+			# drop head — the detail that says where this frame carries its
+			# load and where punching shear takes it out.
+			for edge in [-half.y, half.y - 7.0]:
+				_bar(face, Rect2(-half.x - 4.0, edge, half.x * 2.0 + 8.0, 7.0),
+					colour.lightened(0.20))
+			_bar(face, Rect2(-half.x + 2.0, -half.y + 9.0, 2.0,
+				half.y * 2.0 - 18.0), colour.lightened(0.26))
+		"deck":
+			# A soffit, and a joint line where the deck meets the storey below.
+			_bar(face, Rect2(-half.x, half.y - 4.0, half.x * 2.0, 4.0),
+				colour.darkened(0.30))
+			_bar(face, Rect2(-half.x, -half.y, half.x * 2.0, 2.0),
+				colour.lightened(0.24))
+		"panel":
+			# Joints on all four sides. A large-panel block is separate units
+			# bearing on each other, and the joint is where it comes apart.
+			for side in [-1.0, 1.0]:
+				_bar(face, Rect2(side * half.x - (2.5 if side > 0.0 else 0.0),
+					-half.y, 2.5, half.y * 2.0), colour.darkened(0.26))
+				_bar(face, Rect2(-half.x, side * half.y - (2.5 if side > 0.0 else 0.0),
+					half.x * 2.0, 2.5), colour.darkened(0.26))
+			# One window per panel, which is how these blocks were made.
+			var win := Vector2(minf(half.x * 0.52, 20.0), minf(half.y * 0.42, 22.0))
+			if win.x > 5.0 and win.y > 5.0:
+				_bar(face, Rect2(-win.x, -win.y - half.y * 0.12, win.x * 2.0,
+					win.y * 2.0), colour.darkened(0.44))
+		"stanchion":
+			# A universal column seen face-on: two flanges and a web between.
+			for side in [-1.0, 1.0]:
+				_bar(face, Rect2(side * half.x - (3.5 if side > 0.0 else 0.0),
+					-half.y, 3.5, half.y * 2.0), colour.lightened(0.26))
+			_bar(face, Rect2(-1.0, -half.y, 2.0, half.y * 2.0),
+				colour.darkened(0.22))
+		"chord":
+			for edge in [-half.y, half.y - 3.0]:
+				_bar(face, Rect2(-half.x, edge, half.x * 2.0, 3.0),
+					colour.lightened(0.26))
+		"web":
+			_bar(face, Rect2(-1.5, -half.y, 3.0, half.y * 2.0),
+				colour.lightened(0.20))
+		"sheeting":
+			# Profiled metal, ribbed at a regular pitch. Thin and obviously
+			# non-structural, which is exactly what it is.
+			var pitch := 11.0
+			var x := -half.x + pitch * 0.5
+			while x < half.x:
+				_bar(face, Rect2(x - 1.0, -half.y, 2.0, half.y * 2.0),
+					colour.darkened(0.24))
+				x += pitch
+		"rooflight":
+			# Glazing bars only — a rooflight has no transom to speak of.
+			var bay := 16.0
+			var gx := -half.x + bay
+			while gx < half.x - 1.0:
+				_bar(face, Rect2(gx - 1.0, -half.y, 2.0, half.y * 2.0),
+					colour.darkened(0.26))
+				gx += bay
+		"footing":
+			# Half in the ground. The dark band is what is buried.
+			_bar(face, Rect2(-half.x, 0.0, half.x * 2.0, half.y),
+				colour.darkened(0.32))
+		"pier", "shaft":
+			_courses(face, half, colour)
+		"spandrel":
+			_courses(face, half, colour)
+			# A stone band on top, where the course carrying the openings
+			# meets the wall above it.
+			_bar(face, Rect2(-half.x, -half.y, half.x * 2.0, 3.5),
+				colour.lightened(0.24))
+		"parapet":
+			_courses(face, half, colour)
+			# A coping stone, which is what stops a parapet reading as one
+			# more course of wall.
+			_bar(face, Rect2(-half.x - 3.0, -half.y - 3.0, half.x * 2.0 + 6.0, 5.0),
+				colour.lightened(0.30))
+		"joist":
+			for edge in [-half.y + 2.0, half.y - 4.0]:
+				_bar(face, Rect2(-half.x, edge, half.x * 2.0, 2.0),
+					colour.darkened(0.26))
+		"plinth":
+			_bar(face, Rect2(-half.x, -half.y, half.x * 2.0, 3.0),
+				colour.lightened(0.26))
+			_bar(face, Rect2(-half.x, half.y - 5.0, half.x * 2.0, 5.0),
+				colour.darkened(0.30))
+		"cap":
+			# Corbelled, in two steps, the way a stack is finished.
+			_bar(face, Rect2(-half.x, -half.y, half.x * 2.0, 5.0),
+				colour.lightened(0.28))
+			_bar(face, Rect2(-half.x * 0.86, -half.y + 5.0, half.x * 1.72, 4.0),
+				colour.darkened(0.18))
+
+
+## Brick, drawn as brick: mortar beds at a regular gauge, with a perpend in
+## every other course offset by half a brick. The offset is the whole point —
+## coursing without the stagger reads as tile, and stretcher bond is what
+## makes a wall carry rather than split down a continuous joint.
+func _courses(face: Polygon2D, half: Vector2, colour: Color) -> void:
+	var gauge := 11.0
+	var brick := 26.0
+	var mortar := colour.darkened(0.26)
+	var row := 0
+	var y := -half.y + gauge
+	while y < half.y:
+		_bar(face, Rect2(-half.x, y - 1.0, half.x * 2.0, 1.6), mortar)
+		var x := -half.x + (brick * 0.5 if row % 2 == 1 else brick)
+		while x < half.x:
+			_bar(face, Rect2(x - 0.7, y, 1.4, gauge), mortar)
+			x += brick
+		y += gauge
+		row += 1
 
 
 func _bar(face: Polygon2D, rect: Rect2, colour: Color) -> void:
