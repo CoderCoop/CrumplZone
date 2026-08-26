@@ -180,23 +180,50 @@ setTimeout(() => {
     helpless.canAsk ? 'it still has the hooks — the test is not testing this'
       : 'no update hooks, as an old install']);
 
-  // Now publish a current build over the top and let it visit, as a person
-  // opening the app does. Nothing but the worker can rescue this client.
-  at('publishing over a client that cannot help itself');
+  // Now publish a current build over the top — and do NOT reload. This is the
+  // distinction the previous version of this check missed and passed anyway: a
+  // reload releases the old client, which lets even an unpatched worker
+  // activate, so the test healed for a reason that had nothing to do with the
+  // fix. Reopening an installed app on a phone usually *resumes* the existing
+  // client rather than navigating, so the worker never gets that opportunity —
+  // which is exactly why a real install stayed on 0.7.0 while this test went
+  // green.
+  //
+  // So the assertion is on the mechanism: with the client still open, does the
+  // newly installed worker take over, or is it left sitting in "waiting"?
+  at('publishing under a client that stays open');
   fs.writeFileSync(pageHtml, current);
   fs.writeFileSync(MARK, 'BUILD-NEW');
   fs.writeFileSync(swFile, fs.readFileSync(swFile, 'utf8')
     .replace(/const CACHE_VERSION = '[^']*'/, "const CACHE_VERSION = 'verify-update-new'"));
 
-  let healed = 'never checked';
-  for (let i = 0; i < 25; i += 1) {
-    await stuck.reload({ waitUntil: 'load', timeout: 60000 }).catch(() => {});
-    healed = await served(stuck).catch(() => healed);
-    if (healed === 'BUILD-NEW') { break; }
-    await stuck.waitForTimeout(1000);
-  }
-  checks.push(['the worker updates it with no help from the page',
-    healed === 'BUILD-NEW', healed]);
+  const took_over = await stuck.evaluate(async () => {
+    const reg = await navigator.serviceWorker.getRegistration();
+    let sawChange = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => { sawChange = true; });
+    for (let i = 0; i < 40; i += 1) {
+      await reg.update().catch(() => {});
+      await new Promise((r) => setTimeout(r, 500));
+      if (!reg.waiting && (reg.active || sawChange)) {
+        // Nothing queued behind us: either it never needed to wait, or it
+        // stepped over the open client the way an installed app needs it to.
+        if (sawChange) { return { stuck: false, why: 'the worker took over' }; }
+      }
+      if (reg.waiting) {
+        // Keep going: it may still skip. Record that it got as far as waiting.
+        continue;
+      }
+    }
+    const reg2 = await navigator.serviceWorker.getRegistration();
+    return {
+      stuck: !!reg2.waiting,
+      why: reg2.waiting
+        ? 'a new worker is installed but left waiting behind the open client'
+        : 'no worker left waiting',
+    };
+  });
+  checks.push(['the new worker does not queue behind an open client',
+    !took_over.stuck, took_over.why]);
   await oldCtx.close();
   fs.rmSync(oldProfile, { recursive: true, force: true });
 
