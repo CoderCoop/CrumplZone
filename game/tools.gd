@@ -54,15 +54,19 @@ const JACKHAMMER_INTERVAL := 0.22
 ## out a region. So the charge is severe inside a core that is a third of its
 ## reach, and falls off gently rather than linearly past that: at half the
 ## radius a linear falloff left half damage, and this leaves about two thirds.
-## A full charge is 105 at the centre, which is past reinforced concrete's 100,
-## so nothing survives being sat on.
+## A full charge is 85 at the centre. It was 105, which is past reinforced
+## concrete's 100 — and that quietly deleted the one piece a level is built to
+## be brought down *around*: one charge took the core out, and one charge
+## cleared the whole hard level, 176 px of rubble under a 204 px line. Eighty
+## five destroys steel, concrete, brick and glass where it lands and still
+## needs two goes at a reinforced core.
 ##
 ## It costs accordingly — see HOLD, where the explosive is the expensive tool.
 ## The bar buys about five full charges rather than eight.
 const BLAST_RADIUS := 155.0
 const BLAST_FORCE := 950.0
 const BLAST_SHATTER := 52.0
-const BLAST_DAMAGE := 105
+const BLAST_DAMAGE := 85
 ## How gently damage falls away past the core. Below 1 keeps it high further
 ## out; 1.0 would be the linear falloff this replaced.
 const BLAST_FALLOFF := 0.6
