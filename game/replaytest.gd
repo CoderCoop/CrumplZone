@@ -4,88 +4,73 @@ extends Node2D
 ##
 ##   godot --headless --fixed-fps 60 --path game res://replaytest.tscn
 ##
-## Note what this does *not* claim. Exact replay was measured long ago and does
-## not hold: the physics diverges across a multi-move collapse, which is why
-## the solver confirms a candidate rather than trusting one run. Positions here
-## drift by design and are reported, not asserted.
+## Note what this does *not* claim, and what it used to claim wrongly.
 ##
-## What must hold is that the same building breaks into the same pieces. That
-## is fracture geometry, which is seeded, and it has been broken once — by a
-## counter feeding each piece's seed that was reset with the Level object
-## rather than with the level. Every rebuild then broke the building
-## differently, and the solver was comparing runs that differed for reasons
-## that had nothing to do with the moves: partest reported the same level
-## solvable in one run and unsolvable in the next.
+## Exact replay does not hold: the physics diverges across a multi-move
+## collapse, which is why the solver confirms a candidate rather than trusting
+## one run. This first tried to assert that a whole collapse produced the same
+## number of pieces, which sounds like fracture geometry but is not — how many
+## pieces a collapse makes depends on which pieces took enough damage to
+## shatter, and that depends on the physics that is known to diverge. It passed
+## while collapses were mild and started failing the moment the explosive got
+## stronger and more pieces sat near their thresholds. A test that holds only
+## while nothing is near a threshold is not testing what it says.
+##
+## What is guaranteed, and what broke once, is narrower: a given piece with a
+## given seed breaks into the same fragments every time. That is pure geometry
+## with no physics in it. It was broken by a counter feeding each piece's seed
+## that reset with the Level object rather than with the level, so every
+## rebuild broke the same building differently and the solver was comparing
+## runs that differed for reasons unrelated to the moves.
 
-const TICKS := 700
+## How many pieces to shatter and compare. One is enough to catch the bug; a
+## handful catches it wherever in the build order it happens to sit.
+const SAMPLES := 6
 
 var _level: Level
-var _ticks := 0
-var _pass := 0
-var _step := 0
-var _plan: Array = []
-var _prints: Array[String] = []
+var _first: Array = []
+var _again: Array = []
 
 
 func _ready() -> void:
 	_level = Level.new()
 	add_child(_level)
-	_begin()
-
-
-func _begin() -> void:
-	var spec := Levels.level(Levels.MEDIUM)
-	_level.build(spec)
-	var cx: float = spec["centre_x"]
-	var fy: float = spec["floor_y"]
-	_plan = [
-		[30, Tools.Kind.EXPLOSIVE, Vector2(cx - 86.0, fy - 50.0)],
-		[150, Tools.Kind.WRECKING_BALL, Vector2(cx, fy - 180.0)],
-		[330, Tools.Kind.EXPLOSIVE, Vector2(cx + 60.0, fy - 120.0)],
-	]
-	_step = 0
-	_ticks = 0
-
-
-func _physics_process(_delta: float) -> void:
-	_ticks += 1
-	_level.tick_settle()
-	while _step < _plan.size() and _ticks >= int(_plan[_step][0]):
-		Tools.apply(_plan[_step][1], _level, _plan[_step][2], 1.0)
-		_step += 1
-	if _ticks < TICKS:
-		return
-	_prints.append(_fingerprint())
-	_pass += 1
-	if _pass < 2:
-		_begin()
-		return
+	_first = _shatter_pass()
+	_again = _shatter_pass()
 	_report()
 
 
-## Enough of the final state to notice a difference that matters: how many
-## pieces there are, how many are still up, and where their mass ended up.
-func _fingerprint() -> String:
-	var live := _level.live_blocks()
-	var sum_x := 0.0
-	var sum_y := 0.0
-	for body in live:
-		sum_x += body.global_position.x
-		sum_y += body.global_position.y
-	return "%d pieces | %d standing, centre (%.1f, %.1f)" % [
-		live.size(), _level.standing(),
-		sum_x / maxf(1.0, float(live.size())),
-		sum_y / maxf(1.0, float(live.size()))]
+## Builds the level fresh and shatters the same pieces, recording the exact
+## fragments each one produced. No ticks are run: nothing here touches the
+## physics, so anything that differs between two passes is the seed.
+func _shatter_pass() -> Array:
+	_level.build(Levels.level(Levels.MEDIUM))
+	var out: Array = []
+	for i in SAMPLES:
+		var live := _level.live_blocks()
+		if live.is_empty():
+			break
+		var body: RigidBody2D = live[(i * 3) % live.size()]
+		var at := body.global_position
+		_level.shatter(body, at)
+		# What came out, as shapes rather than as a count.
+		var shapes: Array = []
+		for piece in _level.live_blocks():
+			if piece.global_position.distance_to(at) < 90.0:
+				var poly: PackedVector2Array = piece.get_meta("poly")
+				shapes.append("%d:%.2f" % [poly.size(), Fracture.area(poly)])
+		shapes.sort()
+		out.append(",".join(shapes))
+	return out
 
 
 func _report() -> void:
-	print("first play  : %s" % _prints[0])
-	print("replayed    : %s" % _prints[1])
-	var first_pieces := _prints[0].split("|")[0]
-	var again_pieces := _prints[1].split("|")[0]
+	var same := _first == _again
+	for i in mini(_first.size(), 3):
+		print("piece %d  first: %s" % [i, _first[i].substr(0, 60)])
+		print("         again: %s" % _again[i].substr(0, 60))
 	print("")
-	print("expected : the same building rebuilt breaks into the same pieces")
-	print("           (where they end up drifts, and is not asserted)")
-	var same := first_pieces == again_pieces
+	print("expected : a given piece with a given seed breaks into the same")
+	print("           fragments every time, with no physics involved")
 	print("VERDICT  : %s" % ["PASS" if same else "FAIL"])
 	get_tree().quit(0 if same else 1)

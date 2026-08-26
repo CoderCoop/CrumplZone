@@ -55,7 +55,7 @@ func _ready() -> void:
 			_rest_damage += amount
 )
 	add_child(_level)
-	_level.build(Levels.tower())
+	_level.build(Levels.level(Levels.MEDIUM))
 	_pieces_before = _level.live_blocks().size()
 
 
@@ -172,7 +172,7 @@ func _finish_load() -> void:
 # --- 3. rubble below the line is swept up ----------------------------------
 
 func _start_sweep() -> void:
-	_level.build(Levels.tower())
+	_level.build(Levels.level(Levels.MEDIUM))
 	_swept_before = _level.debris_count()
 	# Shatter the ground-floor glazing, which lands below the line.
 	for x in [314.0, 400.0, 486.0]:
@@ -247,7 +247,7 @@ func _finish_dust() -> void:
 ## arriving at 400. Glass is exempt by design — a pane under sustained weight
 ## is supposed to crack — so the assertion is about everything else.
 func _start_velocity() -> void:
-	_level.build(Levels.tower())
+	_level.build(Levels.level(Levels.MEDIUM))
 	var cx: float = float(_level.spec["centre_x"])
 	var fy: float = float(_level.spec["floor_y"])
 	_velocity_plan = [

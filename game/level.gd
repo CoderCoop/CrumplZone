@@ -135,6 +135,15 @@ var _ball_hit_once := {}
 func build(level_spec: Dictionary) -> void:
 	clear()
 	spec = level_spec
+	# Before anything is made, not after. This counter goes into each piece's
+	# seed and that seed decides how the piece breaks, so it has to start from
+	# the same place every build or the same level breaks differently each
+	# time. It was reset at the end of this function, which looks equivalent
+	# and is not: any shattering between two builds left the counter somewhere
+	# else, so the second build's pieces were seeded from a different place
+	# entirely. The solver rebuilds one Level hundreds of times, so its search
+	# was comparing runs that differed for reasons unrelated to the moves.
+	_pieces_made = 0
 
 	var material := PhysicsMaterial.new()
 	material.friction = 0.85
@@ -170,14 +179,6 @@ func build(level_spec: Dictionary) -> void:
 			String(b.get("role", ""))))
 
 	_settled_ticks = 0
-	# Reset with the level, not with the Level object. This counter goes into
-	# each piece's seed, and that seed decides how the piece breaks — so a
-	# counter carried across rebuilds means the same level breaks differently
-	# every time it is rebuilt. The solver rebuilds one Level hundreds of
-	# times looking for a solution, which made its search and its parity
-	# confirmation both unreproducible: the same level came back solvable in
-	# one run and unsolvable in the next.
-	_pieces_made = 0
 	load_damage_total = 0
 	load_damage_slow = 0
 	load_damage_slow_solid = 0
@@ -722,8 +723,50 @@ func centre_x() -> float:
 	return spec.get("centre_x", 480.0)
 
 
+## The line the level is won at — the highest of the three, and the one
+## everything has to get under before the level counts as brought down.
 func height_line() -> float:
 	return spec["height_line"]
+
+
+## The three survey lines, highest first. Getting everything under the first
+## is one star, under the second is two, under the third is three.
+##
+## A rating made of lines rather than of power left is a rating you can see on
+## the way down, and one you can choose to go back for: a building resting just
+## over the second line is an invitation, and a number in a bar is not.
+func lines() -> Array:
+	var found: Array = spec.get("lines", [])
+	if found.is_empty():
+		return [height_line()]
+	return found
+
+
+## How far the highest remaining piece still has to come down to earn the next
+## star, in pixels. Zero once all three are earned.
+func gap_to_next_star() -> float:
+	var highest := INF
+	for body in live_blocks():
+		highest = minf(highest, _top_of(body))
+	if highest == INF:
+		return 0.0
+	for line in lines():
+		if highest < float(line):
+			return float(line) - highest
+	return 0.0
+
+
+## How many stars the level is currently worth: the number of lines everything
+## is under.
+func stars_earned() -> int:
+	var highest := INF
+	for body in live_blocks():
+		highest = minf(highest, _top_of(body))
+	var earned := 0
+	for line in lines():
+		if highest >= float(line):
+			earned += 1
+	return earned
 
 
 ## The world rectangle worth looking at: everything the level was built from,

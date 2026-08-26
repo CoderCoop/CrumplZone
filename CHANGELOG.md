@@ -7,7 +7,53 @@ sections are dated.
 
 ## [Unreleased]
 
-Nothing since 0.9.1.
+Nothing since 0.10.0.
+
+## [0.10.0] - 2026-08-26
+
+### Added
+
+- **Three lines on the level instead of one.** The lowest line is where the
+  level is won; the two above it are two and three stars. Get the building
+  under the first and the level offers you the choice: bank it and move on, or
+  keep demolishing with the power you have left and go for the next line. The
+  result screen tells you how many pixels of building still stand above it.
+- **Every generated level is a different kind of building.** Five real
+  structural systems, each of which stands up for a different reason and so
+  has to be brought down a different way: a glazed steel frame, a large-panel
+  block, a flat-slab frame, a stacked chimney, and a portal-framed shed. What
+  holds a shed up is not what holds a tower up, and the tool that works on one
+  is the wrong tool for the other.
+- **Buildings are of a period.** The same structural system appears as
+  riveted steel with brick infill, or as concrete and glass, depending on when
+  it was built. It changes what things are made of, not what carries what.
+- **The city behind the level matches what is being demolished.** Four
+  settings — a downtown, a works, a waterfront and an estate — each with its
+  own sky, skyline height and density, and lit windows. A warehouse stands in
+  an industrial district before dawn, not in a glass financial one.
+
+### Changed
+
+- **The charge does far more damage where it lands, and costs far more to
+  use.** It now flattens steel, concrete, brick and glass inside its core
+  rather than cracking them, and falls off gently rather than linearly past
+  that. A reinforced core still takes two of them. The bar buys about five
+  full charges where it used to buy eight, so it is the tool you pick a moment
+  for.
+- **Stars are measured against the lines, not against par.** Par had to be
+  re-measured with the solver every time the physics changed what a demolition
+  costs — twice in one day, at one point. The lines are drawn from how flat
+  the building can physically be left, so three stars is demanding on every
+  level by construction rather than by tuning, and you can see what you are
+  aiming at while you play instead of finding out at the end.
+
+### Fixed
+
+- **Rubble no longer wears away what it is sitting on.** A settled pile was
+  still doing slow damage to solid material underneath it; it now does none.
+- **A level breaks the same way every time it is loaded.** Pieces were being
+  seeded from a counter that survived across rebuilds, so replaying a level
+  could break it differently.
 
 ## [0.9.1] - 2026-08-26
 

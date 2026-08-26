@@ -23,29 +23,65 @@ const FLOOR_Y := 540.0
 ## tower below has 78,912 px² of material and settles into a pile 119 px deep
 ## across about 1150 px of street. These numbers reproduce that within a few
 ## pixels and then keep a fifth of it as clearance.
-## Debris spreads in proportion to how far it had to fall — as an estimate
-## only, and one that is not accurate enough to trust on its own.
+## How high a level's rubble sits when it is completely destroyed, estimated
+## from the building rather than measured.
 ##
-## This was a constant, then a ratio, and neither works. Measured across the
-## three levels by pulverising each one and looking at what is left, the spread
-## a building actually makes per unit of its own height came out 0.96, 1.55 and
-## 0.68 — a factor of 2.3 apart. How high a building piles when it is destroyed
-## depends on how it comes down, which is chaotic; it is not a tidy function of
-## its area and its height.
+## An authored level can be pulverised in a harness and measured. A generated
+## one cannot: the estimate has to be made at the moment the level is built,
+## with nobody watching. So this is deliberately pessimistic — it assumes the
+## debris spreads less than it really does, which over-estimates the pile,
+## which puts the lines higher, which makes a level too easy rather than
+## impossible. That is the safe direction to be wrong in, and gentest.gd fails
+## if the estimate ever comes out *below* what a level really leaves.
 ##
-## So an authored level carries a line that was measured, not computed. This
-## stays as the opening estimate for a generated level, which then has to be
-## verified by simulation before it is accepted — the estimate says where to
-## start looking, and linetest.gd says whether it was right.
-const SPREAD_PER_HEIGHT := 1.16
-const PACKING := 0.62        # how much of that area broken pieces actually fill
-const CLEARANCE := 1.2       # how much room the line keeps above the pile
+## The spread term is per unit of height, because debris travels in proportion
+## to how far it fell. It is not a constant that can be trusted on its own —
+## measured across the authored levels it ranged over a factor of two — which
+## is why this is a floor rather than a prediction.
+## How far debris spreads per unit of the height it fell, per structural
+## system — because how far it spreads follows from how the building fails.
+## A chimney goes over in one direction; a shed's roof comes down almost in
+## place across a footprint that was already wide; a masonry wall collapses
+## into its own plan.
+##
+## Measured, not chosen. gentest.gd pulverises sampled levels and reports what
+## spread each one would have needed for the estimate to have been exact;
+## these are the smallest observed for each system, less 15%. Smaller means a
+## narrower spread means a higher estimate, and a high estimate only makes a
+## level easier — the direction it is safe to be wrong in.
+##
+## Ranges seen: flat_slab 1.12-3.01, masonry 1.37-1.70, stack 2.15,
+## shed 2.17-6.10, curtain_wall 2.40, panel 2.04.
+const SPREAD_PER_HEIGHT := {
+	"flat_slab": 0.95,
+	"masonry": 1.16,
+	"panel": 1.73,
+	"stack": 1.83,
+	"shed": 1.45,
+	"curtain_wall": 2.04,
+}
+const SPREAD_DEFAULT := 0.95
+
+## Padding on the whole estimate, on top of the per-system spreads.
+##
+## Those spreads were calibrated against buildings that have since changed —
+## masonry grew a lintel course, the car park lost a ramp — and the moment they
+## did, three seeds produced more rubble than they were estimated to, the worst
+## by a fifth. Chasing the constants each time the architecture moves is a
+## losing game, and being wrong the other way only makes a level easier.
+const ESTIMATE_SAFETY := 1.35
+const PACKING := 0.62
 const LINE_MIN := 90.0
 
+## No line may sit higher than this share of the building's own height. A wide
+## low building has little material over a large footprint, so its estimated
+## pile is small and a line set purely as a multiple of it lands near the roof
+## — measured, a shed 202 px tall had its winning line at 202, which is a level
+## already won before it is touched.
+const LINE_OVER_HEIGHT := 0.52
 
-## The line for a set of blocks: high enough that the rubble fits under it, low
-## enough that anything still standing breaks it.
-static func line_above_ground(blocks: Array) -> float:
+
+static func estimate_pile(blocks: Array, kind := "") -> float:
 	var area := 0.0
 	var left := INF
 	var right := -INF
@@ -58,20 +94,20 @@ static func line_above_ground(blocks: Array) -> float:
 		top = minf(top, float(b["y"]) - float(b["h"]) * 0.5)
 		bottom = maxf(bottom, float(b["y"]) + float(b["h"]) * 0.5)
 	if area <= 0.0:
-		return LINE_MIN
+		return LINE_MIN / WIN_LINE_OVER_PILE
 	var height: float = maxf(bottom - top, 1.0)
-	var spread: float = maxf(right - left, 1.0) + height * SPREAD_PER_HEIGHT * 2.0
-	return maxf(LINE_MIN, area / (spread * PACKING) * CLEARANCE)
+	var per_height: float = float(SPREAD_PER_HEIGHT.get(kind, SPREAD_DEFAULT))
+	var spread: float = maxf(right - left, 1.0) + height * per_height * 2.0
+	return area / (spread * PACKING) * ESTIMATE_SAFETY
 
 
 const COLUMN := Vector2(22.0, 76.0)
 const SLAB_H := 22.0
 
 
-## The three difficulties, by name. Everything else about a level follows from
-## the shape of the building — the survey line from its material volume, the
-## power bar and the par from what a solution actually costs — so a difficulty
-## is a size and a materials choice, not a set of numbers to tune by hand.
+## The three authored difficulties. Generated levels come from generator.gd
+## and go through the same finish() below, so nothing downstream can tell them
+## apart.
 const EASY := "easy"
 const MEDIUM := "medium"
 const HARD := "hard"
@@ -84,72 +120,87 @@ const TITLES := {
 }
 
 
-## A level by difficulty. Par and power are measured, not chosen — see
-## partest.gd, which fails if either has drifted from what the solver finds.
 static func level(difficulty: String) -> Dictionary:
 	match difficulty:
 		EASY:
-			# Three storeys, four columns, and no reinforced core: everything
-			# here can be cut, so it is about the order rather than about
-			# working around something you cannot break.
-			#
-			# It was two storeys, and that made it a level one well-placed
-			# charge cleared outright — measured, a single use left nothing
-			# standing. A level cleared by one tap is not an easy puzzle, it
-			# is no puzzle, so it gained a storey rather than losing the point.
-			return _finish(tower(3, 4, 86.0, false), difficulty, 8, 90.0, 148.0)
+			return finish(_placed(tower(3, 4, 86.0, false), difficulty, 8))
 		HARD:
-			# Four storeys and two reinforced columns: taller than medium, and
-			# with more of the ground floor that a tool will not go through.
-			#
-			# Six columns wide was tried and taken back. At 48 blocks the beam
-			# search found no solution within eight uses, which says nothing
-			# about whether one exists — only that a level this wide costs
-			# more search than it is worth gating CI on. Five columns and a
-			# deeper search is the same idea for a level that can be verified.
-			return _finish(tower(4, 5, 84.0, true, 2), difficulty, 10, 192.0, 175.0)
+			return finish(_placed(tower(4, 5, 84.0, true, 2), difficulty, 10))
 		_:
-			return _finish(tower(3, 5, 86.0, true), difficulty, 8, 216.0, 143.0)
+			return finish(_placed(tower(3, 5, 86.0, true), difficulty, 8))
 
 
-## Attaches the numbers that depend on a measured solution rather than on the
-## shape of the building.
-##
-## `par` is what the solver's best solution costs. The power bar is set well
-## clear of it so finishing is never the hard part; the rating is what makes it
-## a puzzle, and the rating is measured against par.
-## `line` is how far above the ground the survey line sits, in pixels, measured
-## by pulverising the level rather than computed — see SPREAD_PER_HEIGHT for
-## why the computation is only an estimate. Each is its measured pile plus
-## about a third, and linetest.gd fails if the pile ever outgrows it.
-##
-## The line also has to be tight enough to be a puzzle. Hard was first given
-## 235 — 60% of its own height — and one charge cleared all forty blocks,
-## because at that height almost anything that falls is already under it. The
-## three now sit at 45-50% of the building's height.
-##
-##   easy    pile 104 px, line 148  (50% of height)
-##   medium  pile  73 px, line 143  (49%)
-##   hard    pile 106 px, line 175  (45%)
-##
-## Note what the pile measurement is: the level pulverised completely, which is
-## the *flattest* it can be left. A solution that topples the building instead
-## leaves larger pieces that stack higher, so the room between pile and line is
-## what makes anything other than grinding it all down viable.
-static func _finish(spec: Dictionary, difficulty: String, depth: int,
-		par: float, line: float) -> Dictionary:
+static func _placed(spec: Dictionary, difficulty: String, depth: int) -> Dictionary:
 	spec["difficulty"] = difficulty
 	spec["moves"] = depth
-	spec["par"] = par
-	spec["power"] = par * POWER_OVER_PAR
-	spec["height_line"] = float(spec["floor_y"]) - line
+	spec["title"] = TITLES.get(difficulty, "Level")
+	spec["about"] = "a steel frame, glazed. The glass holds nothing up."
+	spec["kind"] = "curtain_wall"
 	return spec
 
 
-## How much more than par the bar holds. Enough that a player who wastes a
-## couple of uses still clears the level — finishing is the floor, not the
-## challenge — and not so much that spending is meaningless.
-const POWER_OVER_PAR := 1.9
+## How much bar a level gets, per pixel of material in it.
+##
+## Sized from the building rather than from a solved par. Par had to be
+## re-measured with the solver every time the physics changed what a demolition
+## costs — which happened twice in one day — and since the rating is drawn on
+## the level as lines now, the bar's only job is to be enough. Enough is a
+## function of how much building there is.
+##
+## Calibrated so the medium tower gets about what its measured par bought it.
+const POWER_PER_AREA := 0.0048
+const POWER_MIN := 140.0
+
+## Where the second and third stars sit, between the winning line and the pile
+## the level makes when it is pulverised completely.
+##
+## The third is a third of a pile's height above that pile — three stars means
+## taking the building to very near the flattest it can physically be left,
+## which makes it demanding on every level by construction rather than by
+## tuning. The second sits midway. The first is where the level is won, and is
+## set well clear so that bringing a building down is never the hard part.
+const THREE_STAR_OVER_PILE := 1.35
+const TWO_STAR_SHARE := 0.5
+const WIN_LINE_OVER_PILE := 2.4
+
+
+## Attaches everything that follows from the shape of the building: how much
+## material it has, how high its rubble will sit, where the three lines go, and
+## how much bar it gets. Authored and generated levels both come through here.
+static func finish(spec: Dictionary) -> Dictionary:
+	var blocks: Array = spec["blocks"]
+	var area := 0.0
+	for b in blocks:
+		area += float(b["w"]) * float(b["h"])
+
+	var tall := 0.0
+	for b in blocks:
+		tall = maxf(tall, float(spec["floor_y"]) - (float(b["y"]) - float(b["h"]) * 0.5))
+
+	var pile: float = spec.get("pile", 0.0)
+	if pile <= 0.0:
+		pile = estimate_pile(blocks, String(spec.get("kind", "")))
+		spec["pile"] = pile
+
+	# The third line is what makes three stars hard; the first is where the
+	# level is won and must sit clear of it. Both are held under a share of the
+	# building's own height so that a wide low building is not already won.
+	# Order matters more than either bound. The third line may never fall below
+	# the pile the level will make, or three stars is unreachable — measured, a
+	# panel block with a 117 px pile had its third line put at 109 by the
+	# height cap alone. So the cap applies, and then the pile wins.
+	var ceiling: float = maxf(tall * LINE_OVER_HEIGHT, LINE_MIN)
+	var third: float = maxf(minf(pile * THREE_STAR_OVER_PILE, ceiling * 0.62),
+		pile * 1.05)
+	var win: float = clampf(pile * WIN_LINE_OVER_PILE, third * 1.35,
+		maxf(ceiling, third * 1.5))
+	var second: float = third + (win - third) * TWO_STAR_SHARE
+	var floor_y: float = float(spec["floor_y"])
+	spec["lines"] = [floor_y - win, floor_y - second, floor_y - third]
+	spec["height_line"] = floor_y - win
+	spec["power"] = maxf(area * POWER_PER_AREA, POWER_MIN)
+	spec["moves"] = int(spec.get("moves", 8))
+	return spec
 
 
 ## A curtain-wall office block: steel columns carrying concrete floor slabs,
@@ -220,18 +271,18 @@ static func tower(storeys: int = 3, columns: int = 5, spacing: float = 86.0,
 		})
 		y -= SLAB_H
 
+	# The lines, the bar and the pile are attached by finish(), which every
+	# level goes through whether it was authored or generated. A bare tower()
+	# is only ever built by harnesses, so it gets sensible defaults for the
+	# fields finish() does not set.
 	return {
 		"centre_x": CENTRE_X,
 		"floor_y": FLOOR_Y,
-		"height_line": FLOOR_Y - line_above_ground(blocks),
 		"blocks": blocks,
 		# `moves` is the solver's search depth: how many tool uses it may chain
-		# looking for a solution. It needs seven, and a player is not a beam
-		# search, so the depth allows eight.
+		# looking for a solution. A player is not a beam search, so the depth
+		# allows one more than the search has ever needed.
 		"moves": 8,
-		# Overwritten by _finish for a named difficulty. A bare tower() — which
-		# only the harnesses build — gets a bar rather than nothing.
-		"power": 260.0,
-		"par": 140.0,
 		"difficulty": MEDIUM,
+		"kind": "curtain_wall",
 	}

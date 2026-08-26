@@ -48,19 +48,39 @@ const JACKHAMMER_INTERVAL := 0.22
 ## is carrying at the moment it lands — see Level.swing.
 
 ## Explosive: radial impulse, and everything inside the radius takes damage
-## falling off with distance. Deliberately not strong enough to flatten a
-## building on its own.
+## falling off with distance.
 ##
-## Sixty at the charge point takes out anything but reinforced concrete in one
-## go, and two charges will do that — no piece is invincible, some are just
-## a terrible use of a move.
-const BLAST_RADIUS := 120.0
-const BLAST_FORCE := 640.0
-const BLAST_SHATTER := 30.0
-const BLAST_DAMAGE := 60
+## A real shot charge does not politely crack what stands near it — it takes
+## out a region. So the charge is severe inside a core that is a third of its
+## reach, and falls off gently rather than linearly past that: at half the
+## radius a linear falloff left half damage, and this leaves about two thirds.
+## A full charge is 85 at the centre. It was 105, which is past reinforced
+## concrete's 100 — and that quietly deleted the one piece a level is built to
+## be brought down *around*: one charge took the core out, and one charge
+## cleared the whole hard level, 176 px of rubble under a 204 px line. Eighty
+## five destroys steel, concrete, brick and glass where it lands and still
+## needs two goes at a reinforced core.
+##
+## It costs accordingly — see HOLD, where the explosive is the expensive tool.
+## The bar buys about five full charges rather than eight.
+const BLAST_RADIUS := 155.0
+const BLAST_FORCE := 950.0
+const BLAST_SHATTER := 52.0
+const BLAST_DAMAGE := 85
+## How gently damage falls away past the core. Below 1 keeps it high further
+## out; 1.0 would be the linear falloff this replaced.
+const BLAST_FALLOFF := 0.6
 
 ## What a held tool costs: something for reaching for it at all, and the rest
 ## for how long you held. A tap is cheap and weak, a full hold is neither.
+##
+## Per tool, because they are not worth the same. The explosive takes out a
+## region and everything in it; the ball takes out what it swings through. One
+## full charge costs what nearly two full swings do.
+const HOLD := {
+	Kind.WRECKING_BALL: {"base": 10.0, "full": 20.0},
+	Kind.EXPLOSIVE: {"base": 17.0, "full": 35.0},
+}
 const HOLD_BASE := 10.0
 const HOLD_FULL := 20.0
 ## The weakest a charged tool gets. A tap is not nothing.
@@ -89,7 +109,8 @@ static func damage_of(kind: Kind) -> int:
 static func cost(kind: Kind, charge := 1.0) -> float:
 	if kind == Kind.JACKHAMMER:
 		return JACKHAMMER_POWER
-	return HOLD_BASE + HOLD_FULL * clampf(charge, 0.0, 1.0)
+	var held: Dictionary = HOLD.get(kind, {"base": HOLD_BASE, "full": HOLD_FULL})
+	return float(held["base"]) + float(held["full"]) * clampf(charge, 0.0, 1.0)
 
 
 ## How much of a charged tool a hold delivers: never nothing, never more than
@@ -137,6 +158,7 @@ static func _explosive(level: Level, at: Vector2, charge: float) -> bool:
 	# further and hits harder.
 	var packed := strength(charge)
 	var radius := BLAST_RADIUS * packed
+	var core := BLAST_SHATTER * packed
 	var touched := false
 	for body in level.live_blocks().duplicate():
 		if not is_instance_valid(body):
@@ -146,14 +168,16 @@ static func _explosive(level: Level, at: Vector2, charge: float) -> bool:
 		if distance > radius:
 			continue
 		touched = true
-		var falloff := 1.0 - distance / radius
+		# Gentle rather than linear, so the charge does real damage across its
+		# whole reach instead of only where it was placed.
+		var falloff := pow(1.0 - distance / radius, BLAST_FALLOFF)
 		# Damaged, not deleted: the pieces stay and still have to end up below
 		# the line. Damage falls off with distance, so a charge takes out what
 		# it is placed on and cracks what stands around it.
 		var full := BLAST_DAMAGE * packed
-		var force: int = int(round(full if distance < BLAST_SHATTER else full * falloff))
+		var force: int = int(round(full if distance < core else full * falloff))
 		level.damage(body, force, at)
-		if distance < BLAST_SHATTER:
+		if distance < core:
 			continue
 		# A floor on the distance keeps a charge placed on a block's centre
 		# from producing a near-infinite direction vector.

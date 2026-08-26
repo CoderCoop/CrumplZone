@@ -11,6 +11,22 @@ extends RefCounted
 
 const NOTES: Array = [
 	{
+		"version": "0.10.0",
+		"date": "2026-08-26",
+		"lines": [
+			"Three lines on the level now, not one. The lowest wins it; the "
+			+ "two above are two and three stars. Get under the first and you "
+			+ "choose: bank it, or keep going with the power you have left.",
+			"Every generated level is a different kind of building — a glazed "
+			+ "frame, a panel block, a flat-slab frame, a chimney, a shed. Each "
+			+ "stands up for a different reason, so each comes down differently.",
+			"Buildings come from different periods, and the city behind them "
+			+ "matches what you are demolishing.",
+			"The charge is far more destructive where it lands, and costs far "
+			+ "more. The bar buys about five of them.",
+		],
+	},
+	{
 		"version": "0.9.1",
 		"date": "2026-08-26",
 		"lines": [
