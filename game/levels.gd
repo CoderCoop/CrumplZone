@@ -97,7 +97,7 @@ static func level(difficulty: String) -> Dictionary:
 			# charge cleared outright — measured, a single use left nothing
 			# standing. A level cleared by one tap is not an easy puzzle, it
 			# is no puzzle, so it gained a storey rather than losing the point.
-			return _finish(tower(3, 4, 86.0, false), difficulty, 8, 90.0, 148.0)
+			return _finish(tower(3, 4, 86.0, false), difficulty, 8, 90.0, 148.0, 61.0)
 		HARD:
 			# Four storeys and two reinforced columns: taller than medium, and
 			# with more of the ground floor that a tool will not go through.
@@ -107,9 +107,9 @@ static func level(difficulty: String) -> Dictionary:
 			# about whether one exists — only that a level this wide costs
 			# more search than it is worth gating CI on. Five columns and a
 			# deeper search is the same idea for a level that can be verified.
-			return _finish(tower(4, 5, 84.0, true, 2), difficulty, 10, 192.0, 175.0)
+			return _finish(tower(4, 5, 84.0, true, 2), difficulty, 10, 192.0, 175.0, 79.0)
 		_:
-			return _finish(tower(3, 5, 86.0, true), difficulty, 8, 216.0, 143.0)
+			return _finish(tower(3, 5, 86.0, true), difficulty, 8, 216.0, 143.0, 60.0)
 
 
 ## Attaches the numbers that depend on a measured solution rather than on the
@@ -136,13 +136,35 @@ static func level(difficulty: String) -> Dictionary:
 ## the *flattest* it can be left. A solution that topples the building instead
 ## leaves larger pieces that stack higher, so the room between pile and line is
 ## what makes anything other than grinding it all down viable.
+## Where the second and third stars sit, between the winning line and the pile
+## the level makes when it is pulverised completely.
+##
+## The third line is just above that pile, so three stars means taking the
+## building down to very near the flattest it can physically be left — which
+## is what makes three stars hard on every level by construction rather than
+## by tuning. The second sits midway.
+## Enough over the measured pile that three stars is a demanding demolition
+## rather than an exhaustive one. The pile is the level pulverised completely —
+## the flattest it can physically be left — and a real solution topples rather
+## than grinds, leaving larger pieces that stack higher. At 1.12 the third line
+## sat within a few pixels of the theoretical floor, which asks for the boring
+## strategy; a third of the pile's height above it asks for a good one.
+const THREE_STAR_OVER_PILE := 1.35
+const TWO_STAR_SHARE := 0.5
+
+
 static func _finish(spec: Dictionary, difficulty: String, depth: int,
-		par: float, line: float) -> Dictionary:
+		par: float, line: float, pile: float) -> Dictionary:
+	var third: float = minf(pile * THREE_STAR_OVER_PILE, line)
+	var second: float = third + (line - third) * TWO_STAR_SHARE
+	var floor_y: float = float(spec["floor_y"])
+	spec["lines"] = [floor_y - line, floor_y - second, floor_y - third]
+	spec["pile"] = pile
 	spec["difficulty"] = difficulty
 	spec["moves"] = depth
 	spec["par"] = par
 	spec["power"] = par * POWER_OVER_PAR
-	spec["height_line"] = float(spec["floor_y"]) - line
+	spec["height_line"] = floor_y - line
 	return spec
 
 

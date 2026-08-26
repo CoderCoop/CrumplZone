@@ -67,6 +67,13 @@ const CHARGE_TIME := 1.1
 ## if something is genuinely stuck.
 const SETTLE_LIMIT := 1800
 
+## Warmer as it gets harder to reach, and dimmed once it has been.
+const STAR_LINE: Array[Color] = [
+	Color(0.95, 0.32, 0.30, 0.9),
+	Color(0.96, 0.62, 0.26, 0.85),
+	Color(0.98, 0.85, 0.34, 0.85),
+]
+
 var _layer: CanvasLayer
 var _root: Control
 var _row: HBoxContainer
@@ -80,6 +87,8 @@ var _results: Results
 ## costs — the rating is measured against that rather than against the bar.
 var _difficulty: String = Levels.MEDIUM
 var _par := 0.0
+## The best rating already offered, so the same one is not offered twice.
+var _shown_stars := 0
 var _buttons: Array[Button] = []
 var _art: Array[Control] = []
 var _intro: Intro
@@ -125,6 +134,7 @@ func _start() -> void:
 	_power_full = float(spec["power"])
 	_power = _power_full
 	_resolved = ""
+	_shown_stars = 0
 	_busy = false
 	_holding = false
 	_charge = 0.0
@@ -514,29 +524,57 @@ func _physics_process(_delta: float) -> void:
 
 
 func _judge() -> void:
-	if _level.cleared():
-		_resolved = "CLEARED with %d%% of the bar left" % int(round(_power / _power_full * 100.0))
-		_show_results(true)
-	elif _power < _cheapest():
-		var left := _level.standing()
-		_resolved = "OUT OF POWER — %d piece%s still above the line" \
-			% [left, "" if left == 1 else "s"]
-		_show_results(false)
+	var earned := _level.stars_earned()
+	var spent := _power < _cheapest()
+	if earned > 0 and earned > _shown_stars and not spent:
+		# Down far enough to count, with power left: offered rather than
+		# imposed. The player can bank it or go back for the next line.
+		_shown_stars = earned
+		_show_results(true, earned, true)
+	elif spent:
+		_resolved = "OUT OF POWER — %d star%s" % [earned, "" if earned == 1 else "s"]
+		_show_results(earned > 0, earned, false)
 
 
-func _show_results(won: bool) -> void:
+func _show_results(won: bool, earned: int, may_continue: bool) -> void:
 	if _results != null:
 		return
 	_holding = false
 	_effects.stop_aim()
 	_results = Results.new()
 	_results.cleared = won
+	_results.stars = earned
 	_results.power_left = _power
 	_results.power_full = _power_full
-	_results.par = _par
 	_results.standing = _level.standing()
+	# How much further the next star is, in pixels of building. A number the
+	# player can act on, rather than a rating they cannot influence any more.
+	_results.to_next = _level.gap_to_next_star()
+	_results.may_continue = may_continue
 	_results.again_pressed.connect(_restart)
+	_results.keep_going_pressed.connect(_keep_going)
+	_results.next_level_pressed.connect(_next_level)
 	add_child(_results)
+
+
+## Back to the rubble with the bar as it stands. The level is not over until
+## the power is.
+func _keep_going() -> void:
+	if _results != null:
+		_results.queue_free()
+		_results = null
+	_resolved = ""
+	_busy = false
+
+
+func _next_level() -> void:
+	if _results != null:
+		_results.queue_free()
+		_results = null
+	var at := Levels.ORDER.find(_difficulty)
+	_difficulty = Levels.ORDER[mini(at + 1, Levels.ORDER.size() - 1)]
+	_shown_stars = 0
+	_start()
 
 
 func _restart() -> void:
@@ -576,8 +614,21 @@ func _refresh() -> void:
 
 
 func _draw() -> void:
-	# The survey line the level is judged against, spanning whatever the camera
-	# can see.
-	var line := _level.height_line()
-	draw_dashed_line(Vector2(_view.position.x, line), Vector2(_view.end.x, line),
-		Color(0.95, 0.32, 0.30, 0.9), 3.0, 12.0)
+	# Three survey lines, spanning whatever the camera can see. The top one is
+	# what the level is won at; each one below is another star. Drawn together
+	# so the next one down is visible while you are still playing — that is the
+	# whole point of rating by lines instead of by what is left in the bar.
+	var earned := _level.stars_earned()
+	var all := _level.lines()
+	for i in all.size():
+		var line: float = float(all[i])
+		var got := i < earned
+		draw_dashed_line(Vector2(_view.position.x, line), Vector2(_view.end.x, line),
+			STAR_LINE[i].darkened(0.45) if got else STAR_LINE[i],
+			3.0 if i == 0 else 2.0, 12.0)
+		# A pip per star at the left end, so a line says which one it is
+		# without a word on it.
+		for pip in i + 1:
+			Icons.star(self,
+				Vector2(_view.position.x + 14.0 + float(pip) * 15.0, line - 11.0),
+				5.5, STAR_LINE[i].darkened(0.45) if got else STAR_LINE[i])

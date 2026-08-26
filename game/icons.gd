@@ -125,3 +125,16 @@ static func draw_help(item: CanvasItem, at: Vector2, size: float, colour: Color)
 	item.draw_line(at + Vector2(0.6 * unit, -0.6 * unit),
 		at + Vector2(0.6 * unit, 4.0 * unit), colour, width)
 	item.draw_circle(at + Vector2(0.6 * unit, 8.0 * unit), 1.7 * unit, colour)
+
+
+## A five-pointed star, drawn rather than typed — the glyph came out as a tofu
+## box on the first build that shipped it, which is why nothing here is a
+## character. Used on the survey lines and on the results panel, so both are
+## saying the same thing in the same shape.
+static func star(item: CanvasItem, at: Vector2, size: float, colour: Color) -> void:
+	var points := PackedVector2Array()
+	for i in 10:
+		var angle := -PI * 0.5 + float(i) * PI / 5.0
+		var reach := size if i % 2 == 0 else size * 0.44
+		points.append(at + Vector2(cos(angle), sin(angle)) * reach)
+	item.draw_colored_polygon(points, colour)

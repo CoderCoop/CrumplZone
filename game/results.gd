@@ -9,21 +9,19 @@ extends CanvasLayer
 ## button's symbol was meant to be.
 
 signal again_pressed
+signal keep_going_pressed
+signal next_level_pressed
 
 const STARS := 3
 
-## What a run may spend, as a multiple of par, for three stars and for two.
+## The rating comes from the level's survey lines now, not from what a run
+## spent. Level.stars_earned counts how many lines everything is under, and
+## this only reports it.
 ##
-## Rated against par — what the solver's best solution for this level costs —
-## rather than against a fraction of the bar. A fraction of the bar makes three
-## stars mean different things on different levels: generous on one, impossible
-## on another, and neither on a level nobody has measured. Against par it means
-## the same thing everywhere, which is "you played close to as well as this can
-## be played", and it stays true for a level generated tomorrow.
-##
-## Three stars is 15% off the best known solution. That is meant to be hard:
-## clearing the level at all is the floor, and the bar holds nearly twice par
-## so finishing is never the challenge.
+## Rating by lines rather than by power left is what makes the rating something
+## you can act on: a building resting just over the next line is an invitation
+## to go back for it, and a percentage in a bar is not. It is also visible on
+## the way down instead of only at the end.
 
 const MARGIN := 16.0
 const BUTTON_HEIGHT := 56.0
@@ -34,9 +32,15 @@ const EMPTY := Color(0.30, 0.32, 0.37)
 const ACCENT := Color(0.95, 0.45, 0.35)
 
 var cleared := false
+var stars := 0
 var power_left := 0.0
 var power_full := 1.0
 var standing := 0
+## How much further the building has to come down for the next star, in px.
+var to_next := 0.0
+## Whether there is any point going back for more: power left and a star still
+## unearned.
+var may_continue := false
 
 var _root: Control
 var _shade: ColorRect
@@ -45,25 +49,8 @@ var _line: Label
 var _note: Label
 var _stars: Control
 var _again: Button
-
-
-const THREE_STAR := 1.15
-const TWO_STAR := 1.55
-
-var par := 0.0
-
-
-## How many stars a run earns, from what it spent against what the level's best
-## known solution costs. Clearing at all is worth one.
-static func stars_for_spend(spent: float, level_par: float) -> int:
-	if level_par <= 0.0:
-		return 1
-	var ratio := spent / level_par
-	if ratio <= THREE_STAR:
-		return 3
-	if ratio <= TWO_STAR:
-		return 2
-	return 1
+var _keep: Button
+var _next: Button
 
 
 func _ready() -> void:
@@ -83,8 +70,7 @@ func _ready() -> void:
 	# size and taken its contents off the screen with it — the intro's Play
 	# button, the tool row, and this panel, which showed nothing but its own
 	# button the first time it ran.
-	_title = _label("CLEARED" if cleared else "OUT OF POWER", 34,
-		BRIGHT if cleared else ACCENT)
+	_title = _label(_headline(), 34, BRIGHT if cleared else ACCENT)
 	_root.add_child(_title)
 
 	if cleared:
@@ -92,12 +78,11 @@ func _ready() -> void:
 		_stars.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_stars.draw.connect(_draw_stars)
 		_root.add_child(_stars)
-		var spent := maxf(0.0, power_full - power_left)
-		_line = _label("%d power spent  ·  par %d" % [int(round(spent)), int(round(par))],
-			18, DIM)
-		_note = _label(_advice(stars_for_spend(spent, par), spent), 15, DIM, true)
+		_line = _label("%d%% of the bar left"
+			% int(round(power_left / maxf(1.0, power_full) * 100.0)), 18, DIM)
+		_note = _label(_advice(), 15, DIM, true)
 	else:
-		_line = _label("%d piece%s still above the line"
+		_line = _label("%d piece%s still above the first line"
 			% [standing, "" if standing == 1 else "s"], 18, DIM)
 		_note = _label(
 			"Nothing is deleted, so everything you break still has to end up "
@@ -106,10 +91,17 @@ func _ready() -> void:
 	_root.add_child(_line)
 	_root.add_child(_note)
 
-	_again = Button.new()
-	_again.text = "Play again"
-	_again.focus_mode = Control.FOCUS_NONE
-	_again.add_theme_font_size_override("font_size", 19)
+	# Going back for another star is the interesting choice, so it is the
+	# button under the thumb and the one that is lit.
+	if may_continue and stars < 3:
+		_keep = _button("Keep going", true)
+		_keep.pressed.connect(func() -> void: keep_going_pressed.emit())
+		_root.add_child(_keep)
+	if cleared:
+		_next = _button("Next level", not (may_continue and stars < 3))
+		_next.pressed.connect(func() -> void: next_level_pressed.emit())
+		_root.add_child(_next)
+	_again = _button("Play again", false)
 	_again.pressed.connect(func() -> void: again_pressed.emit())
 	_root.add_child(_again)
 
@@ -120,16 +112,50 @@ func _ready() -> void:
 ## What to say under the stars. Nothing at all on a three-star run: a player
 ## who has just done the best thing available does not need advice, and the
 ## first version cheerfully told them they had two.
-func _advice(earned: int, spent: float) -> String:
-	var target := par * THREE_STAR
-	match earned:
-		1:
-			return ("Down, but it cost %d. Par is %d — fewer, better placed uses."
-				% [int(round(spent)), int(round(par))])
+func _headline() -> String:
+	if not cleared:
+		return "OUT OF POWER"
+	match stars:
+		3:
+			return "FLATTENED"
 		2:
-			return ("Three stars needs it done for %d or less. This run spent %d."
-				% [int(round(target)), int(round(spent))])
-	return "Nothing left standing, and done at par. There is no better rating."
+			return "DOWN"
+	return "CLEARED"
+
+
+## What to say under the stars — and on anything but a three-star run, that is
+## how much further the building has to come down for the next one. A distance
+## is something a player can look at the level and act on.
+func _advice() -> String:
+	if not cleared:
+		return ""
+	if stars >= 3:
+		return "Nothing standing above the last line. There is no better rating."
+	if not may_continue:
+		return "The bar is spent, so this is where it stops."
+	return ("The next line is %d px further down. There is power left to go "
+		+ "back for it.") % int(round(to_next))
+
+
+## A button, styled like the rest of the game's controls.
+func _button(text: String, lit: bool) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.focus_mode = Control.FOCUS_NONE
+	button.clip_text = true
+	button.add_theme_font_size_override("font_size", 19)
+	var box := StyleBoxFlat.new()
+	box.bg_color = GOLD if lit else Color(0.20, 0.22, 0.27)
+	box.set_corner_radius_all(10)
+	box.set_border_width_all(2)
+	box.border_color = GOLD.lightened(0.3) if lit else Color(0.32, 0.35, 0.42)
+	button.add_theme_stylebox_override("normal", box)
+	button.add_theme_stylebox_override("hover", box)
+	button.add_theme_stylebox_override("pressed", box)
+	button.add_theme_stylebox_override("hover_pressed", box)
+	if lit:
+		button.add_theme_color_override("font_color", Color(0.10, 0.10, 0.12))
+	return button
 
 
 func relayout() -> void:
@@ -153,12 +179,24 @@ func relayout() -> void:
 	_line.size = Vector2(width, 26.0)
 	_note.position = Vector2(MARGIN, _line.position.y + 36.0)
 	_note.size = Vector2(width, 80.0)
-	_again.position = Vector2(MARGIN, size.y - BUTTON_HEIGHT - MARGIN)
-	_again.size = Vector2(width, BUTTON_HEIGHT)
+	# Stacked upwards from the bottom, so whichever buttons exist sit in thumb
+	# reach and the most interesting one is lowest.
+	var stack: Array[Button] = []
+	if _keep != null:
+		stack.append(_keep)
+	if _next != null:
+		stack.append(_next)
+	stack.append(_again)
+	var gap := 10.0
+	for i in stack.size():
+		var from_bottom := float(stack.size() - 1 - i)
+		stack[i].position = Vector2(MARGIN,
+			size.y - MARGIN - (from_bottom + 1.0) * BUTTON_HEIGHT - from_bottom * gap)
+		stack[i].size = Vector2(width, BUTTON_HEIGHT)
 
 
 func _draw_stars() -> void:
-	var earned := stars_for_spend(maxf(0.0, power_full - power_left), par)
+	var earned := stars
 	var span := _stars.size.x
 	var middle := Vector2(span * 0.5, _stars.size.y * 0.5)
 	var step := 74.0
