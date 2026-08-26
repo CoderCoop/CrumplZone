@@ -43,7 +43,6 @@ func _next() -> void:
 
 
 func _on_finished(result: Dictionary) -> void:
-	_solver.queue_free()
 	var solved: bool = result["solved"]
 	var spent := 0.0
 	for move in result.get("solution", []):
@@ -69,7 +68,49 @@ func _on_finished(result: Dictionary) -> void:
 				% [_difficulty, spent, power])
 	if best_single <= 0:
 		_failures.append("%s is cleared by a single use" % _difficulty)
+	# Not straight on to the next level. Solver.finish clears its level with
+	# queue_free, which is deferred, so building the next one in this frame
+	# puts two levels' worth of bodies in the same physics space — the new
+	# building goes up inside the old one's collapsing rubble. That is not a
+	# subtle effect: it reported a forty-block tower cleared by a single use,
+	# and the same level solvable in one run and unsolvable in the next.
+	_solver.queue_free()
+	_solver = null
+	_cooldown = COOLDOWN
+	set_physics_process(true)
+
+
+## Long enough for every deferred free from the level just finished to land.
+const COOLDOWN := 30
+
+var _cooldown := 0
+
+
+func _physics_process(_delta: float) -> void:
+	if _cooldown <= 0:
+		return
+	_cooldown -= 1
+	if _cooldown > 0:
+		return
+	set_physics_process(false)
+	var left := _bodies_left()
+	if left > 0:
+		_failures.append("%d bodies from the previous level were still in the world"
+			% left)
 	_next()
+
+
+## Nothing from the last level may still exist when the next one is built.
+func _bodies_left() -> int:
+	var count := 0
+	var stack: Array[Node] = [get_tree().root]
+	while not stack.is_empty():
+		var node: Node = stack.pop_back()
+		if node is RigidBody2D:
+			count += 1
+		for child in node.get_children():
+			stack.append(child)
+	return count
 
 
 func _report() -> void:

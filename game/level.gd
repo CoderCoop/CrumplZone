@@ -170,6 +170,14 @@ func build(level_spec: Dictionary) -> void:
 			String(b.get("role", ""))))
 
 	_settled_ticks = 0
+	# Reset with the level, not with the Level object. This counter goes into
+	# each piece's seed, and that seed decides how the piece breaks — so a
+	# counter carried across rebuilds means the same level breaks differently
+	# every time it is rebuilt. The solver rebuilds one Level hundreds of
+	# times looking for a solution, which made its search and its parity
+	# confirmation both unreproducible: the same level came back solvable in
+	# one run and unsolvable in the next.
+	_pieces_made = 0
 	load_damage_total = 0
 	load_damage_slow = 0
 	load_damage_slow_solid = 0
