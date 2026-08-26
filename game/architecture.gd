@@ -159,8 +159,13 @@ static func _masonry(rng: RandomNumberGenerator) -> Array:
 			# which put it in the same space as the pier tops it was supposed
 			# to bear on. Two overlapping rigid bodies get pushed apart hard,
 			# and the wall cracked itself worse than the arch had.
+			# Spanning the full bay pitch, so adjacent lintels meet over the
+			# middle of each pier and the course is continuous. At 0.9 of the
+			# pier they stopped just short of each other, leaving a gap over
+			# every pier for the storey above to bridge — and the building
+			# settled into those gaps, 28 px on the tallest seed.
 			blocks.append(_block(centre, y - storey_h - LINTEL_H * 0.5,
-				opening + pier * 0.9, LINTEL_H, "lintel", Materials.BRICK))
+				opening + pier, LINTEL_H, "lintel", Materials.BRICK))
 		# Timber floor spanning between the walls, which is what a warehouse
 		# of this age actually had.
 		# The floor goes in the openings, not across the whole plan, and the
