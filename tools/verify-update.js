@@ -137,40 +137,69 @@ setTimeout(() => {
   }
   checks.push(['the player ends up on the new build', after === 'BUILD-TWO', after]);
 
-  // And the case the first version of this test missed entirely: a client
-  // whose cached page is older than the update code itself. That page cannot
-  // ask the worker to stand aside, because it does not know it should — so if
-  // the worker only skips waiting when asked, such a client is pinned to its
+  // And the case that matters most, which the first two versions of this test
+  // both got wrong. A client whose *cached* page predates the update code
+  // cannot ask the worker to stand aside, because it does not know it should.
+  // If the worker only skips waiting when asked, that client is pinned to its
   // install for ever. Reported from a real phone: 0.7.0, with 0.9.0 deployed.
   //
-  // Simulated by stripping the hooks out of the page the client has, then
-  // publishing again. Nothing but the worker can rescue this.
-  at('a client whose page predates the update code');
-  const stripped = fs.readFileSync(path.join(serveDir, 'index.html'), 'utf8')
-    .replace(/window\.__cz_update_ready\s*=/, 'window.__cz_no_update_ready =')
-    .replace(/window\.__cz_apply_update\s*=/, 'window.__cz_no_apply_update =');
-  fs.writeFileSync(path.join(serveDir, 'index.html'), stripped);
-  fs.writeFileSync(MARK, 'BUILD-THREE');
+  // The first attempt stripped the hooks from the file on disk and reloaded.
+  // That proves nothing: the client is served the page the worker cached, not
+  // the file on disk, so it still had the hooks and still asked. The client's
+  // cache has to be built from the old build in the first place, which means
+  // a fresh profile that installs a hookless build before anything else.
+  at('installing a build that predates the update code');
+  const pageHtml = path.join(serveDir, 'index.html');
+  const current = fs.readFileSync(pageHtml, 'utf8');
+  fs.writeFileSync(pageHtml, current
+    .replace(/window\.__cz_update_ready\s*=/, 'window.__cz_gone_update_ready =')
+    .replace(/window\.__cz_apply_update\s*=/, 'window.__cz_gone_apply_update ='));
+  fs.writeFileSync(MARK, 'BUILD-OLD');
   fs.writeFileSync(swFile, fs.readFileSync(swFile, 'utf8')
-    .replace(/const CACHE_VERSION = '[^']*'/, "const CACHE_VERSION = 'verify-update-three'"));
+    .replace(/const CACHE_VERSION = '[^']*'/, "const CACHE_VERSION = 'verify-update-old'"));
 
-  const old_page = await ctx.newPage();
-  old_page.on('pageerror', (e) => errors.push(String(e)));
-  await old_page.goto(url, { waitUntil: 'load', timeout: 90000 });
-  await old_page.waitForSelector('canvas', { timeout: 90000 });
-  const helpless = await old_page.evaluate(
-    () => typeof window.__cz_update_ready !== 'function',
-  );
-  checks.push(['that page really cannot ask for an update', helpless, String(helpless)]);
+  const oldProfile = fs.mkdtempSync(path.join(os.tmpdir(), 'cz-old-'));
+  const oldCtx = await chromium.launchPersistentContext(oldProfile, opts);
+  const stuck = oldCtx.pages()[0] || await oldCtx.newPage();
+  stuck.on('pageerror', (e) => errors.push(String(e)));
+  await stuck.goto(url, { waitUntil: 'load', timeout: 90000 });
+  await stuck.waitForSelector('canvas', { timeout: 90000 });
+  await stuck.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+    for (let i = 0; i < 60 && !navigator.serviceWorker.controller; i += 1) {
+      await new Promise((r) => setTimeout(r, 500));
+    }
+  });
+  const helpless = await stuck.evaluate(() => ({
+    controlled: !!navigator.serviceWorker.controller,
+    canAsk: typeof window.__cz_update_ready === 'function',
+  }));
+  checks.push(['the old client is controlled by a worker', helpless.controlled,
+    String(helpless.controlled)]);
+  checks.push(['and its page cannot ask for an update', !helpless.canAsk,
+    helpless.canAsk ? 'it still has the hooks — the test is not testing this'
+      : 'no update hooks, as an old install']);
 
-  let healed = 'unknown';
-  for (let i = 0; i < 40; i += 1) {
-    await old_page.reload({ waitUntil: 'load', timeout: 60000 }).catch(() => {});
-    healed = await served(old_page).catch(() => healed);
-    if (healed === 'BUILD-THREE') { break; }
-    await old_page.waitForTimeout(500);
+  // Now publish a current build over the top and let it visit, as a person
+  // opening the app does. Nothing but the worker can rescue this client.
+  at('publishing over a client that cannot help itself');
+  fs.writeFileSync(pageHtml, current);
+  fs.writeFileSync(MARK, 'BUILD-NEW');
+  fs.writeFileSync(swFile, fs.readFileSync(swFile, 'utf8')
+    .replace(/const CACHE_VERSION = '[^']*'/, "const CACHE_VERSION = 'verify-update-new'"));
+
+  let healed = 'never checked';
+  for (let i = 0; i < 25; i += 1) {
+    await stuck.reload({ waitUntil: 'load', timeout: 60000 }).catch(() => {});
+    healed = await served(stuck).catch(() => healed);
+    if (healed === 'BUILD-NEW') { break; }
+    await stuck.waitForTimeout(1000);
   }
-  checks.push(['the worker updates it anyway', healed === 'BUILD-THREE', healed]);
+  checks.push(['the worker updates it with no help from the page',
+    healed === 'BUILD-NEW', healed]);
+  await oldCtx.close();
+  fs.rmSync(oldProfile, { recursive: true, force: true });
+
   checks.push(['no page errors', errors.length === 0,
     errors.length ? errors.join('; ') : 'none']);
 
