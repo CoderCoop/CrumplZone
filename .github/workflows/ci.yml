@@ -147,9 +147,13 @@ jobs:
           # by retuning a tool, and neither is visible in a diff.
           run_harness "crack test" res://cracktest.tscn
 
+          # Cheap, and it catches the failure that reads as "merely hard":
+          # a level whose own rubble will not fit under its own line.
+          run_harness "line test" res://linetest.tscn
+
           # partest supersedes the old single-level playtest: it runs the same
           # search over all three difficulties and additionally checks each
           # level's par against what a solution really costs.
           run_harness "par test" res://partest.tscn
 
-          echo "::notice::ci passed — secret scan, GDScript checks, wake test, break test, stress test, collapse test, crack test, par test"
+          echo "::notice::ci passed — secret scan, GDScript checks, wake test, break test, stress test, collapse test, crack test, line test, par test"

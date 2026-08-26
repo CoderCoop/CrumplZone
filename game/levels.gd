@@ -23,7 +23,14 @@ const FLOOR_Y := 540.0
 ## tower below has 78,912 px² of material and settles into a pile 119 px deep
 ## across about 1150 px of street. These numbers reproduce that within a few
 ## pixels and then keep a fifth of it as clearance.
-const SPREAD := 350.0        # how far debris travels past each edge
+## Debris spreads in proportion to how far it had to fall, not by a constant.
+## A constant was calibrated on the three-storey tower and quietly wrong for
+## anything else: on a two-storey building it predicted the rubble would spread
+## nearly as wide, so it predicted a thinner pile than the level really makes,
+## put the line under it, and produced a level with no solution. Measured, the
+## easy level left six pieces standing 1-83 px over a line the formula had
+## clamped to its floor.
+const SPREAD_PER_HEIGHT := 1.16
 const PACKING := 0.62        # how much of that area broken pieces actually fill
 const CLEARANCE := 1.2       # how much room the line keeps above the pile
 const LINE_MIN := 90.0
@@ -35,13 +42,18 @@ static func line_above_ground(blocks: Array) -> float:
 	var area := 0.0
 	var left := INF
 	var right := -INF
+	var top := INF
+	var bottom := -INF
 	for b in blocks:
 		area += float(b["w"]) * float(b["h"])
 		left = minf(left, float(b["x"]) - float(b["w"]) * 0.5)
 		right = maxf(right, float(b["x"]) + float(b["w"]) * 0.5)
+		top = minf(top, float(b["y"]) - float(b["h"]) * 0.5)
+		bottom = maxf(bottom, float(b["y"]) + float(b["h"]) * 0.5)
 	if area <= 0.0:
 		return LINE_MIN
-	var spread: float = maxf(right - left, 1.0) + SPREAD * 2.0
+	var height: float = maxf(bottom - top, 1.0)
+	var spread: float = maxf(right - left, 1.0) + height * SPREAD_PER_HEIGHT * 2.0
 	return maxf(LINE_MIN, area / (spread * PACKING) * CLEARANCE)
 
 
