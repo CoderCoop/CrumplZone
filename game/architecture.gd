@@ -116,15 +116,20 @@ static func _curtain_wall(rng: RandomNumberGenerator) -> Array:
 # --- load-bearing brick, arched openings ------------------------------------
 
 static func _masonry(rng: RandomNumberGenerator) -> Array:
-	var storeys := rng.randi_range(2, 4)
+	# Three storeys at most. Load-bearing brick past that needs walls thicker
+	# out of all proportion to what it gains, which is the reason steel frames
+	# replaced it — and measured here, a four-storey warehouse crushed its own
+	# piers untouched at every wall thickness tried. The range was arbitrary;
+	# the limit is not.
+	var storeys := rng.randi_range(2, 3)
 	var bays := rng.randi_range(3, 5)
-	var pier := rng.randf_range(30.0, 40.0)
+	var pier := rng.randf_range(32.0, 42.0)
 	# Walls thicken toward the base, as every load-bearing masonry building's
 	# do — there is more above them down there. Measured before they did: the
 	# tallest warehouse crushed 15 of its own piers standing untouched, because
 	# a wall of constant thickness carrying four storeys of brick is not how
 	# anyone ever built one.
-	var batter := 0.20
+	var batter := 0.28
 	var opening := rng.randf_range(56.0, 74.0)
 	var storey_h := rng.randf_range(78.0, 92.0)
 	var floor_h := 16.0
@@ -198,8 +203,8 @@ static func _panel(rng: RandomNumberGenerator) -> Array:
 				panel_w - 2.0, panel_h, "panel",
 				Materials.REINFORCED if storey == 0 else Materials.CONCRETE))
 		y -= panel_h
-		blocks.append(_block(0.0, y - floor_h * 0.5, span, floor_h,
-			"deck", Materials.CONCRETE))
+		blocks.append(_block(0.0, y - floor_h * 0.5, span, floor_h, "deck",
+			Materials.REINFORCED if storey == 0 else Materials.CONCRETE))
 		y -= floor_h
 	return blocks
 
