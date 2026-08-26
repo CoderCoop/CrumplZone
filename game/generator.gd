@@ -61,7 +61,8 @@ static func generate(level_seed: int) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = level_seed
 
-	var kind: String = Architecture.TYPES[rng.randi() % Architecture.TYPES.size()]
+	var kind: String = Architecture.GENERATED[
+		rng.randi() % Architecture.GENERATED.size()]
 	var built := Architecture.build(kind, rng)
 	var blocks: Array = built["blocks"]
 

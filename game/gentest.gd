@@ -183,8 +183,14 @@ func _report() -> void:
 	print("")
 	print("systems seen: %s" % _seen)
 	print("closest the estimate came to being too low: %.2fx" % _worst_ratio)
-	var missing: Array[String] = []
+	var held: Array[String] = []
 	for kind in Architecture.TYPES:
+		if not Architecture.GENERATED.has(kind):
+			held.append(kind)
+	if not held.is_empty():
+		print("held back from generation: %s" % str(held))
+	var missing: Array[String] = []
+	for kind in Architecture.GENERATED:
 		if not _seen.has(kind):
 			missing.append(kind)
 	if not missing.is_empty():

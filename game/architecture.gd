@@ -54,6 +54,21 @@ const TYPES: Array[String] = [
 	CURTAIN_WALL, MASONRY, PANEL, FLAT_SLAB, STACK, SHED,
 ]
 
+## What the generator may actually build. Masonry is held back: it is the only
+## system that still settles into its own contacts more than its height allows
+## — 15 px on a 254 px building, once, damaging nothing, where the other five
+## settle under 2 px.
+##
+## Held back rather than fixed-in-place or quietly passed. The threshold it
+## misses by is a rounding margin and moving it would have been tuning a check
+## to get green; the system itself is complete and correct in every other
+## respect, so it stays in the codebase, stays in the harness, and comes back
+## the moment it settles like the rest. A level type nobody has got to stand
+## still is not one to put in front of a player.
+const GENERATED: Array[String] = [
+	CURTAIN_WALL, PANEL, FLAT_SLAB, STACK, SHED,
+]
+
 ## What each one is called on the level card, and the one-line reason it is
 ## different to knock down.
 const ABOUT := {
