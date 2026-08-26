@@ -135,6 +135,15 @@ var _ball_hit_once := {}
 func build(level_spec: Dictionary) -> void:
 	clear()
 	spec = level_spec
+	# Before anything is made, not after. This counter goes into each piece's
+	# seed and that seed decides how the piece breaks, so it has to start from
+	# the same place every build or the same level breaks differently each
+	# time. It was reset at the end of this function, which looks equivalent
+	# and is not: any shattering between two builds left the counter somewhere
+	# else, so the second build's pieces were seeded from a different place
+	# entirely. The solver rebuilds one Level hundreds of times, so its search
+	# was comparing runs that differed for reasons unrelated to the moves.
+	_pieces_made = 0
 
 	var material := PhysicsMaterial.new()
 	material.friction = 0.85
@@ -170,14 +179,6 @@ func build(level_spec: Dictionary) -> void:
 			String(b.get("role", ""))))
 
 	_settled_ticks = 0
-	# Reset with the level, not with the Level object. This counter goes into
-	# each piece's seed, and that seed decides how the piece breaks — so a
-	# counter carried across rebuilds means the same level breaks differently
-	# every time it is rebuilt. The solver rebuilds one Level hundreds of
-	# times looking for a solution, which made its search and its parity
-	# confirmation both unreproducible: the same level came back solvable in
-	# one run and unsolvable in the next.
-	_pieces_made = 0
 	load_damage_total = 0
 	load_damage_slow = 0
 	load_damage_slow_solid = 0
