@@ -97,7 +97,7 @@ static func level(difficulty: String) -> Dictionary:
 			# charge cleared outright — measured, a single use left nothing
 			# standing. A level cleared by one tap is not an easy puzzle, it
 			# is no puzzle, so it gained a storey rather than losing the point.
-			return _finish(tower(3, 4, 86.0, false), difficulty, 8, 132.0, 148.0)
+			return _finish(tower(3, 4, 86.0, false), difficulty, 8, 90.0, 148.0)
 		HARD:
 			# Four storeys and two reinforced columns: taller than medium, and
 			# with more of the ground floor that a tool will not go through.
@@ -107,9 +107,9 @@ static func level(difficulty: String) -> Dictionary:
 			# about whether one exists — only that a level this wide costs
 			# more search than it is worth gating CI on. Five columns and a
 			# deeper search is the same idea for a level that can be verified.
-			return _finish(tower(4, 5, 84.0, true, 2), difficulty, 10, 300.0, 235.0)
+			return _finish(tower(4, 5, 84.0, true, 2), difficulty, 10, 300.0, 175.0)
 		_:
-			return _finish(tower(3, 5, 86.0, true), difficulty, 8, 192.0, 143.0)
+			return _finish(tower(3, 5, 86.0, true), difficulty, 8, 216.0, 143.0)
 
 
 ## Attaches the numbers that depend on a measured solution rather than on the
@@ -123,9 +123,19 @@ static func level(difficulty: String) -> Dictionary:
 ## why the computation is only an estimate. Each is its measured pile plus
 ## about a third, and linetest.gd fails if the pile ever outgrows it.
 ##
-##   easy    pile 114 px, line 148
-##   medium  pile  98 px, line 143
-##   hard    pile 181 px, line 235
+## The line also has to be tight enough to be a puzzle. Hard was first given
+## 235 — 60% of its own height — and one charge cleared all forty blocks,
+## because at that height almost anything that falls is already under it. The
+## three now sit at 45-50% of the building's height.
+##
+##   easy    pile 104 px, line 148  (50% of height)
+##   medium  pile  73 px, line 143  (49%)
+##   hard    pile 106 px, line 175  (45%)
+##
+## Note what the pile measurement is: the level pulverised completely, which is
+## the *flattest* it can be left. A solution that topples the building instead
+## leaves larger pieces that stack higher, so the room between pile and line is
+## what makes anything other than grinding it all down viable.
 static func _finish(spec: Dictionary, difficulty: String, depth: int,
 		par: float, line: float) -> Dictionary:
 	spec["difficulty"] = difficulty
