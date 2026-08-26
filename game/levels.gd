@@ -38,12 +38,41 @@ const FLOOR_Y := 540.0
 ## to how far it fell. It is not a constant that can be trusted on its own —
 ## measured across the authored levels it ranged over a factor of two — which
 ## is why this is a floor rather than a prediction.
-const SPREAD_PER_HEIGHT := 0.55
+## How far debris spreads per unit of the height it fell, per structural
+## system — because how far it spreads follows from how the building fails.
+## A chimney goes over in one direction; a shed's roof comes down almost in
+## place across a footprint that was already wide; a masonry wall collapses
+## into its own plan.
+##
+## Measured, not chosen. gentest.gd pulverises sampled levels and reports what
+## spread each one would have needed for the estimate to have been exact;
+## these are the smallest observed for each system, less 15%. Smaller means a
+## narrower spread means a higher estimate, and a high estimate only makes a
+## level easier — the direction it is safe to be wrong in.
+##
+## Ranges seen: flat_slab 1.12-3.01, masonry 1.37-1.70, stack 2.15,
+## shed 2.17-6.10, curtain_wall 2.40, panel 2.04.
+const SPREAD_PER_HEIGHT := {
+	"flat_slab": 0.95,
+	"masonry": 1.16,
+	"panel": 1.73,
+	"stack": 1.83,
+	"shed": 1.45,
+	"curtain_wall": 2.04,
+}
+const SPREAD_DEFAULT := 0.95
 const PACKING := 0.62
 const LINE_MIN := 90.0
 
+## No line may sit higher than this share of the building's own height. A wide
+## low building has little material over a large footprint, so its estimated
+## pile is small and a line set purely as a multiple of it lands near the roof
+## — measured, a shed 202 px tall had its winning line at 202, which is a level
+## already won before it is touched.
+const LINE_OVER_HEIGHT := 0.52
 
-static func estimate_pile(blocks: Array) -> float:
+
+static func estimate_pile(blocks: Array, kind := "") -> float:
 	var area := 0.0
 	var left := INF
 	var right := -INF
@@ -58,7 +87,8 @@ static func estimate_pile(blocks: Array) -> float:
 	if area <= 0.0:
 		return LINE_MIN / WIN_LINE_OVER_PILE
 	var height: float = maxf(bottom - top, 1.0)
-	var spread: float = maxf(right - left, 1.0) + height * SPREAD_PER_HEIGHT * 2.0
+	var per_height: float = float(SPREAD_PER_HEIGHT.get(kind, SPREAD_DEFAULT))
+	var spread: float = maxf(right - left, 1.0) + height * per_height * 2.0
 	return area / (spread * PACKING)
 
 
@@ -134,13 +164,21 @@ static func finish(spec: Dictionary) -> Dictionary:
 	for b in blocks:
 		area += float(b["w"]) * float(b["h"])
 
+	var tall := 0.0
+	for b in blocks:
+		tall = maxf(tall, float(spec["floor_y"]) - (float(b["y"]) - float(b["h"]) * 0.5))
+
 	var pile: float = spec.get("pile", 0.0)
 	if pile <= 0.0:
-		pile = estimate_pile(blocks)
+		pile = estimate_pile(blocks, String(spec.get("kind", "")))
 		spec["pile"] = pile
 
-	var win: float = maxf(pile * WIN_LINE_OVER_PILE, LINE_MIN)
-	var third: float = minf(pile * THREE_STAR_OVER_PILE, win)
+	# The third line is what makes three stars hard; the first is where the
+	# level is won and must sit clear of it. Both are held under a share of the
+	# building's own height so that a wide low building is not already won.
+	var ceiling: float = maxf(tall * LINE_OVER_HEIGHT, LINE_MIN)
+	var third: float = minf(pile * THREE_STAR_OVER_PILE, ceiling * 0.62)
+	var win: float = clampf(pile * WIN_LINE_OVER_PILE, third * 1.35, ceiling)
 	var second: float = third + (win - third) * TWO_STAR_SHARE
 	var floor_y: float = float(spec["floor_y"])
 	spec["lines"] = [floor_y - win, floor_y - second, floor_y - third]

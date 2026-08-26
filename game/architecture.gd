@@ -134,7 +134,11 @@ static func _masonry(rng: RandomNumberGenerator) -> Array:
 		# so the arch stands the way an arch stands.
 		for i in bays:
 			var centre := first + pier * 0.5 + opening * 0.5 + float(i) * (opening + pier)
-			_arch(blocks, centre, y - storey_h, opening, 5)
+			# Spanning pier centre to pier centre, not just the opening. An
+			# arch bears on its springing; voussoirs that stop at the reveal
+			# have nothing under them and simply fall, which is what the first
+			# version of this did the instant the level was built.
+			_arch(blocks, centre, y - storey_h, opening + pier, 5)
 		# Timber floor spanning between the walls, which is what a warehouse
 		# of this age actually had.
 		y -= storey_h
@@ -165,7 +169,10 @@ static func _arch(blocks: Array, centre: float, y: float, span: float,
 # --- precast panels stacked dry ---------------------------------------------
 
 static func _panel(rng: RandomNumberGenerator) -> Array:
-	var storeys := rng.randi_range(4, 6)
+	# Five at most. Measured, six storeys of precast panel put more on the
+	# bottom course than concrete carries standing still, and the block quietly
+	# crushed its own ground floor before anyone touched it.
+	var storeys := rng.randi_range(4, 5)
 	var wide := rng.randi_range(3, 4)
 	var panel_w := rng.randf_range(84.0, 100.0)
 	var panel_h := rng.randf_range(58.0, 70.0)
@@ -180,8 +187,11 @@ static func _panel(rng: RandomNumberGenerator) -> Array:
 			# A gap of a pixel between panels, because there is one in the
 			# real thing: they are separate units bearing on each other, not
 			# a monolithic wall, and that is the whole character of the system.
+			# The ground storey is the heavy one, as it is in the real system:
+			# a thicker in-situ base carrying the stacked panels above.
 			blocks.append(_block(first + float(i) * panel_w, y - panel_h * 0.5,
-				panel_w - 2.0, panel_h, "panel", Materials.CONCRETE))
+				panel_w - 2.0, panel_h, "panel",
+				Materials.REINFORCED if storey == 0 else Materials.CONCRETE))
 		y -= panel_h
 		blocks.append(_block(0.0, y - floor_h * 0.5, span, floor_h,
 			"deck", Materials.CONCRETE))
@@ -211,9 +221,13 @@ static func _flat_slab(rng: RandomNumberGenerator) -> Array:
 		blocks.append(_block(0.0, y - slab_h * 0.5, span, slab_h, "deck",
 			Materials.CONCRETE))
 		y -= slab_h
-	# The up ramp, leaning against one end — the thing that makes a car park
-	# look like a car park rather than a shelf.
-	blocks.append(_block(span * 0.5 - 30.0, y * 0.5, 26.0, absf(y) * 0.5,
+	# The up ramp against one end — the thing that makes a car park look like a
+	# car park rather than a shelf. It reaches the ground: the first version
+	# was centred at half the building's height with half its height, which
+	# left it hanging in mid-air with nothing under it, and it dropped the
+	# moment the level was built.
+	var rise := absf(y)
+	blocks.append(_block(span * 0.5 - 30.0, -rise * 0.5, 26.0, rise,
 		"ramp", Materials.CONCRETE))
 	return blocks
 
@@ -229,7 +243,10 @@ static func _stack(rng: RandomNumberGenerator) -> Array:
 	var y := 0.0
 
 	# A plinth, wider than the shaft, as every real stack has.
-	blocks.append(_block(0.0, -16.0, base_w * 1.5, 32.0, "plinth", Materials.BRICK))
+	# A concrete plinth rather than brick. Measured, the bottom of a ten-course
+	# brick shaft sits within a few percent of what brick carries standing
+	# still, and cracked itself on some seeds before being touched.
+	blocks.append(_block(0.0, -16.0, base_w * 1.5, 32.0, "plinth", Materials.CONCRETE))
 	y = -32.0
 	for course in courses:
 		var t := float(course) / float(maxi(courses - 1, 1))
@@ -237,9 +254,10 @@ static func _stack(rng: RandomNumberGenerator) -> Array:
 		# Built as two half-shafts per course rather than one block, so there
 		# is a vertical joint down the middle. A stack does not crush — it
 		# hinges and goes over — and it needs somewhere to hinge.
+		var made_of: String = Materials.CONCRETE if course < 2 else Materials.BRICK
 		for side in [-1.0, 1.0]:
 			blocks.append(_block(side * w * 0.25, y - course_h * 0.5,
-				w * 0.5 - 1.0, course_h, "shaft", Materials.BRICK))
+				w * 0.5 - 1.0, course_h, "shaft", made_of))
 		y -= course_h
 	blocks.append(_block(0.0, y - 9.0, top_w * 1.25, 18.0, "cap", Materials.CONCRETE))
 	return blocks

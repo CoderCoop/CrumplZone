@@ -34,6 +34,7 @@ var _spec: Dictionary
 var _phase := ""
 var _ticks := 0
 var _standing_before := 0
+var _top_at_build := 0.0
 var _spots: Array[Vector2] = []
 var _charge_at := 0
 var _failures: Array[String] = []
@@ -57,6 +58,7 @@ func _next() -> void:
 	_level.build(_spec)
 	_seen[_spec["kind"]] = int(_seen.get(_spec["kind"], 0)) + 1
 	_standing_before = _level.standing()
+	_top_at_build = _top_now()
 	_spots = []
 	for b in _spec["blocks"]:
 		_spots.append(Vector2(float(b["x"]), float(b["y"])))
@@ -74,9 +76,23 @@ func _physics_process(_delta: float) -> void:
 		"standing":
 			if _ticks < STAND_TICKS:
 				return
-			if _level.standing() < _standing_before:
-				_failures.append("seed %d (%s) falls down on its own"
-					% [_spec["seed"], _spec["kind"]])
+			# Judged on damage and on how far the top has dropped, not on the
+			# count above the line: when a line sits near a low building's
+			# roof, ordinary settling moves pieces across it and a count reads
+			# that as a collapse. Measured — two shed seeds were reported as
+			# falling over when what had actually happened was that their
+			# winning line was level with their own roof.
+			var damaged := 0
+			for body in _level.live_blocks():
+				if int(body.get_meta("damage", 0)) > 0:
+					damaged += 1
+			var dropped := _top_now() - _top_at_build
+			if damaged > 0:
+				_failures.append("seed %d (%s) damages itself standing still: %d pieces"
+					% [_spec["seed"], _spec["kind"], damaged])
+			if dropped > 12.0:
+				_failures.append("seed %d (%s) sags %.0f px untouched"
+					% [_spec["seed"], _spec["kind"], dropped])
 			_phase = "flatten"
 			_ticks = 0
 		"flatten":
@@ -87,6 +103,18 @@ func _physics_process(_delta: float) -> void:
 				return
 			_judge()
 			_next()
+
+
+## The highest point of anything still in the level, as a depth below the
+## street rather than a world coordinate.
+func _top_now() -> float:
+	var floor_y: float = float(_spec["floor_y"])
+	var peak := floor_y
+	for body in _level.live_blocks():
+		var poly: PackedVector2Array = body.get_meta("poly")
+		for point in poly:
+			peak = minf(peak, body.global_position.y + point.rotated(body.rotation).y)
+	return floor_y - peak
 
 
 func _judge() -> void:
