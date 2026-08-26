@@ -136,6 +136,41 @@ setTimeout(() => {
     }
   }
   checks.push(['the player ends up on the new build', after === 'BUILD-TWO', after]);
+
+  // And the case the first version of this test missed entirely: a client
+  // whose cached page is older than the update code itself. That page cannot
+  // ask the worker to stand aside, because it does not know it should — so if
+  // the worker only skips waiting when asked, such a client is pinned to its
+  // install for ever. Reported from a real phone: 0.7.0, with 0.9.0 deployed.
+  //
+  // Simulated by stripping the hooks out of the page the client has, then
+  // publishing again. Nothing but the worker can rescue this.
+  at('a client whose page predates the update code');
+  const stripped = fs.readFileSync(path.join(serveDir, 'index.html'), 'utf8')
+    .replace(/window\.__cz_update_ready\s*=/, 'window.__cz_no_update_ready =')
+    .replace(/window\.__cz_apply_update\s*=/, 'window.__cz_no_apply_update =');
+  fs.writeFileSync(path.join(serveDir, 'index.html'), stripped);
+  fs.writeFileSync(MARK, 'BUILD-THREE');
+  fs.writeFileSync(swFile, fs.readFileSync(swFile, 'utf8')
+    .replace(/const CACHE_VERSION = '[^']*'/, "const CACHE_VERSION = 'verify-update-three'"));
+
+  const old_page = await ctx.newPage();
+  old_page.on('pageerror', (e) => errors.push(String(e)));
+  await old_page.goto(url, { waitUntil: 'load', timeout: 90000 });
+  await old_page.waitForSelector('canvas', { timeout: 90000 });
+  const helpless = await old_page.evaluate(
+    () => typeof window.__cz_update_ready !== 'function',
+  );
+  checks.push(['that page really cannot ask for an update', helpless, String(helpless)]);
+
+  let healed = 'unknown';
+  for (let i = 0; i < 40; i += 1) {
+    await old_page.reload({ waitUntil: 'load', timeout: 60000 }).catch(() => {});
+    healed = await served(old_page).catch(() => healed);
+    if (healed === 'BUILD-THREE') { break; }
+    await old_page.waitForTimeout(500);
+  }
+  checks.push(['the worker updates it anyway', healed === 'BUILD-THREE', healed]);
   checks.push(['no page errors', errors.length === 0,
     errors.length ? errors.join('; ') : 'none']);
 

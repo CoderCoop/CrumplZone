@@ -63,6 +63,13 @@ jobs:
       # page with a script tag that never closes — a build that exports,
       # deploys, serves, and never starts. In a browser that looks like a
       # canvas which never appears, ninety seconds later.
+      # Godot regenerates the worker on every export, so this is applied to
+      # the generated one rather than kept in the repo. Without it the worker
+      # only stands aside when a page asks it to — and a page old enough to
+      # matter does not know how to ask.
+      - name: Let the service worker replace itself
+        run: node tools/patch-service-worker.js build/web
+
       - name: Verify the exported page is well formed
         run: node tools/verify-page-scripts.js build/web
 
