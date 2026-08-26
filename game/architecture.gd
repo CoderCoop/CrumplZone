@@ -50,9 +50,10 @@ const SHED := "shed"
 ## not the settle. This is the measured best, not a guess.
 const LINTEL_H := 20.0
 
-## How deep the shed's ground beam is. It carries the frame, the cladding and
-## the roof, so it is sized like a beam rather than like a kerb.
-const BASE_H := 24.0
+## How deep the shed's ground work is — the pads under the stanchions and the
+## sills the cladding stands on, which are the same depth so nothing is built
+## inside anything else.
+const BASE_H := 10.0
 
 const TYPES: Array[String] = [
 	CURTAIN_WALL, MASONRY, PANEL, FLAT_SLAB, STACK, SHED,
@@ -350,32 +351,48 @@ static func _shed(rng: RandomNumberGenerator) -> Array:
 	var span := float(bays) * spacing + column_w
 	var y := 0.0
 
-	# Stanchions on base plates. Measured before they had any: two shed seeds
+	# One bay is left open as the doorway, which is what a shed is for. Chosen
+	# before anything is placed, because the ground work skips it too.
+	var door := rng.randi_range(0, bays - 1)
+
+	# The clear width between two pads, less a little. Everything at ground
+	# level in a bay is derived from this one number rather than measured
+	# from the bay: the sill is this wide and the wall standing on it is
+	# narrower still, so neither can be built inside a pad. Sizing the wall
+	# from the bay instead put it 1.4 to 4.4 px into the pads at the ends of
+	# the generator's ranges — small enough that the stability gate passed
+	# anyway, which is what makes it worth writing down rather than leaving.
+	var sill_w := spacing - column_w * 2.2 - 6.0
+
+	# Stanchions on pad footings. Measured before they had any: two shed seeds
 	# in twelve fell over untouched — a row of slender columns carrying a wide
 	# truss is an inverted pendulum, and a real one is bolted to a pad footing
 	# for exactly that reason.
-	# One ground beam under the whole frame rather than a pad under each
-	# stanchion. Pads were what stopped the shed falling over untouched — a
-	# row of slender columns carrying a wide truss is an inverted pendulum —
-	# and a continuous beam does that better, because it is what the cladding
-	# stands on too. Separate pads and cladding both starting at ground level
-	# meant the bottom course was built inside the pad beside it at every
-	# column width the generator makes above 17 px, and its range starts at
-	# 19: measured, not assumed, after the same mistake in the masonry wall.
-	#
-	# It also gives the shed a demolition of its own. Break the beam and
-	# everything standing on it goes at once.
-	#
-	# Deep, because it carries everything: at 12 px the biggest shed the
-	# generator makes crushed it standing still, which is what a beam a fifth
-	# of the depth it needs does. A real ground beam under a portal frame is
-	# a substantial piece of concrete, not a kerb.
-	blocks.append(_block(0.0, -BASE_H * 0.5, span, BASE_H, "footing",
-		Materials.CONCRETE))
 	for i in bays + 1:
 		var x := first + float(i) * spacing
+		blocks.append(_block(x, -BASE_H * 0.5, column_w * 2.2, BASE_H,
+			"footing", Materials.CONCRETE))
 		blocks.append(_block(x, -BASE_H - (height - BASE_H) * 0.5,
 			column_w, height - BASE_H, "stanchion", Materials.STEEL))
+	# A sill between each pair of pads for the cladding to stand on. Cast in
+	# bays rather than as one beam across the whole span, which is both how
+	# ground work is really poured and what the stress model needs: a piece
+	# is judged on the sum of every contact impulse on it, so one member
+	# touching the street, every stanchion and every wall accumulates what
+	# the same load spread over separate members never does.
+	#
+	# One continuous beam was tried here first and is the reason that is
+	# written down. It read as the obvious simplification — fewer members,
+	# a wider base for what is otherwise an inverted pendulum — and it
+	# crushed itself standing still. Deepening it made it worse, not better,
+	# which is what said the depth was never the problem: at 12 px one shed
+	# in twelve failed, at 24 px two did, because the extra concrete was
+	# more weight on the same summed contact rather than more section.
+	for i in bays:
+		if i == door:
+			continue
+		blocks.append(_block(first + spacing * 0.5 + float(i) * spacing,
+			-BASE_H * 0.5, sill_w, BASE_H, "footing", Materials.CONCRETE))
 	y = -height
 	# Truss: a bottom chord across the whole span, a top chord, and posts
 	# between them. Light, deep, and it carries a long way on very little.
@@ -408,8 +425,7 @@ static func _shed(rng: RandomNumberGenerator) -> Array:
 	# between its columns braced the frame against shear and took the same
 	# building from solvable in three moves to unsolvable in seven. Cladding
 	# holds nothing up, and has to be built so that it cannot start.
-	var door := rng.randi_range(0, bays - 1)
-	var clad_w := spacing - column_w - 20.0
+	var clad_w := sill_w - 4.0
 	# Up to just under the eaves. At 30 px of clearance the wall stopped a
 	# quarter of the way down the elevation and read as a hoarding rather
 	# than a building; 14 leaves the chord free without the gap showing.
@@ -419,8 +435,6 @@ static func _shed(rng: RandomNumberGenerator) -> Array:
 	var rows := maxi(int(wall_h / 22.0), 1)
 	var course_h := wall_h / float(rows)
 	for i in bays:
-		# One bay is the doorway, which is what a shed is for. It also gives
-		# the elevation something to read against, and a way in.
 		if i == door:
 			continue
 		var cx := first + spacing * 0.5 + float(i) * spacing
