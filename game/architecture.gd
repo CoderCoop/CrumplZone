@@ -50,6 +50,10 @@ const SHED := "shed"
 ## not the settle. This is the measured best, not a guess.
 const LINTEL_H := 20.0
 
+## How deep the shed's ground beam is. It carries the frame, the cladding and
+## the roof, so it is sized like a beam rather than like a kerb.
+const BASE_H := 24.0
+
 const TYPES: Array[String] = [
 	CURTAIN_WALL, MASONRY, PANEL, FLAT_SLAB, STACK, SHED,
 ]
@@ -350,12 +354,28 @@ static func _shed(rng: RandomNumberGenerator) -> Array:
 	# in twelve fell over untouched — a row of slender columns carrying a wide
 	# truss is an inverted pendulum, and a real one is bolted to a pad footing
 	# for exactly that reason.
+	# One ground beam under the whole frame rather than a pad under each
+	# stanchion. Pads were what stopped the shed falling over untouched — a
+	# row of slender columns carrying a wide truss is an inverted pendulum —
+	# and a continuous beam does that better, because it is what the cladding
+	# stands on too. Separate pads and cladding both starting at ground level
+	# meant the bottom course was built inside the pad beside it at every
+	# column width the generator makes above 17 px, and its range starts at
+	# 19: measured, not assumed, after the same mistake in the masonry wall.
+	#
+	# It also gives the shed a demolition of its own. Break the beam and
+	# everything standing on it goes at once.
+	#
+	# Deep, because it carries everything: at 12 px the biggest shed the
+	# generator makes crushed it standing still, which is what a beam a fifth
+	# of the depth it needs does. A real ground beam under a portal frame is
+	# a substantial piece of concrete, not a kerb.
+	blocks.append(_block(0.0, -BASE_H * 0.5, span, BASE_H, "footing",
+		Materials.CONCRETE))
 	for i in bays + 1:
 		var x := first + float(i) * spacing
-		blocks.append(_block(x, -5.0, column_w * 2.2, 10.0, "footing",
-			Materials.CONCRETE))
-		blocks.append(_block(x, -10.0 - (height - 10.0) * 0.5,
-			column_w, height - 10.0, "stanchion", Materials.STEEL))
+		blocks.append(_block(x, -BASE_H - (height - BASE_H) * 0.5,
+			column_w, height - BASE_H, "stanchion", Materials.STEEL))
 	y = -height
 	# Truss: a bottom chord across the whole span, a top chord, and posts
 	# between them. Light, deep, and it carries a long way on very little.
@@ -372,6 +392,41 @@ static func _shed(rng: RandomNumberGenerator) -> Array:
 			spacing * 0.42, 34.0, "rooflight", Materials.GLASS))
 		blocks.append(_block(centre + spacing * 0.24, y - 55.0,
 			spacing * 0.46, 18.0, "sheeting", Materials.TIMBER))
+
+	# Cladding on the walls. Without it this was a row of columns holding a
+	# truss up in the air — structurally a shed, and to look at, a viaduct.
+	#
+	# In horizontal courses rather than one panel per bay, for a physical
+	# reason: a full-height sheet 20 px thick standing on the ground between
+	# two stanchions has nothing holding it upright and falls over. Courses
+	# are wide relative to their height and stack, the way the stack's own
+	# shaft does.
+	#
+	# Clear of the stanchions on each side and of the bottom chord above, so
+	# the wall is something the shed carries rather than something bracing it.
+	# The curtain wall learned this the expensive way: glazing fitted tight
+	# between its columns braced the frame against shear and took the same
+	# building from solvable in three moves to unsolvable in seven. Cladding
+	# holds nothing up, and has to be built so that it cannot start.
+	var door := rng.randi_range(0, bays - 1)
+	var clad_w := spacing - column_w - 20.0
+	# Up to just under the eaves. At 30 px of clearance the wall stopped a
+	# quarter of the way down the elevation and read as a hoarding rather
+	# than a building; 14 leaves the chord free without the gap showing.
+	var wall_h := height - 14.0 - BASE_H
+	# Shallow courses, because deep ones read as stacked crates rather than
+	# as siding — five or six on a wall of this height.
+	var rows := maxi(int(wall_h / 22.0), 1)
+	var course_h := wall_h / float(rows)
+	for i in bays:
+		# One bay is the doorway, which is what a shed is for. It also gives
+		# the elevation something to read against, and a way in.
+		if i == door:
+			continue
+		var cx := first + spacing * 0.5 + float(i) * spacing
+		for c in rows:
+			blocks.append(_block(cx, -BASE_H - course_h * (float(c) + 0.5),
+				clad_w, course_h - 1.0, "sheeting", Materials.TIMBER))
 	return blocks
 
 
