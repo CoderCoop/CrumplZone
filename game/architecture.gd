@@ -134,11 +134,15 @@ static func _masonry(rng: RandomNumberGenerator) -> Array:
 		# so the arch stands the way an arch stands.
 		for i in bays:
 			var centre := first + pier * 0.5 + opening * 0.5 + float(i) * (opening + pier)
-			# Spanning pier centre to pier centre, not just the opening. An
-			# arch bears on its springing; voussoirs that stop at the reveal
-			# have nothing under them and simply fall, which is what the first
-			# version of this did the instant the level was built.
-			_arch(blocks, centre, y - storey_h, opening + pier, 5)
+			# A lintel bearing on the pier either side, not an arch of separate
+			# voussoirs. Arch action needs wedges that cannot slip past each
+			# other, and every piece in this game is an axis-aligned rectangle
+			# — so a row of rectangles over an opening is not an arch, it is
+			# five blocks over a hole, and it sagged and cracked the wall on
+			# every masonry seed. The arched head is drawn on the lintel
+			# instead: the look without a load path the physics cannot carry.
+			blocks.append(_block(centre, y - storey_h + 11.0, opening + pier * 0.9,
+				22.0, "lintel", Materials.BRICK))
 		# Timber floor spanning between the walls, which is what a warehouse
 		# of this age actually had.
 		y -= storey_h
@@ -149,21 +153,6 @@ static func _masonry(rng: RandomNumberGenerator) -> Array:
 	# A brick parapet, the detail that makes the top read as a warehouse.
 	blocks.append(_block(0.0, y - 14.0, span, 28.0, "parapet", Materials.BRICK))
 	return blocks
-
-
-## A flat segmental arch built from wedge blocks. Approximated with rectangles
-## of decreasing width, which is close enough to read as an arch and behaves
-## like one: take the keystone and the rest has nothing to lean on.
-static func _arch(blocks: Array, centre: float, y: float, span: float,
-		count: int) -> void:
-	var each := span / float(count)
-	var rise := 14.0
-	for i in count:
-		var offset := (float(i) - float(count - 1) * 0.5) * each
-		var lift := rise * (1.0 - absf(offset) / (span * 0.5))
-		blocks.append(_block(centre + offset, y - 10.0 - lift * 0.5,
-			each * 0.96, 20.0 + lift,
-			"keystone" if i == count / 2 else "voussoir", Materials.BRICK))
 
 
 # --- precast panels stacked dry ---------------------------------------------
@@ -221,14 +210,11 @@ static func _flat_slab(rng: RandomNumberGenerator) -> Array:
 		blocks.append(_block(0.0, y - slab_h * 0.5, span, slab_h, "deck",
 			Materials.CONCRETE))
 		y -= slab_h
-	# The up ramp against one end — the thing that makes a car park look like a
-	# car park rather than a shelf. It reaches the ground: the first version
-	# was centred at half the building's height with half its height, which
-	# left it hanging in mid-air with nothing under it, and it dropped the
-	# moment the level was built.
-	var rise := absf(y)
-	blocks.append(_block(span * 0.5 - 30.0, -rise * 0.5, 26.0, rise,
-		"ramp", Materials.CONCRETE))
+	# No ramp. Two versions of one were tried and both were wrong: the first
+	# hung in mid-air, and the second reached the ground but was a 26 px wide
+	# full-height freestanding wall, which leaned and dropped about 20 px on
+	# every seed. A car park reads perfectly well as slabs on columns, and a
+	# thing that has to be braced to stand up is not worth the decoration.
 	return blocks
 
 

@@ -176,9 +176,15 @@ static func finish(spec: Dictionary) -> Dictionary:
 	# The third line is what makes three stars hard; the first is where the
 	# level is won and must sit clear of it. Both are held under a share of the
 	# building's own height so that a wide low building is not already won.
+	# Order matters more than either bound. The third line may never fall below
+	# the pile the level will make, or three stars is unreachable — measured, a
+	# panel block with a 117 px pile had its third line put at 109 by the
+	# height cap alone. So the cap applies, and then the pile wins.
 	var ceiling: float = maxf(tall * LINE_OVER_HEIGHT, LINE_MIN)
-	var third: float = minf(pile * THREE_STAR_OVER_PILE, ceiling * 0.62)
-	var win: float = clampf(pile * WIN_LINE_OVER_PILE, third * 1.35, ceiling)
+	var third: float = maxf(minf(pile * THREE_STAR_OVER_PILE, ceiling * 0.62),
+		pile * 1.05)
+	var win: float = clampf(pile * WIN_LINE_OVER_PILE, third * 1.35,
+		maxf(ceiling, third * 1.5))
 	var second: float = third + (win - third) * TWO_STAR_SHARE
 	var floor_y: float = float(spec["floor_y"])
 	spec["lines"] = [floor_y - win, floor_y - second, floor_y - third]
