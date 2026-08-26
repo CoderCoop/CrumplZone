@@ -123,6 +123,25 @@ const REST_TOLERANCE := {
 	REINFORCED: 3.0,
 }
 
+## The speed at which a contact counts as a full-strength impact, in px/s.
+##
+## Severity rises with the square of speed, because that is how the energy in
+## a collision rises. Measured over a full collapse, real impacts land between
+## 60 and 400 px/s and account for most of the damage — but a sixth of it was
+## being dealt in the 8-25 band, by pieces barely drifting, because tolerance
+## used to be a step: anything over 8 px/s was judged exactly as harshly as a
+## slab arriving at 400. At 120 as the reference, a 10 px/s nudge is 144 times
+## weaker than a real impact rather than equal to one.
+const IMPACT_SPEED := 120.0
+
+
+## How much of a full impact a contact at this speed amounts to, from 0 at
+## rest to 1 at IMPACT_SPEED and above.
+static func severity(speed: float) -> float:
+	var t := clampf(speed / IMPACT_SPEED, 0.0, 1.0)
+	return t * t
+
+
 ## And when a resting piece is overloaded past even that, it gives way slowly:
 ## a quarter of the rate of something being struck. Grossly overloaded rubble
 ## still fails, which is the point of the mechanism — it just stops grinding
