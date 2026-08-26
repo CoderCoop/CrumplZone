@@ -7,7 +7,28 @@ sections are dated.
 
 ## [Unreleased]
 
-Nothing since 0.10.0.
+Nothing since 0.10.1.
+
+## [0.10.1] - 2026-08-26
+
+### Added
+
+- **A sixth kind of building: a load-bearing brick warehouse.** It was written
+  for 0.10.0 and held back, because it sagged where the others stood still.
+- **Each system is drawn as what it is.** Flat-slab columns flare where they
+  meet the slab, precast panels have joints all the way round and a window
+  each, shed cladding is ribbed, brick is coursed properly. The trim is not
+  decoration — it is how you tell what is carrying a building before you touch
+  it.
+
+### Fixed
+
+- **The brick warehouse stands up.** It was not settling, as it looked: parts
+  of it were being built inside other parts, and what looked like a wall
+  bedding down was the physics pushing them apart. Every floor overlapped the
+  piers beside it, and the parapet ran through the top floor.
+- **Tall flat-slab frames no longer crush their own ground floor.** Their
+  columns get bigger lower down now, because there is more above them.
 
 ## [0.10.0] - 2026-08-26
 

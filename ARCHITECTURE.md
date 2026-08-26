@@ -37,6 +37,7 @@ graph TD
         stresstest["stresstest.gd<br/>weight breaks the right things"]
         collapsetest["collapsetest.gd<br/>broken columns stop carrying"]
         gentest["gentest.gd<br/>generated levels stand up<br/>and stay winnable"]
+        shots["shots.gd<br/>a picture of each system<br/>looked at, not asserted"]
         verifylv["verify_levels.gd<br/>generate-and-verify measurement"]
     end
 
@@ -87,6 +88,7 @@ graph TD
     collapsetest -->|gates| ci
     fracture -->|cuts a piece in two| level
     gentest -->|drives| generator
+    shots -->|renders| generator
     gentest -->|gates| ci
     verifylv -->|gates| ci
     main -->|exported as WASM| pages
@@ -138,8 +140,11 @@ matters:
   because the difference between them is the game — each stands up for a
   different reason, so each has a different load path to attack, and a tool
   that works on one is the wrong tool for another. A system is only listed in
-  `GENERATED` once it stands still on its own; masonry is written and held
-  back, because it settles 15 px untouched where the others settle under 2.
+  `GENERATED` once it stands still on its own, and each one earned its place
+  there by a structural change rather than a tuned constant: footings under
+  the shed, a reinforced ground storey in the panel block, a plinth under the
+  stack, and columns that get bigger lower down in the masonry wall and the
+  flat-slab frame, because there is more above them.
 - **`levels.gd`** produces hand-built level specs — plain dictionaries of
   blocks — and, in `finish()`, attaches everything that follows from the shape
   of a building: how much rubble it will leave, where the three lines go, and
@@ -226,6 +231,12 @@ and work on a generated level nobody has ever solved.
 Getting under the first line ends the level only if you want it to. The result
 screen offers the choice: bank it, or go back with the power still in the bar
 and try for the next line.
+
+`shots.gd` is the other half of that, and not a gate: it renders one picture
+of each system through a real renderer, which the harnesses deliberately do
+without. A number can say a wall sagged 15 px; only the picture said the wall
+was leaning, which is a different fault with a different cause. Look at the
+pictures when a building misbehaves in a way its measurements do not explain.
 
 `gentest.gd` gates the generated side: it samples a dozen seeds and fails if
 any building damages itself or sags while standing untouched, or if the pile
