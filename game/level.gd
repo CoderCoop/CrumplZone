@@ -192,6 +192,7 @@ func clear() -> void:
 
 func _make_piece(pos: Vector2, polygon: PackedVector2Array, made_of: String,
 		material: PhysicsMaterial, durability := -1, role := "") -> RigidBody2D:
+	polygon = Fracture.simplify(polygon)
 	var made := Materials.of(made_of)
 	var body := RigidBody2D.new()
 	body.position = pos
@@ -217,6 +218,9 @@ func _make_piece(pos: Vector2, polygon: PackedVector2Array, made_of: String,
 	var shape := CollisionShape2D.new()
 	var convex := ConvexPolygonShape2D.new()
 	convex.points = polygon
+	# polygon has already been through Fracture.simplify by the time it gets
+	# here, so the collider is the drawn shape rather than a hull the engine
+	# substituted after warning about it.
 	shape.shape = convex
 	body.add_child(shape)
 	body.add_child(_visual(polygon, Materials.colour_at(made_of, 0.0), made_of, role))

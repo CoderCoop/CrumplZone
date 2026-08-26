@@ -147,6 +147,8 @@ jobs:
           # by retuning a tool, and neither is visible in a diff.
           run_harness "crack test" res://cracktest.tscn
 
+          run_harness "hull test" res://hulltest.tscn
+
           # Cheap, and it catches the failure that reads as "merely hard":
           # a level whose own rubble will not fit under its own line.
           run_harness "line test" res://linetest.tscn
@@ -156,4 +158,4 @@ jobs:
           # level's par against what a solution really costs.
           run_harness "par test" res://partest.tscn
 
-          echo "::notice::ci passed — secret scan, GDScript checks, wake test, break test, stress test, collapse test, crack test, line test, par test"
+          echo "::notice::ci passed — secret scan, GDScript checks, wake test, break test, stress test, collapse test, crack test, hull test, line test, par test"
