@@ -83,9 +83,15 @@ func _physics_process(_delta: float) -> void:
 			# falling over when what had actually happened was that their
 			# winning line was level with their own roof.
 			var damaged := 0
+			var culprits := {}
 			for body in _level.live_blocks():
 				if int(body.get_meta("damage", 0)) > 0:
 					damaged += 1
+					var what := "%s %s" % [body.get_meta("role", "?"),
+						body.get_meta("material", "?")]
+					culprits[what] = int(culprits.get(what, 0)) + 1
+			if damaged > 0:
+				_lines.append("        damaged untouched: %s" % culprits)
 			var dropped := _top_now() - _top_at_build
 			if damaged > 0:
 				_failures.append("seed %d (%s) damages itself standing still: %d pieces"

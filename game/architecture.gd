@@ -39,6 +39,10 @@ const FLAT_SLAB := "flat_slab"
 const STACK := "stack"
 const SHED := "shed"
 
+## How deep a masonry opening's lintel is. It sits on top of the piers, so it
+## adds to the storey height rather than fitting inside it.
+const LINTEL_H := 20.0
+
 const TYPES: Array[String] = [
 	CURTAIN_WALL, MASONRY, PANEL, FLAT_SLAB, STACK, SHED,
 ]
@@ -134,18 +138,20 @@ static func _masonry(rng: RandomNumberGenerator) -> Array:
 		# so the arch stands the way an arch stands.
 		for i in bays:
 			var centre := first + pier * 0.5 + opening * 0.5 + float(i) * (opening + pier)
-			# A lintel bearing on the pier either side, not an arch of separate
-			# voussoirs. Arch action needs wedges that cannot slip past each
-			# other, and every piece in this game is an axis-aligned rectangle
-			# — so a row of rectangles over an opening is not an arch, it is
-			# five blocks over a hole, and it sagged and cracked the wall on
-			# every masonry seed. The arched head is drawn on the lintel
-			# instead: the look without a load path the physics cannot carry.
-			blocks.append(_block(centre, y - storey_h + 11.0, opening + pier * 0.9,
-				22.0, "lintel", Materials.BRICK))
+			# A lintel resting ON the piers, not inside them. Arch action needs
+			# wedges that cannot slip past each other and every piece here is
+			# an axis-aligned rectangle, so the opening gets a lintel and the
+			# arched head is drawn on it instead.
+			#
+			# The first lintel was placed level with the top of the storey,
+			# which put it in the same space as the pier tops it was supposed
+			# to bear on. Two overlapping rigid bodies get pushed apart hard,
+			# and the wall cracked itself worse than the arch had.
+			blocks.append(_block(centre, y - storey_h - LINTEL_H * 0.5,
+				opening + pier * 0.9, LINTEL_H, "lintel", Materials.BRICK))
 		# Timber floor spanning between the walls, which is what a warehouse
 		# of this age actually had.
-		y -= storey_h
+		y -= storey_h + LINTEL_H
 		blocks.append(_block(0.0, y - floor_h * 0.5, span - pier, floor_h,
 			"joist", Materials.TIMBER))
 		y -= floor_h
