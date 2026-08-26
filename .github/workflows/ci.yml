@@ -145,6 +145,8 @@ jobs:
           # The hand-built level must stay worth playing: beatable within its
           # move budget, and not beatable in one move. Both are easy to break
           # by retuning a tool, and neither is visible in a diff.
+          run_harness "crack test" res://cracktest.tscn
+
           run_harness "playtest" res://playtest.tscn
 
-          echo "::notice::ci passed — secret scan, GDScript checks, wake test, break test, stress test, collapse test, playtest"
+          echo "::notice::ci passed — secret scan, GDScript checks, wake test, break test, stress test, collapse test, crack test, playtest"
