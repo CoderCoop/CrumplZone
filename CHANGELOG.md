@@ -7,7 +7,17 @@ sections are dated.
 
 ## [Unreleased]
 
-Nothing since 0.10.1.
+Nothing since 0.10.2.
+
+## [0.10.2] - 2026-08-26
+
+### Changed
+
+- **The shed is a building rather than a frame in mid-air.** It had walls
+  nowhere on it — a row of columns holding a roof truss up, which read as a
+  viaduct. It is now clad in profiled sheeting between its stanchions, with
+  one bay left open as the doorway, standing on pad footings with a sill cast
+  between each pair.
 
 ## [0.10.1] - 2026-08-26
 

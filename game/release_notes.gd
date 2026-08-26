@@ -11,6 +11,15 @@ extends RefCounted
 
 const NOTES: Array = [
 	{
+		"version": "0.10.2",
+		"date": "2026-08-26",
+		"lines": [
+			"The shed has walls now. It was a row of columns holding a roof "
+			+ "up, which looked more like a viaduct than a building. Clad "
+			+ "bays, one of them left open as the door.",
+		],
+	},
+	{
 		"version": "0.10.1",
 		"date": "2026-08-26",
 		"lines": [
