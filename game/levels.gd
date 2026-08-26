@@ -107,7 +107,7 @@ static func level(difficulty: String) -> Dictionary:
 			# about whether one exists — only that a level this wide costs
 			# more search than it is worth gating CI on. Five columns and a
 			# deeper search is the same idea for a level that can be verified.
-			return _finish(tower(4, 5, 84.0, true, 2), difficulty, 10, 300.0, 175.0)
+			return _finish(tower(4, 5, 84.0, true, 2), difficulty, 10, 192.0, 175.0)
 		_:
 			return _finish(tower(3, 5, 86.0, true), difficulty, 8, 216.0, 143.0)
 

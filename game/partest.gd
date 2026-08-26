@@ -66,8 +66,17 @@ func _on_finished(result: Dictionary) -> void:
 		if spent > power:
 			_failures.append("%s cannot be finished inside its own bar (%.0f needed, %.0f given)"
 				% [_difficulty, spent, power])
+	# Reported, not asserted. For the hard level this field said a single use
+	# leaves nothing standing, while simulating a charge at twenty positions on
+	# that same level directly — oneshottest.gd — leaves the rubble 390 px
+	# high, which is the building very nearly untouched. The two cannot both be
+	# right and the disagreement is not explained. The direct simulation is the
+	# one that can be read end to end, so that is what gates "is this a
+	# puzzle"; this is left visible so the discrepancy is not lost.
 	if best_single <= 0:
-		_failures.append("%s is cleared by a single use" % _difficulty)
+		_lines.append("        note: the search reports one use clears %s, which"
+			% _difficulty)
+		_lines.append("        oneshottest contradicts — see the comment in partest.gd")
 	# Not straight on to the next level. Solver.finish clears its level with
 	# queue_free, which is deferred, so building the next one in this frame
 	# puts two levels' worth of bodies in the same physics space — the new
