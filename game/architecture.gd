@@ -41,7 +41,7 @@ const SHED := "shed"
 
 ## How deep a masonry opening's lintel is. It sits on top of the piers, so it
 ## adds to the storey height rather than fitting inside it.
-const LINTEL_H := 20.0
+const LINTEL_H := 15.0
 
 const TYPES: Array[String] = [
 	CURTAIN_WALL, MASONRY, PANEL, FLAT_SLAB, STACK, SHED,
@@ -180,7 +180,12 @@ static func _masonry(rng: RandomNumberGenerator) -> Array:
 				floor_h, "joist", Materials.TIMBER))
 
 	# A brick parapet, the detail that makes the top read as a warehouse.
-	blocks.append(_block(0.0, y - 14.0, span, 28.0, "parapet", Materials.BRICK))
+	# A parapet is a low wall at the roof edge, not a deep band. At 28 it was
+	# the heaviest thing in the building and carried nothing — and masonry is
+	# heavy enough that the whole stack bedded 15 px into its own contacts
+	# under the load, which is settling rather than failure but is still the
+	# building moving on its own.
+	blocks.append(_block(0.0, y - 8.0, span, 16.0, "parapet", Materials.BRICK))
 	return blocks
 
 
