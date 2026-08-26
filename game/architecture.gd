@@ -39,9 +39,14 @@ const FLAT_SLAB := "flat_slab"
 const STACK := "stack"
 const SHED := "shed"
 
-## How deep a masonry opening's lintel is. It sits on top of the piers, so it
+## How deep the course over the openings is. It sits on top of the piers, so it
 ## adds to the storey height rather than fitting inside it.
-const LINTEL_H := 15.0
+##
+## Depth is stiffness: this member spans the openings, so it is what stops the
+## storeys above sagging into them. Thinning it from 20 to 15 to save weight
+## doubled the settle — 15 px became 32 — and brought self-damage back. It is
+## deeper than it started, not thinner.
+const LINTEL_H := 24.0
 
 const TYPES: Array[String] = [
 	CURTAIN_WALL, MASONRY, PANEL, FLAT_SLAB, STACK, SHED,
