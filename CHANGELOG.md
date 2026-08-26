@@ -7,7 +7,17 @@ sections are dated.
 
 ## [Unreleased]
 
-Nothing since 0.9.0.
+Nothing since 0.9.1.
+
+## [0.9.1] - 2026-08-26
+
+### Fixed
+
+- **An installed app updates itself without being closed first.** It was
+  downloading each new version and then queueing it behind the app you had
+  open, so it only ever switched over if you happened to close every window —
+  which on a phone is close to never. Reported from an install still running
+  0.7.0 with 0.9.0 long since deployed.
 
 ## [0.9.0] - 2026-08-26
 
