@@ -76,6 +76,10 @@ var _status: Label
 var _bar: ProgressBar
 var _pending: ProgressBar
 var _results: Results
+## Which of the three the player picked, and what its best known solution
+## costs — the rating is measured against that rather than against the bar.
+var _difficulty: String = Levels.MEDIUM
+var _par := 0.0
 var _buttons: Array[Button] = []
 var _art: Array[Control] = []
 var _intro: Intro
@@ -115,8 +119,9 @@ func _start() -> void:
 	# game with no level at all if the reload never came.
 	if UI.update_ready():
 		UI.apply_update()
-	var spec := Levels.tower()
+	var spec := Levels.level(_difficulty)
 	_level.build(spec)
+	_par = float(spec.get("par", 0.0))
 	_power_full = float(spec["power"])
 	_power = _power_full
 	_resolved = ""
@@ -333,11 +338,16 @@ func _open_intro() -> void:
 	add_child(_intro)
 
 
-func _close_intro() -> void:
+func _close_intro(difficulty := "") -> void:
 	if _intro == null:
 		return
 	_intro.queue_free()
 	_intro = null
+	# Picked from the help screen, so the level has to be rebuilt for it. Help
+	# opened mid-level closes with no choice made and leaves the level alone.
+	if difficulty != "" and difficulty != _difficulty:
+		_difficulty = difficulty
+		_start()
 
 
 func _select(kind: Tools.Kind) -> void:
@@ -523,6 +533,7 @@ func _show_results(won: bool) -> void:
 	_results.cleared = won
 	_results.power_left = _power
 	_results.power_full = _power_full
+	_results.par = _par
 	_results.standing = _level.standing()
 	_results.again_pressed.connect(_restart)
 	add_child(_results)

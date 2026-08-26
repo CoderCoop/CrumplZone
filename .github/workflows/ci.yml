@@ -147,6 +147,9 @@ jobs:
           # by retuning a tool, and neither is visible in a diff.
           run_harness "crack test" res://cracktest.tscn
 
-          run_harness "playtest" res://playtest.tscn
+          # partest supersedes the old single-level playtest: it runs the same
+          # search over all three difficulties and additionally checks each
+          # level's par against what a solution really costs.
+          run_harness "par test" res://partest.tscn
 
-          echo "::notice::ci passed — secret scan, GDScript checks, wake test, break test, stress test, collapse test, crack test, playtest"
+          echo "::notice::ci passed — secret scan, GDScript checks, wake test, break test, stress test, collapse test, crack test, par test"

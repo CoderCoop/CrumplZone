@@ -10,7 +10,8 @@ extends CanvasLayer
 ## without pinching. The body of it scrolls, so a landscape phone with 390 px
 ## of height still reaches the Play button.
 
-signal play_pressed
+## Carries which of the three the player picked.
+signal play_pressed(difficulty: String)
 
 const TITLE_SIZE := 32
 const HEADING_SIZE := 17
@@ -32,6 +33,7 @@ var _shade: ColorRect
 var _column: VBoxContainer
 var _scroll: ScrollContainer
 var _play: Button
+var _plays: Array[Button] = []
 var _install: Button
 var _install_note: Label
 var _install_poll := 0.0
@@ -90,12 +92,25 @@ func _ready() -> void:
 	_install.visible = false
 	_root.add_child(_install)
 
-	_play = Button.new()
-	_play.text = "Play"
-	_play.focus_mode = Control.FOCUS_NONE
-	_play.add_theme_font_size_override("font_size", 19)
-	_play.pressed.connect(func() -> void: play_pressed.emit())
-	_root.add_child(_play)
+	# One button per difficulty rather than a Play button and a setting to
+	# find: three targets side by side is the whole choice, in thumb reach,
+	# with nothing to open first.
+	for difficulty in Levels.ORDER:
+		var button := Button.new()
+		button.text = Levels.TITLES[difficulty]
+		button.focus_mode = Control.FOCUS_NONE
+		button.clip_text = true
+		button.add_theme_font_size_override("font_size", 19)
+		button.add_theme_stylebox_override("normal", _play_style(difficulty))
+		button.add_theme_stylebox_override("hover", _play_style(difficulty))
+		button.add_theme_stylebox_override("pressed", _play_style(difficulty, true))
+		button.add_theme_stylebox_override("hover_pressed", _play_style(difficulty, true))
+		button.add_theme_color_override("font_color", Color(0.10, 0.10, 0.12))
+		button.add_theme_color_override("font_pressed_color", Color(0.10, 0.10, 0.12))
+		button.pressed.connect(func() -> void: play_pressed.emit(difficulty))
+		_root.add_child(button)
+		_plays.append(button)
+	_play = _plays[0]
 
 	_show_how(true)
 	_refresh_install()
@@ -147,6 +162,22 @@ func _on_install() -> void:
 	relayout()
 
 
+## Warmer as it gets harder, so the three read as a scale rather than as three
+## unrelated buttons.
+func _play_style(difficulty: String, held := false) -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	var tint := {
+		Levels.EASY: Color(0.58, 0.80, 0.52),
+		Levels.MEDIUM: Color(0.95, 0.78, 0.34),
+		Levels.HARD: Color(0.93, 0.51, 0.36),
+	}.get(difficulty, Color(0.95, 0.78, 0.34)) as Color
+	box.bg_color = tint.lightened(0.18) if held else tint
+	box.set_corner_radius_all(10)
+	box.set_border_width_all(2)
+	box.border_color = tint.lightened(0.35)
+	return box
+
+
 func relayout() -> void:
 	var k := UI.units_per_css(get_viewport())
 	var size := get_viewport().get_visible_rect().size / k
@@ -161,8 +192,15 @@ func relayout() -> void:
 	var reserved := PLAY_HEIGHT + install_room + MARGIN * 2.0
 	_scroll.position = Vector2(MARGIN, MARGIN)
 	_scroll.size = Vector2(width, maxf(size.y - MARGIN - reserved, 80.0))
-	_play.position = Vector2(MARGIN, size.y - PLAY_HEIGHT - MARGIN)
-	_play.size = Vector2(width, PLAY_HEIGHT)
+	# Three across the bottom, with real gaps between them so a thumb cannot
+	# land on two.
+	var gap := 10.0
+	var each: float = maxf((width - gap * float(_plays.size() - 1))
+		/ float(_plays.size()), 44.0)
+	for i in _plays.size():
+		_plays[i].position = Vector2(MARGIN + float(i) * (each + gap),
+			size.y - PLAY_HEIGHT - MARGIN)
+		_plays[i].size = Vector2(each, PLAY_HEIGHT)
 	if _install != null:
 		_install.position = Vector2(MARGIN, _play.position.y - INSTALL_HEIGHT - 8.0)
 		_install.size = Vector2(width, INSTALL_HEIGHT)

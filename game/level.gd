@@ -2,7 +2,7 @@ class_name Level
 extends Node2D
 
 ## A structure, the rule it is judged by, and the physics that decides. No
-## input, no UI, no scoring — main.gd wraps this for a player and playtest.gd
+## input, no UI, no scoring — main.gd wraps this for a player and partest.gd
 ## drives it headlessly.
 ##
 ## That seam is deliberate. The charter's levels are generated and verified
@@ -61,7 +61,7 @@ const SLOW_CONTACT := 25.0
 ## it, and the sustained weight afterwards would break the pane regardless.
 ##
 ## The interval is not free to lower: reading every tick put the solver's
-## playtest up from 97 seconds to 322, because a collapse has a couple of
+## solver search up from 97 seconds to 322, because a collapse has a couple of
 ## hundred awake bodies in it and the solver replays the level hundreds of
 ## times.
 const STRESS_TICKS := 2

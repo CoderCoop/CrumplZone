@@ -86,7 +86,7 @@ correction.
 godot --path game
 
 # Check the level is still solvable within its budget, and not in one move
-godot --headless --fixed-fps 60 --path game res://playtest.tscn
+godot --headless --fixed-fps 60 --path game res://partest.tscn
 
 # Export the web build and check it runs on a header-less static host
 godot --headless --path game --import

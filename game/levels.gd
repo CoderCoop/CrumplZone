@@ -49,6 +49,59 @@ const COLUMN := Vector2(22.0, 76.0)
 const SLAB_H := 22.0
 
 
+## The three difficulties, by name. Everything else about a level follows from
+## the shape of the building — the survey line from its material volume, the
+## power bar and the par from what a solution actually costs — so a difficulty
+## is a size and a materials choice, not a set of numbers to tune by hand.
+const EASY := "easy"
+const MEDIUM := "medium"
+const HARD := "hard"
+const ORDER: Array[String] = [EASY, MEDIUM, HARD]
+
+const TITLES := {
+	EASY: "Easy",
+	MEDIUM: "Medium",
+	HARD: "Hard",
+}
+
+
+## A level by difficulty. Par and power are measured, not chosen — see
+## partest.gd, which fails if either has drifted from what the solver finds.
+static func level(difficulty: String) -> Dictionary:
+	match difficulty:
+		EASY:
+			# Two storeys, four columns, and no reinforced core: everything
+			# here can be cut, so it is about the order rather than about
+			# working around something you cannot break.
+			return _finish(tower(2, 4, 86.0, false), difficulty, 96.0)
+		HARD:
+			# Four storeys, six columns, and two reinforced columns rather
+			# than one — a wider base to bring down and less of it that a
+			# tool will go through.
+			return _finish(tower(4, 6, 82.0, true, 2), difficulty, 300.0)
+		_:
+			return _finish(tower(3, 5, 86.0, true), difficulty, 216.0)
+
+
+## Attaches the numbers that depend on a measured solution rather than on the
+## shape of the building.
+##
+## `par` is what the solver's best solution costs. The power bar is set well
+## clear of it so finishing is never the hard part; the rating is what makes it
+## a puzzle, and the rating is measured against par.
+static func _finish(spec: Dictionary, difficulty: String, par: float) -> Dictionary:
+	spec["difficulty"] = difficulty
+	spec["par"] = par
+	spec["power"] = par * POWER_OVER_PAR
+	return spec
+
+
+## How much more than par the bar holds. Enough that a player who wastes a
+## couple of uses still clears the level — finishing is the floor, not the
+## challenge — and not so much that spending is meaningless.
+const POWER_OVER_PAR := 1.9
+
+
 ## A curtain-wall office block: steel columns carrying concrete floor slabs,
 ## with glass glazing the bays between them, and a reinforced concrete core at
 ## ground level that no budget of jackhammer blows will get through.
@@ -58,9 +111,10 @@ const SLAB_H := 22.0
 ## what actually carries the building, and the most expensive thing to cut. A
 ## player who reads the structure can tell all of that before touching it.
 ##
-## Checked by playtest.gd (solvable, not trivial), toolcheck.gd (every tool
-## does something) and waketest.gd — not by eye.
-static func tower(storeys: int = 3, columns: int = 5, spacing: float = 86.0) -> Dictionary:
+## Checked by partest.gd (every difficulty solvable, not trivial, and its par
+## matching what a solution really costs) and waketest.gd — not by eye.
+static func tower(storeys: int = 3, columns: int = 5, spacing: float = 86.0,
+		cored: bool = true, cores: int = 1) -> Dictionary:
 	var blocks: Array = []
 	var first_x := CENTRE_X - (columns - 1) * spacing * 0.5
 	var slab_w := (columns - 1) * spacing + COLUMN.x * 2.0
@@ -77,11 +131,17 @@ static func tower(storeys: int = 3, columns: int = 5, spacing: float = 86.0) -> 
 	# piece you bring the building down around. That is the shape of the
 	# decision the materials exist to create.
 	var core := int(columns / 2)
+	# Which ground-floor columns are reinforced. Spread out rather than
+	# adjacent, so a hard level is not one solid block at the bottom.
+	var cored_at := {}
+	if cored:
+		for n in cores:
+			cored_at[posmod(core + n * 2, columns)] = true
 
 	for storey in storeys:
 		for i in columns:
 			var made_of: String = Materials.STEEL
-			if storey == 0 and i == core:
+			if storey == 0 and cored_at.has(i):
 				made_of = Materials.REINFORCED
 			blocks.append({
 				"x": first_x + i * spacing,
@@ -119,13 +179,9 @@ static func tower(storeys: int = 3, columns: int = 5, spacing: float = 86.0) -> 
 		# looking for a solution. It needs seven, and a player is not a beam
 		# search, so the depth allows eight.
 		"moves": 8,
-		# Set against the solution the solver actually finds, not against the
-		# search depth, and re-measured whenever the physics changes what a
-		# demolition costs: 210 before weight broke things, 90 when it first
-		# did, 156 once pieces that leave the world stopped being simulated.
-		# At 260 a solver-quality run — five uses costing 126 — finishes with
-		# about half the bar, which is the two-star band. Three stars is left
-		# for playing better than the search does, which is the point of
-		# having a rating at all.
+		# Overwritten by _finish for a named difficulty. A bare tower() — which
+		# only the harnesses build — gets a bar rather than nothing.
 		"power": 260.0,
+		"par": 140.0,
+		"difficulty": MEDIUM,
 	}
