@@ -1,88 +1,109 @@
 class_name Generator
 extends RefCounted
 
-## Builds structures from a seed. Emits the same dictionary shape as
-## levels.gd, so everything downstream is unaware of where a level came from.
+## Builds levels from a seed. Emits the same dictionary shape as levels.gd, so
+## everything downstream is unaware of where a level came from.
 ##
-## Nothing here decides whether a level is any good — that is the solver's job.
-## The generator's only responsibility is to produce varied structures that
-## stand up and have somewhere worth hitting.
+## Nothing here decides whether a level is any good — the solver does that, and
+## gentest.gd checks the cheap things across many seeds. The generator's job is
+## variety that is real rather than cosmetic: a different structural system,
+## with different materials, a different silhouette and a different weak point,
+## so the demolition that worked last time does not work here.
+##
+## Where the variety comes from, in order of how much it changes the puzzle:
+##
+##   1. The structural system — see architecture.gd. Six of them, each with a
+##      real load path taken from how the thing is actually built.
+##   2. Size: storeys, bays, spans, member sizes, all from the seed.
+##   3. Materials: each system has an era, and the era decides what it is made
+##      of. A 1900 frame is steel and brick; a 1970 one is concrete.
+##   4. The setting behind it — see backdrop.gd. A works shed does not stand
+##      in the same place as a curtain-wall office.
 
 const CENTRE_X := 400.0
 const FLOOR_Y := 540.0
-const SLAB_H := 22.0
+
+## Which settings suit which building. A chimney belongs to the works, an
+## office to downtown; picking at random would put a Victorian warehouse in a
+## glass financial district, which reads as a mistake rather than as variety.
+const SETTINGS := {
+	Architecture.CURTAIN_WALL: ["downtown", "waterfront"],
+	Architecture.MASONRY: ["works", "waterfront"],
+	Architecture.PANEL: ["estate", "downtown"],
+	Architecture.FLAT_SLAB: ["downtown", "estate"],
+	Architecture.STACK: ["works"],
+	Architecture.SHED: ["works", "estate"],
+}
+
+## An era changes what a system is built from without changing how it stands.
+## The same frame in 1900 is riveted steel with brick infill; in 1970 it is
+## concrete and glass. Applied as a substitution over the architecture's own
+## choice, so the load path is untouched and only the character changes.
+const ERAS := {
+	"victorian": {Materials.STEEL: Materials.BRICK, Materials.CONCRETE: Materials.TIMBER},
+	"interwar": {Materials.GLASS: Materials.BRICK},
+	"postwar": {},
+	"modern": {Materials.BRICK: Materials.CONCRETE, Materials.TIMBER: Materials.STEEL},
+}
+
+## Which eras a system could plausibly have been built in.
+const ERA_FOR := {
+	Architecture.CURTAIN_WALL: ["postwar", "modern"],
+	Architecture.MASONRY: ["victorian", "interwar"],
+	Architecture.PANEL: ["postwar"],
+	Architecture.FLAT_SLAB: ["postwar", "modern"],
+	Architecture.STACK: ["victorian", "interwar"],
+	Architecture.SHED: ["interwar", "postwar"],
+}
 
 
 static func generate(level_seed: int) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = level_seed
 
-	var storeys := rng.randi_range(3, 5)
-	var bays := rng.randi_range(3, 5)
-	var pillars := bays + 1
-	var spacing := rng.randf_range(74.0, 96.0)
-	var pillar_w := rng.randf_range(18.0, 26.0)
-	var pillar_h := rng.randf_range(64.0, 84.0)
+	var kind: String = Architecture.TYPES[rng.randi() % Architecture.TYPES.size()]
+	var built := Architecture.build(kind, rng)
+	var blocks: Array = built["blocks"]
 
-	var blocks: Array = []
-	var first_x := CENTRE_X - (pillars - 1) * spacing * 0.5
-	var slab_w := (pillars - 1) * spacing + pillar_w * 2.0
-	var y := FLOOR_Y
+	var eras: Array = ERA_FOR.get(kind, ["postwar"])
+	var era: String = eras[rng.randi() % eras.size()]
+	blocks = _weather(blocks, era)
 
-	for storey in storeys:
-		# Upper storeys may drop an interior pillar. That is where the level
-		# gets its shape: a gap makes the slab above it depend on fewer
-		# supports, so there is a wrong side to hit and a right one.
-		var missing := -1
-		if storey > 0 and pillars > 3 and rng.randf() < 0.45:
-			missing = rng.randi_range(1, pillars - 2)
+	var places: Array = SETTINGS.get(kind, ["downtown"])
+	var setting: String = places[rng.randi() % places.size()]
 
-		for i in pillars:
-			if i == missing:
-				continue
-			# A wider pillar is a stronger support: worth spending a move on,
-			# and worth noticing before you spend it elsewhere.
-			var width := pillar_w
-			if rng.randf() < 0.15:
-				width = pillar_w * 1.6
-			blocks.append({
-				"x": first_x + i * spacing,
-				"y": y - pillar_h * 0.5,
-				"w": width, "h": pillar_h,
-				"role": "column", "material": Materials.STEEL,
-			})
-		# Bays are glazed, or bricked up where the generator wants a solid
-		# wall. Neither holds the building up; both change how it reads.
-		for i in pillars - 1:
-			if i == missing or i + 1 == missing:
-				continue
-			blocks.append({
-				"x": first_x + i * spacing + spacing * 0.5,
-				"y": y - pillar_h * 0.5,
-				"w": spacing - pillar_w - 6.0, "h": pillar_h - 8.0,
-				"role": "infill",
-				"material": Materials.BRICK if rng.randf() < 0.25 else Materials.GLASS,
-			})
-		y -= pillar_h
-		blocks.append({
-			"x": CENTRE_X + rng.randf_range(-6.0, 6.0),
-			"y": y - SLAB_H * 0.5,
-			"w": slab_w, "h": SLAB_H,
-			"role": "slab", "material": Materials.CONCRETE,
-		})
-		y -= SLAB_H
+	# Placed on the street: architecture builds around the origin, the level
+	# lives at CENTRE_X with its feet on FLOOR_Y.
+	for b in blocks:
+		b["x"] = float(b["x"]) + CENTRE_X
+		b["y"] = float(b["y"]) + FLOOR_Y
 
-	return {
-		"seed": level_seed,
+	var about: Array = Architecture.ABOUT.get(kind, ["Building", ""])
+	return Levels.finish({
 		"centre_x": CENTRE_X,
 		"floor_y": FLOOR_Y,
-		# Computed from this level's own material volume — see
-		# Levels.line_above_ground. A generated level with a constant line is
-		# a level that can be born impossible.
-		"height_line": FLOOR_Y - Levels.line_above_ground(blocks),
-		"power": 8.0 * Tools.cost(Tools.Kind.EXPLOSIVE, 1.0),
 		"blocks": blocks,
-		# Filled in by the solver once the level has been verified: the budget
-		# is the length of a solution that actually exists, plus slack.
-		"moves": 0,
-	}
+		"kind": kind,
+		"era": era,
+		"setting": setting,
+		"title": about[0],
+		"about": about[1],
+		"seed": level_seed,
+	})
+
+
+## Substitutes materials for the era, leaving the structure alone.
+static func _weather(blocks: Array, era: String) -> Array:
+	var swap: Dictionary = ERAS.get(era, {})
+	if swap.is_empty():
+		return blocks
+	for b in blocks:
+		var made_of: String = b["material"]
+		# Reinforced concrete is never substituted: it is the thing a level
+		# has to be brought down around, and swapping it away would quietly
+		# remove the only piece no tool goes through.
+		if made_of == Materials.REINFORCED:
+			continue
+		if swap.has(made_of):
+			b["material"] = swap[made_of]
+	return blocks

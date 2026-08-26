@@ -83,10 +83,8 @@ var _status: Label
 var _bar: ProgressBar
 var _pending: ProgressBar
 var _results: Results
-## Which of the three the player picked, and what its best known solution
-## costs — the rating is measured against that rather than against the bar.
+## Which of the three the player picked.
 var _difficulty: String = Levels.MEDIUM
-var _par := 0.0
 ## The best rating already offered, so the same one is not offered twice.
 var _shown_stars := 0
 var _buttons: Array[Button] = []
@@ -130,7 +128,11 @@ func _start() -> void:
 		UI.apply_update()
 	var spec := Levels.level(_difficulty)
 	_level.build(spec)
-	_par = float(spec.get("par", 0.0))
+	# The place the level stands in comes with the level, and the city has to
+	# be rebuilt for it — it is baked once from a fixed seed so the skyline
+	# does not reshuffle on every rebuild.
+	_backdrop.setting = String(spec.get("setting", "downtown"))
+	_backdrop.rebuild()
 	_power_full = float(spec["power"])
 	_power = _power_full
 	_resolved = ""

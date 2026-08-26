@@ -17,6 +17,57 @@ extends Node2D
 
 const SEED := 8412
 
+## Where the level is. A works shed does not stand in a glass financial
+## district, and putting it there reads as a mistake rather than as variety —
+## so the generator picks a setting that suits the building and the sky, the
+## skyline and the ground all follow from it.
+##
+## Each is a whole palette rather than a tint: the sky it is happening under,
+## the haze on the horizon, and how dense and how tall the city behind is. That
+## is enough to make two levels of the same building feel like different jobs.
+const SETTINGS := {
+	"downtown": {
+		"sky_top": Color(0.07, 0.09, 0.17), "sky_low": Color(0.48, 0.31, 0.27),
+		"haze": Color(0.42, 0.30, 0.31),
+		"far": Color(0.19, 0.20, 0.29), "mid": Color(0.13, 0.15, 0.22),
+		"near": Color(0.08, 0.10, 0.15),
+		"density": 1.0, "tall": 1.0, "lit": 1.0,
+		"ground": Color(0.16, 0.17, 0.19),
+	},
+	"works": {
+		# Industrial, before dawn: a colder sky, a low sprawling skyline of
+		# sheds and stacks, and almost nothing lit.
+		"sky_top": Color(0.05, 0.07, 0.13), "sky_low": Color(0.26, 0.25, 0.30),
+		"haze": Color(0.30, 0.28, 0.30),
+		"far": Color(0.15, 0.16, 0.21), "mid": Color(0.11, 0.12, 0.16),
+		"near": Color(0.07, 0.08, 0.11),
+		"density": 1.35, "tall": 0.55, "lit": 0.35,
+		"ground": Color(0.19, 0.18, 0.16),
+	},
+	"waterfront": {
+		# Wide, open and hazy, with the city set well back across the water.
+		"sky_top": Color(0.10, 0.13, 0.22), "sky_low": Color(0.62, 0.46, 0.36),
+		"haze": Color(0.55, 0.44, 0.40),
+		"far": Color(0.24, 0.24, 0.31), "mid": Color(0.17, 0.18, 0.24),
+		"near": Color(0.10, 0.12, 0.16),
+		"density": 0.6, "tall": 0.8, "lit": 0.7,
+		"ground": Color(0.20, 0.21, 0.23),
+	},
+	"estate": {
+		# Overcast daylight, and a horizon of blocks exactly like the one being
+		# taken down.
+		"sky_top": Color(0.30, 0.33, 0.40), "sky_low": Color(0.55, 0.56, 0.58),
+		"haze": Color(0.52, 0.53, 0.56),
+		"far": Color(0.34, 0.35, 0.40), "mid": Color(0.26, 0.27, 0.32),
+		"near": Color(0.18, 0.19, 0.23),
+		"density": 1.1, "tall": 0.7, "lit": 0.15,
+		"ground": Color(0.22, 0.22, 0.24),
+	},
+}
+
+## Which setting this backdrop is drawing. Set before it enters the tree.
+var setting := "downtown"
+
 const SKY_TOP := Color(0.07, 0.09, 0.17)
 const SKY_HORIZON := Color(0.48, 0.31, 0.27)
 const HAZE := Color(0.42, 0.30, 0.31)
@@ -24,6 +75,12 @@ const HAZE := Color(0.42, 0.30, 0.31)
 const FAR := Color(0.19, 0.20, 0.29)
 const MID := Color(0.13, 0.15, 0.22)
 const NEAR := Color(0.08, 0.10, 0.15)
+
+
+## The palette for the setting in force, falling back to downtown for a name
+## that does not exist rather than drawing nothing.
+func _palette() -> Dictionary:
+	return SETTINGS.get(setting, SETTINGS["downtown"])
 
 const WARM_WINDOW := Color(1.0, 0.82, 0.45, 0.85)
 const COOL_WINDOW := Color(0.62, 0.82, 1.0, 0.55)
@@ -58,15 +115,28 @@ func cover(world: Rect2) -> void:
 	queue_redraw()
 
 
+## Rebuilds the city for the current setting. Called when a level is built,
+## since the setting arrives with it.
+func rebuild() -> void:
+	_build_city()
+	queue_redraw()
+
+
 func _build_city() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = SEED
 	# base_offset is how far above the road each layer's feet sit; the further
 	# away, the higher and the hazier.
+	var pal := _palette()
+	var tall: float = float(pal["tall"])
+	var dense: float = float(pal["density"])
 	_layers = [
-		_row(rng, 150.0, 120.0, 320.0, 54.0, 130.0, FAR, 0.55),
-		_row(rng, 96.0, 90.0, 240.0, 46.0, 108.0, MID, 0.35),
-		_row(rng, 52.0, 60.0, 170.0, 62.0, 150.0, NEAR, 0.22),
+		_row(rng, 150.0, 120.0 * tall, 320.0 * tall, 54.0 / dense, 130.0 / dense,
+			pal["far"], 0.55 * float(pal["lit"])),
+		_row(rng, 96.0, 90.0 * tall, 240.0 * tall, 46.0 / dense, 108.0 / dense,
+			pal["mid"], 0.35 * float(pal["lit"])),
+		_row(rng, 52.0, 60.0 * tall, 170.0 * tall, 62.0 / dense, 150.0 / dense,
+			pal["near"], 0.22 * float(pal["lit"])),
 	]
 	_lamps = []
 	var x := extent.position.x + 60.0
@@ -104,6 +174,9 @@ func _draw() -> void:
 ## Banded rather than a shader: a couple of dozen rectangles is enough for a
 ## dusk gradient and costs nothing on a phone.
 func _draw_sky() -> void:
+	var pal := _palette()
+	var sky_top: Color = pal["sky_top"]
+	var sky_low: Color = pal["sky_low"]
 	const BANDS := 26
 	var top := extent.position.y
 	var height := floor_y - top
@@ -112,7 +185,7 @@ func _draw_sky() -> void:
 		var band := Rect2(
 			extent.position.x, top + height * float(i) / BANDS,
 			extent.size.x, height / BANDS + 1.0)
-		draw_rect(band, SKY_TOP.lerp(SKY_HORIZON, pow(t, 2.4)))
+		draw_rect(band, sky_top.lerp(sky_low, pow(t, 2.4)))
 
 
 func _draw_row(layer: Dictionary) -> void:
@@ -175,10 +248,12 @@ func _draw_ground() -> void:
 
 	# A band of haze where the city meets the ground, so the skyline sits in
 	# the air rather than on the pavement.
-	draw_rect(Rect2(left, floor_y - 60.0, width, 60.0), Color(HAZE.r, HAZE.g, HAZE.b, 0.18))
+	var haze: Color = _palette()["haze"]
+	draw_rect(Rect2(left, floor_y - 60.0, width, 60.0), Color(haze.r, haze.g, haze.b, 0.18))
 
 	draw_rect(Rect2(left, floor_y, width, bottom - floor_y), PAVEMENT)
-	draw_rect(Rect2(left, floor_y + 92.0, width, maxf(bottom - floor_y - 92.0, 0.0)), ROAD)
+	draw_rect(Rect2(left, floor_y + 92.0, width, maxf(bottom - floor_y - 92.0, 0.0)),
+		_palette()["ground"])
 	draw_rect(Rect2(left, floor_y + 88.0, width, 4.0), KERB)
 
 	# Demolition hoarding along the plot edge: diagonal hazard stripes.
