@@ -13,6 +13,10 @@ const BRICK := "brick"
 const CONCRETE := "concrete"
 const STEEL := "steel"
 const REINFORCED := "reinforced"
+## Sawn timber: joists, trusses, the floors of an old warehouse. Light and
+## weak, and the only material a jackhammer goes through in one blow — a
+## timber-framed building is a different demolition from a concrete one.
+const TIMBER := "timber"
 
 ## `durability` is how much damage a piece absorbs before it comes apart, on a
 ## scale where one jackhammer blow is Tools.JACKHAMMER_DAMAGE. Read it as hits:
@@ -65,6 +69,12 @@ const SPEC := {
 		"colour": Color(0.52, 0.50, 0.46),
 		"density": 0.0019,
 	},
+	TIMBER: {
+		"durability": 8,
+		"pieces": 3,
+		"colour": Color(0.55, 0.40, 0.25),
+		"density": 0.0005,
+	},
 }
 
 ## How much contact load a piece carries before it starts to suffer, in the
@@ -92,6 +102,7 @@ const STRESS := {
 	CONCRETE: 300.0,
 	STEEL: 1000.0,
 	REINFORCED: 1400.0,
+	TIMBER: 120.0,
 }
 
 ## How fast overload turns into damage: three points a second at twice a
@@ -121,6 +132,7 @@ const REST_TOLERANCE := {
 	CONCRETE: 3.0,
 	STEEL: 3.0,
 	REINFORCED: 3.0,
+	TIMBER: 2.0,
 }
 
 ## The speed at which a contact counts as a full-strength impact, in px/s.
