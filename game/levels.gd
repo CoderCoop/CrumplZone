@@ -23,13 +23,20 @@ const FLOOR_Y := 540.0
 ## tower below has 78,912 px² of material and settles into a pile 119 px deep
 ## across about 1150 px of street. These numbers reproduce that within a few
 ## pixels and then keep a fifth of it as clearance.
-## Debris spreads in proportion to how far it had to fall, not by a constant.
-## A constant was calibrated on the three-storey tower and quietly wrong for
-## anything else: on a two-storey building it predicted the rubble would spread
-## nearly as wide, so it predicted a thinner pile than the level really makes,
-## put the line under it, and produced a level with no solution. Measured, the
-## easy level left six pieces standing 1-83 px over a line the formula had
-## clamped to its floor.
+## Debris spreads in proportion to how far it had to fall — as an estimate
+## only, and one that is not accurate enough to trust on its own.
+##
+## This was a constant, then a ratio, and neither works. Measured across the
+## three levels by pulverising each one and looking at what is left, the spread
+## a building actually makes per unit of its own height came out 0.96, 1.55 and
+## 0.68 — a factor of 2.3 apart. How high a building piles when it is destroyed
+## depends on how it comes down, which is chaotic; it is not a tidy function of
+## its area and its height.
+##
+## So an authored level carries a line that was measured, not computed. This
+## stays as the opening estimate for a generated level, which then has to be
+## verified by simulation before it is accepted — the estimate says where to
+## start looking, and linetest.gd says whether it was right.
 const SPREAD_PER_HEIGHT := 1.16
 const PACKING := 0.62        # how much of that area broken pieces actually fill
 const CLEARANCE := 1.2       # how much room the line keeps above the pile
@@ -90,7 +97,7 @@ static func level(difficulty: String) -> Dictionary:
 			# charge cleared outright — measured, a single use left nothing
 			# standing. A level cleared by one tap is not an easy puzzle, it
 			# is no puzzle, so it gained a storey rather than losing the point.
-			return _finish(tower(3, 4, 86.0, false), difficulty, 8, 132.0)
+			return _finish(tower(3, 4, 86.0, false), difficulty, 8, 132.0, 148.0)
 		HARD:
 			# Four storeys and two reinforced columns: taller than medium, and
 			# with more of the ground floor that a tool will not go through.
@@ -100,9 +107,9 @@ static func level(difficulty: String) -> Dictionary:
 			# about whether one exists — only that a level this wide costs
 			# more search than it is worth gating CI on. Five columns and a
 			# deeper search is the same idea for a level that can be verified.
-			return _finish(tower(4, 5, 84.0, true, 2), difficulty, 10, 300.0)
+			return _finish(tower(4, 5, 84.0, true, 2), difficulty, 10, 300.0, 235.0)
 		_:
-			return _finish(tower(3, 5, 86.0, true), difficulty, 8, 192.0)
+			return _finish(tower(3, 5, 86.0, true), difficulty, 8, 192.0, 143.0)
 
 
 ## Attaches the numbers that depend on a measured solution rather than on the
@@ -111,12 +118,21 @@ static func level(difficulty: String) -> Dictionary:
 ## `par` is what the solver's best solution costs. The power bar is set well
 ## clear of it so finishing is never the hard part; the rating is what makes it
 ## a puzzle, and the rating is measured against par.
+## `line` is how far above the ground the survey line sits, in pixels, measured
+## by pulverising the level rather than computed — see SPREAD_PER_HEIGHT for
+## why the computation is only an estimate. Each is its measured pile plus
+## about a third, and linetest.gd fails if the pile ever outgrows it.
+##
+##   easy    pile 114 px, line 148
+##   medium  pile  98 px, line 143
+##   hard    pile 181 px, line 235
 static func _finish(spec: Dictionary, difficulty: String, depth: int,
-		par: float) -> Dictionary:
+		par: float, line: float) -> Dictionary:
 	spec["difficulty"] = difficulty
 	spec["moves"] = depth
 	spec["par"] = par
 	spec["power"] = par * POWER_OVER_PAR
+	spec["height_line"] = float(spec["floor_y"]) - line
 	return spec
 
 
