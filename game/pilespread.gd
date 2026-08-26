@@ -19,6 +19,10 @@ extends Node2D
 ## a measurement, not a gate: it prints what it found and always exits 0, so
 ## nobody is tempted to tune against it until the number is understood.
 
+## Seeds to measure, overridable so that asking a different question does not
+## mean editing the harness:
+##
+##   godot --headless --fixed-fps 60 --path game res://pilespread.tscn -- 4106 4119
 const SEEDS: Array[int] = [4106, 4102, 4110]
 const REPEATS := 6
 const STAND_TICKS := 240
@@ -37,7 +41,15 @@ var _runs: Array[float] = []
 var _lines: Array[String] = []
 
 
+var _seeds: Array[int] = []
+
+
 func _ready() -> void:
+	for arg in OS.get_cmdline_user_args():
+		if arg.is_valid_int():
+			_seeds.append(int(arg))
+	if _seeds.is_empty():
+		_seeds = SEEDS.duplicate()
 	_level = Level.new()
 	add_child(_level)
 	_next_seed()
@@ -45,7 +57,7 @@ func _ready() -> void:
 
 func _next_seed() -> void:
 	_seed_at += 1
-	if _seed_at >= SEEDS.size():
+	if _seed_at >= _seeds.size():
 		_report()
 		return
 	_runs = []
@@ -56,7 +68,7 @@ func _next_seed() -> void:
 func _start() -> void:
 	# Rebuilt from the seed every run, so each repeat starts from exactly the
 	# state a player would meet and nothing carries over from the last one.
-	_spec = Generator.generate(SEEDS[_seed_at])
+	_spec = Generator.generate(_seeds[_seed_at])
 	_level.build(_spec)
 	_spots = []
 	for b in _spec["blocks"]:
@@ -67,7 +79,7 @@ func _start() -> void:
 
 
 func _physics_process(_delta: float) -> void:
-	if _seed_at >= SEEDS.size():
+	if _seed_at >= _seeds.size():
 		return
 	_ticks += 1
 	_level.tick_settle()
