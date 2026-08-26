@@ -43,10 +43,12 @@ const SHED := "shed"
 ## adds to the storey height rather than fitting inside it.
 ##
 ## Depth is stiffness: this member spans the openings, so it is what stops the
-## storeys above sagging into them. Thinning it from 20 to 15 to save weight
-## doubled the settle — 15 px became 32 — and brought self-damage back. It is
-## deeper than it started, not thinner.
-const LINTEL_H := 24.0
+## storeys above sagging into them. Measured at three depths with the parapet
+## at each weight, 20 with a full parapet settles least — 15 px, against 29-32
+## at every other combination tried. Thinning it to 15 doubled the settle and
+## brought self-damage back; deepening it to 24 cleared the damage again but
+## not the settle. This is the measured best, not a guess.
+const LINTEL_H := 20.0
 
 const TYPES: Array[String] = [
 	CURTAIN_WALL, MASONRY, PANEL, FLAT_SLAB, STACK, SHED,
@@ -185,12 +187,10 @@ static func _masonry(rng: RandomNumberGenerator) -> Array:
 				floor_h, "joist", Materials.TIMBER))
 
 	# A brick parapet, the detail that makes the top read as a warehouse.
-	# A parapet is a low wall at the roof edge, not a deep band. At 28 it was
-	# the heaviest thing in the building and carried nothing — and masonry is
-	# heavy enough that the whole stack bedded 15 px into its own contacts
-	# under the load, which is settling rather than failure but is still the
-	# building moving on its own.
-	blocks.append(_block(0.0, y - 8.0, span, 16.0, "parapet", Materials.BRICK))
+	# The parapet stays deep. Lightening it to save load made the building
+	# settle twice as far, which is the opposite of what was expected — a
+	# heavier top course seats the joints below it rather than loading them.
+	blocks.append(_block(0.0, y - 14.0, span, 28.0, "parapet", Materials.BRICK))
 	return blocks
 
 
