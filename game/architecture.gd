@@ -119,6 +119,12 @@ static func _masonry(rng: RandomNumberGenerator) -> Array:
 	var storeys := rng.randi_range(2, 4)
 	var bays := rng.randi_range(3, 5)
 	var pier := rng.randf_range(30.0, 40.0)
+	# Walls thicken toward the base, as every load-bearing masonry building's
+	# do — there is more above them down there. Measured before they did: the
+	# tallest warehouse crushed 15 of its own piers standing untouched, because
+	# a wall of constant thickness carrying four storeys of brick is not how
+	# anyone ever built one.
+	var batter := 0.20
 	var opening := rng.randf_range(56.0, 74.0)
 	var storey_h := rng.randf_range(78.0, 92.0)
 	var floor_h := 16.0
@@ -130,9 +136,10 @@ static func _masonry(rng: RandomNumberGenerator) -> Array:
 	for storey in storeys:
 		# The piers are the building. Everything above bears on them, and
 		# there is nothing else holding the floors up.
+		var thickness: float = pier * (1.0 + batter * float(storeys - 1 - storey))
 		for i in bays + 1:
 			blocks.append(_block(first + float(i) * (opening + pier),
-				y - storey_h * 0.5, pier, storey_h, "pier", Materials.BRICK))
+				y - storey_h * 0.5, thickness, storey_h, "pier", Materials.BRICK))
 		# A segmental arch over each opening, as voussoirs. Five blocks, the
 		# middle one the keystone — the joints between them are real joints,
 		# so the arch stands the way an arch stands.
@@ -167,7 +174,10 @@ static func _panel(rng: RandomNumberGenerator) -> Array:
 	# Five at most. Measured, six storeys of precast panel put more on the
 	# bottom course than concrete carries standing still, and the block quietly
 	# crushed its own ground floor before anyone touched it.
-	var storeys := rng.randi_range(4, 5)
+	# Four at most. Five put more on the bottom course than the stack carries
+	# standing still even with a reinforced base — measured, one deck cracked
+	# untouched on a five-storey seed.
+	var storeys := rng.randi_range(3, 4)
 	var wide := rng.randi_range(3, 4)
 	var panel_w := rng.randf_range(84.0, 100.0)
 	var panel_h := rng.randf_range(58.0, 70.0)
