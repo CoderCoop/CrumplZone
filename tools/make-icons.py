@@ -141,12 +141,14 @@ def bar(x, y, w, h, lean=0.0):
 
 
 def draw_icon(size, rounded=True):
-    """The app icon: a tower with its top corner knocked off, and the ball.
+    """The app icon: a wrecking ball on a chain, mid-swing into a tower.
 
-    Kept to three things — a slab of building, windows, a ball — because at
-    44 px on a home screen a fourth reads as noise. Earlier attempts had a
-    chain and a rim on the ball and came out looking like a magnifying glass,
-    and separate floors on columns came out looking like a shelf.
+    What was missing in the first version that shipped was the *swing*. A ball
+    resting in a notch is a grey circle next to a yellow shape; the same ball
+    on a taut chain, angled, with the corner it just took out flying away from
+    it, is a wrecking ball. The chain is the single most identifying part and
+    it had been left out for reading as a magnifying glass handle — the fix
+    was to hang it from a corner at an angle rather than stick it on the side.
     """
     u = size / 64.0
     c = Canvas(size, NIGHT)
@@ -155,35 +157,51 @@ def draw_icon(size, rounded=True):
         # has to stop a square of night sky sitting on a light background.
         c.fill(Rect(0, 0, size, size, 14 * u), NIGHT)
 
-    # The tower: one solid mass, with the top right corner sheared away on a
-    # diagonal. The diagonal is the whole idea — a rectangle is a building,
-    # a rectangle missing a corner is a building being demolished.
+    # The tower, left of centre, with its top right corner sheared off.
     c.fill(Poly([
-        (13 * u, 54 * u), (13 * u, 16 * u), (30 * u, 16 * u),
-        (30 * u, 26 * u), (40 * u, 36 * u), (40 * u, 54 * u),
+        (9 * u, 56 * u), (9 * u, 14 * u), (24 * u, 14 * u),
+        (24 * u, 21 * u), (36 * u, 37 * u), (36 * u, 56 * u),
     ]), AMBER)
+    # A darker face down the right-hand side, so the tower has two sides and
+    # reads as a solid rather than as a flat cut-out.
+    c.fill(Poly([
+        (30 * u, 56 * u), (30 * u, 29 * u), (36 * u, 37 * u), (36 * u, 56 * u),
+    ]), AMBER_DIM)
 
-    # Windows, in the night colour so they read as openings rather than as
-    # decoration. Three columns, stopping where the corner is gone.
+    # Windows, in the night colour so they read as openings.
     for row in range(4):
-        y = (21 + row * 8) * u
-        for col in range(3):
-            x = (17 + col * 8) * u
-            if x + 4 * u > 30 * u and y < 34 * u:
+        y = (19 + row * 9) * u
+        for col in range(2):
+            x = (13 + col * 8) * u
+            if y < 26 * u and x > 18 * u:
                 continue  # inside the sheared-off corner
-            c.fill(Rect(x, y, 4.5 * u, 4.5 * u), NIGHT)
+            c.fill(Rect(x, y, 5 * u, 5 * u), NIGHT)
 
-    # The block that came off the corner, tumbling clear.
-    c.fill(bar(45 * u, 41 * u, 9 * u, 5 * u, 2.0 * u), AMBER_DIM)
+    # The chain: from the top right corner of the frame down to the ball, taut
+    # and at an angle. Drawn as links so it is a chain and not a stick.
+    hook = (60 * u, 5 * u)
+    ball = (44 * u, 30 * u)
+    for i in range(5):
+        t0 = i / 5.0
+        t1 = t0 + 0.62 / 5.0
+        ax = hook[0] + (ball[0] - hook[0]) * t0
+        ay = hook[1] + (ball[1] - hook[1]) * t0
+        bx = hook[0] + (ball[0] - hook[0]) * t1
+        by = hook[1] + (ball[1] - hook[1]) * t1
+        c.fill(Poly([(ax - 1.6 * u, ay), (ax + 1.6 * u, ay),
+                     (bx + 1.6 * u, by), (bx - 1.6 * u, by)]), STEEL_DARK)
 
-    # The ball, sitting in the bite it took. One flat disc: a rim turned it
-    # into a lens.
-    c.fill(Disc(37 * u, 25 * u, 9.5 * u), STEEL)
+    # The ball, hanging on the end of it and overlapping the bite it took.
+    c.fill(Disc(42 * u, 33 * u, 9.5 * u), STEEL_DARK)
+    c.fill(Disc(42 * u, 33 * u, 8.2 * u), STEEL)
+
+    # The chunk of corner it knocked loose, thrown clear to the right and down.
+    c.fill(bar(48 * u, 44 * u, 10 * u, 5 * u, 2.5 * u), AMBER_DIM)
 
     # Rubble along the footing, level with the base of the tower.
-    c.fill(bar(8 * u, 54 * u, 17 * u, 3 * u, 0.0), DUST)
-    c.fill(bar(27 * u, 55 * u, 12 * u, 2 * u, 0.0), DUST)
-    c.fill(bar(42 * u, 54 * u, 8 * u, 3 * u, 0.0), DUST)
+    c.fill(bar(6 * u, 56 * u, 15 * u, 3 * u, 0.0), DUST)
+    c.fill(bar(23 * u, 57 * u, 11 * u, 2 * u, 0.0), DUST)
+    c.fill(bar(37 * u, 56 * u, 8 * u, 3 * u, 0.0), DUST)
     return c
 
 

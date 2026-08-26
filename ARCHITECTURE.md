@@ -30,7 +30,7 @@ graph TD
     end
 
     subgraph checks["Checked, not shipped"]
-        playtest["playtest.gd<br/>hand-built level difficulty"]
+        partest["partest.gd<br/>par and solvability<br/>for all three difficulties"]
         waketest["waketest.gd<br/>settled bodies get woken"]
         breaktest["breaktest.gd<br/>everything breakable breaks"]
         stresstest["stresstest.gd<br/>weight breaks the right things"]
@@ -41,7 +41,7 @@ graph TD
     subgraph build["Build and deploy"]
         pages["pages.yml<br/>export → verify → deploy"]
         verify["tools/verify-web-export<br/>runs the build in a browser"]
-        ci["ci.yml<br/>secrets, GDScript, playtest<br/>required on main"]
+        ci["ci.yml<br/>secrets, GDScript, harnesses<br/>required on main"]
     end
 
     subgraph knowledge["Measured, not shipped"]
@@ -71,9 +71,9 @@ graph TD
     generator -->|level spec| solver
     solver -->|drives headlessly| level
     solver -->|budget = solution + slack| levels
-    playtest -->|drives headlessly| level
+    partest -->|drives headlessly| level
     verifylv -->|drives| solver
-    playtest -->|gates| ci
+    partest -->|gates| ci
     waketest -->|drives| level
     waketest -->|gates| ci
     breaktest -->|drives| level
@@ -179,6 +179,40 @@ and it had broken in the third place while the first two were perfect.
 loads a build, publishes a newer one over the top of it, and checks the page
 ends up running the new one without clearing anything or closing the tab. A
 fresh browser always sees the newest build, so no manual test can answer this.
+
+### Difficulty, par, and the rating
+
+A level is a shape; everything numeric about it is measured from that shape or
+from a solution, never chosen by hand:
+
+- **The survey line** comes from the building's material volume, because
+  nothing is ever deleted and the rubble has to fit under the line.
+- **Par** is what the solver's best solution for that level costs in power.
+- **The power bar** is a multiple of par, set well clear of it, so finishing is
+  the floor rather than the challenge.
+- **The rating** is the run's spend against par: three stars for within 15% of
+  the best known solution, two for within 55%, one for clearing it at all.
+
+Rating against par rather than against a fraction of the bar is what makes
+"three stars is hard" true on every level instead of on the one that happened
+to be tuned. A fraction of the bar means something different on each level and
+nothing at all on a level nobody has measured — which is the situation any
+generated level starts in.
+
+`partest.gd` is what keeps this honest: it runs the solver over all three
+difficulties and fails if a par has drifted from what a solution really costs,
+if a level cannot be solved within its depth, or if one use clears it.
+
+```mermaid
+flowchart LR
+    shape[Building shape] --> volume[Material volume]
+    volume --> line[Survey line]
+    shape --> solver[Solver searches]
+    solver --> par[Par: cost of best solution]
+    par --> bar[Power bar = par x multiplier]
+    par --> stars[Stars: spend vs par]
+    par --> partest[partest gates all three in CI]
+```
 
 ### Staying current
 
@@ -302,7 +336,7 @@ to do.
 - **No unit test framework.** The charter's testing default says to propose a
   setup rather than impose one, and so far the checks that earn their keep are
   behavioural rather than unit-shaped: the secret scan, the web export
-  verification, `playtest.gd`, which searches the move space to confirm the
+  verification, `partest.gd`, which searches the move space to confirm the
   level is solvable within its budget and not solvable in one move, and
   `waketest.gd`, which guards the sleeping-body fix. All of them run in CI. A unit framework becomes worth proposing when the generator
   arrives and there are pure functions worth pinning.

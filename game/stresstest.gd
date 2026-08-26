@@ -26,6 +26,9 @@ const LOAD_TICKS := 400
 const REST_SETTLE := 300
 const REST_HOLD := 420
 
+## A whole collapse, then long enough for everything to come to rest.
+const VELOCITY_TICKS := 1500
+
 var _level: Level
 var _failures: Array[String] = []
 var _phase := "standing"
@@ -41,13 +44,16 @@ var _rest_damage := 0
 var _rest_watching := false
 var _rest_floor: RigidBody2D
 var _rest_peak := 0.0
+var _velocity_plan: Array = []
+var _velocity_step := 0
 
 
 func _ready() -> void:
 	_level = Level.new()
 	_level.struck.connect(func(_at: Vector2, amount: int) -> void:
 		if _rest_watching:
-			_rest_damage += amount)
+			_rest_damage += amount
+)
 	add_child(_level)
 	_level.build(Levels.tower())
 	_pieces_before = _level.live_blocks().size()
@@ -85,6 +91,14 @@ func _physics_process(_delta: float) -> void:
 			if _ticks < 240:
 				return
 			_finish_dust()
+			_phase = "velocity"
+			_ticks = 0
+			_start_velocity()
+		"velocity":
+			_drive_velocity()
+			if _ticks < VELOCITY_TICKS:
+				return
+			_finish_velocity()
 			_phase = "resting"
 			_ticks = 0
 			_start_resting()
@@ -217,7 +231,57 @@ func _finish_dust() -> void:
 			"a slab rested on glass slivers: it only fell %.0f px" % dropped)
 
 
-# --- 5. a piece does not grind down for holding something up ---------------
+# --- 5. how fast it arrives is most of what does the damage ----------------
+
+## A real collapse of the real tower, judged on where its load damage landed.
+##
+## A synthetic single drop was tried first and thrown away: the impact spike
+## lasts about two ticks and the stress pass samples every two, so whether it
+## registered at all was a coin toss. That is a test that cannot be trusted in
+## either direction. A whole collapse is deterministic here — two runs came
+## back identical — and it measures the thing actually complained about.
+##
+## Measured before severity was made continuous: a sixth of all load damage
+## was dealt at 8-25 px/s, by pieces barely drifting, because tolerance was a
+## step at 8 px/s and anything over it was judged as harshly as a slab
+## arriving at 400. Glass is exempt by design — a pane under sustained weight
+## is supposed to crack — so the assertion is about everything else.
+func _start_velocity() -> void:
+	_level.build(Levels.tower())
+	var cx: float = float(_level.spec["centre_x"])
+	var fy: float = float(_level.spec["floor_y"])
+	_velocity_plan = [
+		[40, Tools.Kind.EXPLOSIVE, Vector2(cx - 90.0, fy - 60.0)],
+		[120, Tools.Kind.EXPLOSIVE, Vector2(cx + 90.0, fy - 60.0)],
+		[220, Tools.Kind.WRECKING_BALL, Vector2(cx, fy - 200.0)],
+		[420, Tools.Kind.EXPLOSIVE, Vector2(cx, fy - 150.0)],
+	]
+	_velocity_step = 0
+
+
+func _drive_velocity() -> void:
+	while _velocity_step < _velocity_plan.size() \
+			and _ticks >= int(_velocity_plan[_velocity_step][0]):
+		Tools.apply(_velocity_plan[_velocity_step][1], _level,
+			_velocity_plan[_velocity_step][2], 1.0)
+		_velocity_step += 1
+
+
+func _finish_velocity() -> void:
+	var total := _level.load_damage_total
+	var slow := _level.load_damage_slow
+	var solid := _level.load_damage_slow_solid
+	var share := 0.0 if total == 0 else float(slow) / float(total) * 100.0
+	print("velocity    %d load damage over a collapse; %d of it under %.0f px/s (%.0f%%), %d of that to something other than glass"
+		% [total, slow, Level.SLOW_CONTACT, share, solid])
+	if total == 0:
+		_failures.append("a whole collapse did no load damage at all — the model is inert")
+	if solid > 0:
+		_failures.append("%d damage was dealt to solid material by a contact under %.0f px/s"
+			% [solid, Level.SLOW_CONTACT])
+
+
+# --- 6. a piece does not grind down for holding something up ---------------
 
 ## Measured before this phase existed: over one full collapse of the tower,
 ## 40% of all stress damage was dealt to pieces that were standing still, the
@@ -270,8 +334,9 @@ func _report() -> void:
 	print("expected : an untouched building does not break itself, a floor")
 	print("           landing on glass breaks it, rubble that has come to rest")
 	print("           below the line stops being simulated, glass ground to")
-	print("           slivers holds nothing up, and a settled pile does not")
-	print("           wear away what it is sitting on")
+	print("           slivers holds nothing up, how fast something arrives is")
+	print("           most of the damage, and a settled pile does not wear away")
+	print("           what it is sitting on")
 	if _failures.is_empty():
 		print("VERDICT  : PASS")
 		get_tree().quit(0)

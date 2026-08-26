@@ -11,9 +11,19 @@ extends CanvasLayer
 signal again_pressed
 
 const STARS := 3
-## Power left, as a fraction of the bar, for two stars and for three.
-const TWO_STAR := 0.25
-const THREE_STAR := 0.55
+
+## What a run may spend, as a multiple of par, for three stars and for two.
+##
+## Rated against par — what the solver's best solution for this level costs —
+## rather than against a fraction of the bar. A fraction of the bar makes three
+## stars mean different things on different levels: generous on one, impossible
+## on another, and neither on a level nobody has measured. Against par it means
+## the same thing everywhere, which is "you played close to as well as this can
+## be played", and it stays true for a level generated tomorrow.
+##
+## Three stars is 15% off the best known solution. That is meant to be hard:
+## clearing the level at all is the floor, and the bar holds nearly twice par
+## so finishing is never the challenge.
 
 const MARGIN := 16.0
 const BUTTON_HEIGHT := 56.0
@@ -37,13 +47,21 @@ var _stars: Control
 var _again: Button
 
 
-## How many stars a run earns. Clearing at all is worth one; the rest is what
-## you did not have to spend.
-static func stars_for(left: float, full: float) -> int:
-	var share: float = left / maxf(1.0, full)
-	if share >= THREE_STAR:
+const THREE_STAR := 1.15
+const TWO_STAR := 1.55
+
+var par := 0.0
+
+
+## How many stars a run earns, from what it spent against what the level's best
+## known solution costs. Clearing at all is worth one.
+static func stars_for_spend(spent: float, level_par: float) -> int:
+	if level_par <= 0.0:
+		return 1
+	var ratio := spent / level_par
+	if ratio <= THREE_STAR:
 		return 3
-	if share >= TWO_STAR:
+	if ratio <= TWO_STAR:
 		return 2
 	return 1
 
@@ -74,9 +92,10 @@ func _ready() -> void:
 		_stars.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_stars.draw.connect(_draw_stars)
 		_root.add_child(_stars)
-		_line = _label("%d%% of the bar left"
-			% int(round(power_left / maxf(1.0, power_full) * 100.0)), 18, DIM)
-		_note = _label(_advice(stars_for(power_left, power_full)), 15, DIM, true)
+		var spent := maxf(0.0, power_full - power_left)
+		_line = _label("%d power spent  ·  par %d" % [int(round(spent)), int(round(par))],
+			18, DIM)
+		_note = _label(_advice(stars_for_spend(spent, par), spent), 15, DIM, true)
 	else:
 		_line = _label("%d piece%s still above the line"
 			% [standing, "" if standing == 1 else "s"], 18, DIM)
@@ -101,13 +120,16 @@ func _ready() -> void:
 ## What to say under the stars. Nothing at all on a three-star run: a player
 ## who has just done the best thing available does not need advice, and the
 ## first version cheerfully told them they had two.
-func _advice(earned: int) -> String:
+func _advice(earned: int, spent: float) -> String:
+	var target := par * THREE_STAR
 	match earned:
 		1:
-			return "Cleared, but only just. Fewer, better placed uses leave more in the bar."
+			return ("Down, but it cost %d. Par is %d — fewer, better placed uses."
+				% [int(round(spent)), int(round(par))])
 		2:
-			return "Three stars needs more than half the bar still in hand."
-	return "Nothing left standing, and most of the bar unspent."
+			return ("Three stars needs it done for %d or less. This run spent %d."
+				% [int(round(target)), int(round(spent))])
+	return "Nothing left standing, and done at par. There is no better rating."
 
 
 func relayout() -> void:
@@ -136,7 +158,7 @@ func relayout() -> void:
 
 
 func _draw_stars() -> void:
-	var earned := stars_for(power_left, power_full)
+	var earned := stars_for_spend(maxf(0.0, power_full - power_left), par)
 	var span := _stars.size.x
 	var middle := Vector2(span * 0.5, _stars.size.y * 0.5)
 	var step := 74.0

@@ -7,7 +7,39 @@ sections are dated.
 
 ## [Unreleased]
 
-Nothing since 0.8.0.
+Nothing since 0.9.0.
+
+## [0.9.0] - 2026-08-26
+
+### Added
+
+- **Three levels, easy to hard**, picked from three buttons on the help screen.
+  Easy is three storeys with nothing you cannot cut; medium adds a reinforced
+  core to work around; hard is four storeys with two of them.
+- **Ratings are measured against par** — what the best known solution for that
+  level costs — instead of against a fraction of the power bar. Three stars is
+  finishing within 15% of it, which means the same thing on every level rather
+  than being generous on one and impossible on another. The bar itself holds
+  nearly twice par, so clearing a level is the floor and the rating is the
+  challenge.
+
+### Fixed
+
+- **Damage lines stay where they were drawn.** A piece's cracks were redrawn
+  from its position, so every piece in a collapse had all of its damage lines
+  jump somewhere else each time it took another hit.
+- **How fast something arrives is most of the damage it does.** Load damage
+  used to switch from "resting" to "full impact" at 8 px/s, so a piece drifting
+  at 9 was treated like a slab arriving at 400. It now rises with the square of
+  the closing speed. Rubble that has settled no longer wears away what it is
+  sitting on: solid material took 13 points of damage from slow contacts over a
+  collapse and now takes none. Glass still cracks under weight, which was
+  always the point.
+- **The top left no longer repeats what the bottom of the screen says.** The
+  power number and the tool name were printed above a bar showing the power and
+  a row where the chosen tool is the lit one.
+- **Reset and help look like buttons**, and the app icon reads as a wrecking
+  ball swinging into a building rather than a grey circle beside a yellow one.
 
 ## [0.8.0] - 2026-08-25
 

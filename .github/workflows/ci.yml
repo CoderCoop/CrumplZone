@@ -145,6 +145,28 @@ jobs:
           # The hand-built level must stay worth playing: beatable within its
           # move budget, and not beatable in one move. Both are easy to break
           # by retuning a tool, and neither is visible in a diff.
-          run_harness "playtest" res://playtest.tscn
+          run_harness "crack test" res://cracktest.tscn
 
-          echo "::notice::ci passed — secret scan, GDScript checks, wake test, break test, stress test, collapse test, playtest"
+          run_harness "hull test" res://hulltest.tscn
+
+          # The solver rebuilds one level hundreds of times. If a rebuild does
+          # not produce the same building, it is comparing runs that differ for
+          # reasons that have nothing to do with the moves.
+          run_harness "replay test" res://replaytest.tscn
+
+          # Every level has to stand up until it is touched, and none may be
+          # cleared by a single use. Both are cheap, and both are failures a
+          # search reports as something else entirely.
+          run_harness "stand test" res://standtest.tscn
+          run_harness "one shot test" res://oneshottest.tscn
+
+          # Cheap, and it catches the failure that reads as "merely hard":
+          # a level whose own rubble will not fit under its own line.
+          run_harness "line test" res://linetest.tscn
+
+          # partest supersedes the old single-level playtest: it runs the same
+          # search over all three difficulties and additionally checks each
+          # level's par against what a solution really costs.
+          run_harness "par test" res://partest.tscn
+
+          echo "::notice::ci passed — secret scan, GDScript checks, wake test, break test, stress test, collapse test, crack test, hull test, replay test, stand test, one shot test, line test, par test"

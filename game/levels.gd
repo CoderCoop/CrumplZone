@@ -23,7 +23,21 @@ const FLOOR_Y := 540.0
 ## tower below has 78,912 px² of material and settles into a pile 119 px deep
 ## across about 1150 px of street. These numbers reproduce that within a few
 ## pixels and then keep a fifth of it as clearance.
-const SPREAD := 350.0        # how far debris travels past each edge
+## Debris spreads in proportion to how far it had to fall — as an estimate
+## only, and one that is not accurate enough to trust on its own.
+##
+## This was a constant, then a ratio, and neither works. Measured across the
+## three levels by pulverising each one and looking at what is left, the spread
+## a building actually makes per unit of its own height came out 0.96, 1.55 and
+## 0.68 — a factor of 2.3 apart. How high a building piles when it is destroyed
+## depends on how it comes down, which is chaotic; it is not a tidy function of
+## its area and its height.
+##
+## So an authored level carries a line that was measured, not computed. This
+## stays as the opening estimate for a generated level, which then has to be
+## verified by simulation before it is accepted — the estimate says where to
+## start looking, and linetest.gd says whether it was right.
+const SPREAD_PER_HEIGHT := 1.16
 const PACKING := 0.62        # how much of that area broken pieces actually fill
 const CLEARANCE := 1.2       # how much room the line keeps above the pile
 const LINE_MIN := 90.0
@@ -35,18 +49,107 @@ static func line_above_ground(blocks: Array) -> float:
 	var area := 0.0
 	var left := INF
 	var right := -INF
+	var top := INF
+	var bottom := -INF
 	for b in blocks:
 		area += float(b["w"]) * float(b["h"])
 		left = minf(left, float(b["x"]) - float(b["w"]) * 0.5)
 		right = maxf(right, float(b["x"]) + float(b["w"]) * 0.5)
+		top = minf(top, float(b["y"]) - float(b["h"]) * 0.5)
+		bottom = maxf(bottom, float(b["y"]) + float(b["h"]) * 0.5)
 	if area <= 0.0:
 		return LINE_MIN
-	var spread: float = maxf(right - left, 1.0) + SPREAD * 2.0
+	var height: float = maxf(bottom - top, 1.0)
+	var spread: float = maxf(right - left, 1.0) + height * SPREAD_PER_HEIGHT * 2.0
 	return maxf(LINE_MIN, area / (spread * PACKING) * CLEARANCE)
 
 
 const COLUMN := Vector2(22.0, 76.0)
 const SLAB_H := 22.0
+
+
+## The three difficulties, by name. Everything else about a level follows from
+## the shape of the building — the survey line from its material volume, the
+## power bar and the par from what a solution actually costs — so a difficulty
+## is a size and a materials choice, not a set of numbers to tune by hand.
+const EASY := "easy"
+const MEDIUM := "medium"
+const HARD := "hard"
+const ORDER: Array[String] = [EASY, MEDIUM, HARD]
+
+const TITLES := {
+	EASY: "Easy",
+	MEDIUM: "Medium",
+	HARD: "Hard",
+}
+
+
+## A level by difficulty. Par and power are measured, not chosen — see
+## partest.gd, which fails if either has drifted from what the solver finds.
+static func level(difficulty: String) -> Dictionary:
+	match difficulty:
+		EASY:
+			# Three storeys, four columns, and no reinforced core: everything
+			# here can be cut, so it is about the order rather than about
+			# working around something you cannot break.
+			#
+			# It was two storeys, and that made it a level one well-placed
+			# charge cleared outright — measured, a single use left nothing
+			# standing. A level cleared by one tap is not an easy puzzle, it
+			# is no puzzle, so it gained a storey rather than losing the point.
+			return _finish(tower(3, 4, 86.0, false), difficulty, 8, 90.0, 148.0)
+		HARD:
+			# Four storeys and two reinforced columns: taller than medium, and
+			# with more of the ground floor that a tool will not go through.
+			#
+			# Six columns wide was tried and taken back. At 48 blocks the beam
+			# search found no solution within eight uses, which says nothing
+			# about whether one exists — only that a level this wide costs
+			# more search than it is worth gating CI on. Five columns and a
+			# deeper search is the same idea for a level that can be verified.
+			return _finish(tower(4, 5, 84.0, true, 2), difficulty, 10, 192.0, 175.0)
+		_:
+			return _finish(tower(3, 5, 86.0, true), difficulty, 8, 216.0, 143.0)
+
+
+## Attaches the numbers that depend on a measured solution rather than on the
+## shape of the building.
+##
+## `par` is what the solver's best solution costs. The power bar is set well
+## clear of it so finishing is never the hard part; the rating is what makes it
+## a puzzle, and the rating is measured against par.
+## `line` is how far above the ground the survey line sits, in pixels, measured
+## by pulverising the level rather than computed — see SPREAD_PER_HEIGHT for
+## why the computation is only an estimate. Each is its measured pile plus
+## about a third, and linetest.gd fails if the pile ever outgrows it.
+##
+## The line also has to be tight enough to be a puzzle. Hard was first given
+## 235 — 60% of its own height — and one charge cleared all forty blocks,
+## because at that height almost anything that falls is already under it. The
+## three now sit at 45-50% of the building's height.
+##
+##   easy    pile 104 px, line 148  (50% of height)
+##   medium  pile  73 px, line 143  (49%)
+##   hard    pile 106 px, line 175  (45%)
+##
+## Note what the pile measurement is: the level pulverised completely, which is
+## the *flattest* it can be left. A solution that topples the building instead
+## leaves larger pieces that stack higher, so the room between pile and line is
+## what makes anything other than grinding it all down viable.
+static func _finish(spec: Dictionary, difficulty: String, depth: int,
+		par: float, line: float) -> Dictionary:
+	spec["difficulty"] = difficulty
+	spec["moves"] = depth
+	spec["par"] = par
+	spec["power"] = par * POWER_OVER_PAR
+	spec["height_line"] = float(spec["floor_y"]) - line
+	return spec
+
+
+## How much more than par the bar holds. Enough that a player who wastes a
+## couple of uses still clears the level — finishing is the floor, not the
+## challenge — and not so much that spending is meaningless.
+const POWER_OVER_PAR := 1.9
 
 
 ## A curtain-wall office block: steel columns carrying concrete floor slabs,
@@ -58,9 +161,10 @@ const SLAB_H := 22.0
 ## what actually carries the building, and the most expensive thing to cut. A
 ## player who reads the structure can tell all of that before touching it.
 ##
-## Checked by playtest.gd (solvable, not trivial), toolcheck.gd (every tool
-## does something) and waketest.gd — not by eye.
-static func tower(storeys: int = 3, columns: int = 5, spacing: float = 86.0) -> Dictionary:
+## Checked by partest.gd (every difficulty solvable, not trivial, and its par
+## matching what a solution really costs) and waketest.gd — not by eye.
+static func tower(storeys: int = 3, columns: int = 5, spacing: float = 86.0,
+		cored: bool = true, cores: int = 1) -> Dictionary:
 	var blocks: Array = []
 	var first_x := CENTRE_X - (columns - 1) * spacing * 0.5
 	var slab_w := (columns - 1) * spacing + COLUMN.x * 2.0
@@ -77,11 +181,17 @@ static func tower(storeys: int = 3, columns: int = 5, spacing: float = 86.0) -> 
 	# piece you bring the building down around. That is the shape of the
 	# decision the materials exist to create.
 	var core := int(columns / 2)
+	# Which ground-floor columns are reinforced. Spread out rather than
+	# adjacent, so a hard level is not one solid block at the bottom.
+	var cored_at := {}
+	if cored:
+		for n in cores:
+			cored_at[posmod(core + n * 2, columns)] = true
 
 	for storey in storeys:
 		for i in columns:
 			var made_of: String = Materials.STEEL
-			if storey == 0 and i == core:
+			if storey == 0 and cored_at.has(i):
 				made_of = Materials.REINFORCED
 			blocks.append({
 				"x": first_x + i * spacing,
@@ -119,13 +229,9 @@ static func tower(storeys: int = 3, columns: int = 5, spacing: float = 86.0) -> 
 		# looking for a solution. It needs seven, and a player is not a beam
 		# search, so the depth allows eight.
 		"moves": 8,
-		# Set against the solution the solver actually finds, not against the
-		# search depth, and re-measured whenever the physics changes what a
-		# demolition costs: 210 before weight broke things, 90 when it first
-		# did, 156 once pieces that leave the world stopped being simulated.
-		# At 260 a solver-quality run — five uses costing 126 — finishes with
-		# about half the bar, which is the two-star band. Three stars is left
-		# for playing better than the search does, which is the point of
-		# having a rating at all.
+		# Overwritten by _finish for a named difficulty. A bare tower() — which
+		# only the harnesses build — gets a bar rather than nothing.
 		"power": 260.0,
+		"par": 140.0,
+		"difficulty": MEDIUM,
 	}

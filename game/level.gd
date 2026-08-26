@@ -2,7 +2,7 @@ class_name Level
 extends Node2D
 
 ## A structure, the rule it is judged by, and the physics that decides. No
-## input, no UI, no scoring — main.gd wraps this for a player and playtest.gd
+## input, no UI, no scoring — main.gd wraps this for a player and partest.gd
 ## drives it headlessly.
 ##
 ## That seam is deliberate. The charter's levels are generated and verified
@@ -37,6 +37,20 @@ var _rubble: PhysicsMaterial
 ## simulation. Still drawn — nothing is deleted — but no longer colliding and
 ## no longer in the way of anything.
 var _debris: Array[RigidBody2D] = []
+## Counts pieces made, so two pieces built at the same spot get different
+## seeds and do not crack identically.
+var _pieces_made := 0
+
+## Damage dealt by load, split by whether anything was really moving when it
+## landed. Two counters rather than a log, so they can stay in the game: the
+## share of damage dealt to slow contacts is the number this model is judged
+## on, and stresstest asserts it rather than a person eyeballing a collapse.
+var load_damage_total := 0
+var load_damage_slow := 0
+var load_damage_slow_solid := 0
+
+## Below this, in px/s, a contact is a lean rather than a blow.
+const SLOW_CONTACT := 25.0
 
 ## How often load is sampled, and how long a piece of rubble has to lie still
 ## before it is swept up.
@@ -47,7 +61,7 @@ var _debris: Array[RigidBody2D] = []
 ## it, and the sustained weight afterwards would break the pane regardless.
 ##
 ## The interval is not free to lower: reading every tick put the solver's
-## playtest up from 97 seconds to 322, because a collapse has a couple of
+## solver search up from 97 seconds to 322, because a collapse has a couple of
 ## hundred awake bodies in it and the solver replays the level hundreds of
 ## times.
 const STRESS_TICKS := 2
@@ -156,6 +170,17 @@ func build(level_spec: Dictionary) -> void:
 			String(b.get("role", ""))))
 
 	_settled_ticks = 0
+	# Reset with the level, not with the Level object. This counter goes into
+	# each piece's seed, and that seed decides how the piece breaks — so a
+	# counter carried across rebuilds means the same level breaks differently
+	# every time it is rebuilt. The solver rebuilds one Level hundreds of
+	# times looking for a solution, which made its search and its parity
+	# confirmation both unreproducible: the same level came back solvable in
+	# one run and unsolvable in the next.
+	_pieces_made = 0
+	load_damage_total = 0
+	load_damage_slow = 0
+	load_damage_slow_solid = 0
 
 
 func clear() -> void:
@@ -175,6 +200,7 @@ func clear() -> void:
 
 func _make_piece(pos: Vector2, polygon: PackedVector2Array, made_of: String,
 		material: PhysicsMaterial, durability := -1, role := "") -> RigidBody2D:
+	polygon = Fracture.simplify(polygon)
 	var made := Materials.of(made_of)
 	var body := RigidBody2D.new()
 	body.position = pos
@@ -200,11 +226,22 @@ func _make_piece(pos: Vector2, polygon: PackedVector2Array, made_of: String,
 	var shape := CollisionShape2D.new()
 	var convex := ConvexPolygonShape2D.new()
 	convex.points = polygon
+	# polygon has already been through Fracture.simplify by the time it gets
+	# here, so the collider is the drawn shape rather than a hull the engine
+	# substituted after warning about it.
 	shape.shape = convex
 	body.add_child(shape)
 	body.add_child(_visual(polygon, Materials.colour_at(made_of, 0.0), made_of, role))
 
 	body.set_meta("poly", polygon)
+	# Stamped once, here, and never derived from the piece's position again.
+	# The seed used to be hashed from global_position, so every repaint after
+	# the piece had shifted redrew every crack at a new angle — damage lines
+	# that crawled around a tumbling piece as it took more of it.
+	body.set_meta("seed", hash([
+		String(made_of), int(round(pos.x)), int(round(pos.y)),
+		int(round(Fracture.area(polygon))), _pieces_made]))
+	_pieces_made += 1
 	body.set_meta("material", made_of)
 	body.set_meta("role", role)
 	body.set_meta("durability",
@@ -426,13 +463,13 @@ func shatter(body: RigidBody2D, at: Vector2) -> bool:
 ## Deterministic per piece, so the same level rebuilt breaks the same way. The
 ## solver replays a level thousands of times; a fracture seeded from an
 ## instance id would differ on every rebuild and make its verdicts meaningless.
+## The piece's own seed, fixed when it was made.
+##
+## This used to hash the body's live global_position, which meant it changed
+## whenever the piece moved: cracks were redrawn somewhere else every time a
+## falling piece took another point of damage. cracktest.gd holds it still.
 func _seed_for(body: RigidBody2D) -> int:
-	var polygon: PackedVector2Array = body.get_meta("poly")
-	var at := body.global_position
-	return hash([
-		String(body.get_meta("material", "")),
-		int(round(at.x)), int(round(at.y)),
-		int(round(Fracture.area(polygon)))])
+	return int(body.get_meta("seed", 0))
 
 
 ## Is there anything left to break this into? False only for rubble already at
@@ -769,7 +806,14 @@ func _stress_pass() -> void:
 	if read_resting:
 		_resting_tick = 0
 
-	for body in live_blocks().duplicate():
+	# Last pass's readings become this pass's "what it was doing just before",
+	# so promote them before anything is judged against them.
+	for body in live_blocks():
+		body.set_meta("was_moving", body.get_meta("now_moving", 0.0))
+		body.set_meta("now_moving", body.linear_velocity.length())
+
+	var seen: Array[RigidBody2D] = live_blocks().duplicate()
+	for body in seen:
 		if not is_instance_valid(body):
 			continue
 		# A sleeping body still reports what it is carrying — which is the
@@ -786,17 +830,26 @@ func _stress_pass() -> void:
 		# tolerance applies: a piece being struck and a piece being leaned on
 		# report the same impulse, and judging them alike is what made rubble
 		# grind down the floor it had settled on.
-		var struck := (body as RigidBody2D).linear_velocity.length() > REST_SPEED
+		# The speed that matters is the one just before the contact, not the
+		# one left after it. A head-on impact is inelastic: by the time this
+		# reads the body it has already been stopped by the very collision
+		# being judged, so reading the live velocity scored a slab arriving at
+		# 260 px/s as though it were resting. Each pass leaves its reading
+		# behind for the next one, and the higher of the two is used.
+		var speed := _approach_speed(body)
 		for i in state.get_contact_count():
 			load += state.get_contact_impulse(i).length()
-			if not struck:
-				var other := state.get_contact_collider_object(i)
-				if other is RigidBody2D \
-						and (other as RigidBody2D).linear_velocity.length() > REST_SPEED:
-					struck = true
+			var other := state.get_contact_collider_object(i)
+			if other is RigidBody2D:
+				speed = maxf(speed, _approach_speed(other as RigidBody2D))
+		# How much of a real impact this is, by the square of the closing
+		# speed. Both the tolerance and the rate slide between the resting
+		# case and the struck one, so a piece drifting at 9 px/s is no longer
+		# judged as harshly as a slab arriving at 400.
+		var severity := Materials.severity(speed)
 		var made_of: String = body.get_meta("material", Materials.CONCRETE)
-		var limit := Materials.stress_limit(made_of) if struck \
-			else Materials.rest_limit(made_of)
+		var limit := lerpf(Materials.rest_limit(made_of),
+			Materials.stress_limit(made_of), severity)
 		if load <= limit:
 			# Carrying what it was built to carry: let it rest.
 			body.can_sleep = true
@@ -811,15 +864,33 @@ func _stress_pass() -> void:
 		# A resting body is read once every few ticks, so its sample stands in
 		# for all of them.
 		var slice := (float(RESTING_STRESS_TICKS) / 60.0) if body.sleeping else span
-		var rate := Materials.STRESS_RATE if struck \
-			else Materials.STRESS_RATE * Materials.REST_RATE
+		var rate := Materials.STRESS_RATE * lerpf(Materials.REST_RATE, 1.0, severity)
 		var carried: float = float(body.get_meta("stress", 0.0)) \
 			+ overload * rate * slice
 		if carried < 1.0:
 			body.set_meta("stress", carried)
 			continue
 		body.set_meta("stress", carried - floor(carried))
-		damage(body, int(floor(carried)), body.global_position)
+		var _peer: float = 0.0
+		for i in state.get_contact_count():
+			var o := state.get_contact_collider_object(i)
+			if o is RigidBody2D:
+				_peer = maxf(_peer, (o as RigidBody2D).linear_velocity.length())
+		var dealt := int(floor(carried))
+		load_damage_total += dealt
+		if speed < SLOW_CONTACT:
+			load_damage_slow += dealt
+			# Glass is meant to fail under a load that is not moving; nothing
+			# else is. Kept apart so the two can be asserted separately.
+			if made_of != Materials.GLASS:
+				load_damage_slow_solid += dealt
+		damage(body, dealt, body.global_position)
+
+
+## How fast a piece was going into its current contacts: the faster of what it
+## is doing now and what it was doing when last sampled.
+func _approach_speed(body: RigidBody2D) -> float:
+	return maxf(body.linear_velocity.length(), float(body.get_meta("was_moving", 0.0)))
 
 
 ## Rubble that has come to rest below the line stops being simulated: its
@@ -834,7 +905,8 @@ func _stress_pass() -> void:
 func _sweep_pass() -> void:
 	var line: float = spec.get("height_line", -INF)
 	var floor_y: float = spec.get("floor_y", 540.0)
-	for body in live_blocks().duplicate():
+	var seen: Array[RigidBody2D] = live_blocks().duplicate()
+	for body in seen:
 		if not is_instance_valid(body):
 			continue
 		# Gone over the edge of the world, whatever it is made of.

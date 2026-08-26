@@ -76,6 +76,10 @@ var _status: Label
 var _bar: ProgressBar
 var _pending: ProgressBar
 var _results: Results
+## Which of the three the player picked, and what its best known solution
+## costs — the rating is measured against that rather than against the bar.
+var _difficulty: String = Levels.MEDIUM
+var _par := 0.0
 var _buttons: Array[Button] = []
 var _art: Array[Control] = []
 var _intro: Intro
@@ -115,8 +119,9 @@ func _start() -> void:
 	# game with no level at all if the reload never came.
 	if UI.update_ready():
 		UI.apply_update()
-	var spec := Levels.tower()
+	var spec := Levels.level(_difficulty)
 	_level.build(spec)
+	_par = float(spec.get("par", 0.0))
 	_power_full = float(spec["power"])
 	_power = _power_full
 	_resolved = ""
@@ -140,7 +145,7 @@ func _build_ui() -> void:
 	# Information at the top, out from under the hand. Positioned directly
 	# rather than in a container — see _relayout.
 	_status = Label.new()
-	_status.add_theme_font_size_override("font_size", 17)
+	_status.add_theme_font_size_override("font_size", 20)
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_status.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(_status)
@@ -240,14 +245,31 @@ func _corner_button(icon: Callable, on_press: Callable) -> Button:
 	art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	art.draw.connect(func() -> void:
 		icon.call(art, art.size * 0.5, minf(art.size.y * 0.58, 30.0),
-			Color(0.86, 0.88, 0.92)))
+			Color(0.97, 0.98, 1.0)))
 	button.add_child(art)
-	button.add_theme_stylebox_override("normal", _tool_style(false))
-	button.add_theme_stylebox_override("hover", _tool_style(false))
-	button.add_theme_stylebox_override("pressed", _tool_style(true))
-	button.add_theme_stylebox_override("hover_pressed", _tool_style(true))
+	button.add_theme_stylebox_override("normal", _corner_style(false))
+	button.add_theme_stylebox_override("hover", _corner_style(false))
+	button.add_theme_stylebox_override("pressed", _corner_style(true))
+	button.add_theme_stylebox_override("hover_pressed", _corner_style(true))
+	button.add_theme_stylebox_override("focus", _corner_style(false))
 	_root.add_child(button)
 	return button
+
+
+## Lighter than the tool row and clearly raised, because these two sit over
+## the sky rather than on a bar and were reading as dark patches rather than
+## as things to press.
+func _corner_style(held: bool) -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color(0.42, 0.45, 0.53) if held else Color(0.29, 0.31, 0.38)
+	box.set_corner_radius_all(12)
+	box.set_border_width_all(2)
+	box.border_color = Color(0.62, 0.66, 0.75)
+	# A soft drop shadow is what makes a flat rectangle read as a button.
+	box.shadow_color = Color(0.0, 0.0, 0.0, 0.45)
+	box.shadow_size = 5
+	box.shadow_offset = Vector2(0.0, 2.0)
+	return box
 
 
 ## Rects are set by hand rather than by anchor preset. A preset applied to a
@@ -316,11 +338,16 @@ func _open_intro() -> void:
 	add_child(_intro)
 
 
-func _close_intro() -> void:
+func _close_intro(difficulty := "") -> void:
 	if _intro == null:
 		return
 	_intro.queue_free()
 	_intro = null
+	# Picked from the help screen, so the level has to be rebuilt for it. Help
+	# opened mid-level closes with no choice made and leaves the level alone.
+	if difficulty != "" and difficulty != _difficulty:
+		_difficulty = difficulty
+		_start()
 
 
 func _select(kind: Tools.Kind) -> void:
@@ -506,6 +533,7 @@ func _show_results(won: bool) -> void:
 	_results.cleared = won
 	_results.power_left = _power
 	_results.power_full = _power_full
+	_results.par = _par
 	_results.standing = _level.standing()
 	_results.again_pressed.connect(_restart)
 	add_child(_results)
@@ -540,7 +568,11 @@ func _refresh() -> void:
 			state = "settling…"
 		else:
 			state = "%d above the line" % _level.standing()
-	_status.text = "power %d   ·   %s\n%s" % [int(round(_power)), Tools.NAMES[_tool], state]
+	# Only what nothing else on screen is already saying. The power number and
+	# the tool name used to be printed here as well, directly above a bar that
+	# shows the power and a row of buttons where the chosen tool is the lit
+	# one — three ways of saying two things, in the corner with the least room.
+	_status.text = state
 
 
 func _draw() -> void:
