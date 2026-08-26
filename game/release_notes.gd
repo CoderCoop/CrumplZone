@@ -11,6 +11,21 @@ extends RefCounted
 
 const NOTES: Array = [
 	{
+		"version": "0.9.0",
+		"date": "2026-08-26",
+		"lines": [
+			"Three levels — easy, medium and hard — picked from the buttons "
+			+ "below.",
+			"Stars are rated against par, the best known way to bring the "
+			+ "level down. Three stars means finishing within 15% of it, so "
+			+ "it means the same thing on every level.",
+			"Rubble that has settled no longer grinds away what it is sitting "
+			+ "on. How fast something arrives is what does the damage.",
+			"Damage lines stay where they were drawn instead of crawling "
+			+ "around a piece as it breaks.",
+		],
+	},
+	{
 		"version": "0.8.0",
 		"date": "2026-08-25",
 		"lines": [
