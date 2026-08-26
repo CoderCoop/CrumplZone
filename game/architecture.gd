@@ -148,24 +148,20 @@ static func _masonry(rng: RandomNumberGenerator) -> Array:
 		# A segmental arch over each opening, as voussoirs. Five blocks, the
 		# middle one the keystone — the joints between them are real joints,
 		# so the arch stands the way an arch stands.
-		for i in bays:
-			var centre := first + pier * 0.5 + opening * 0.5 + float(i) * (opening + pier)
-			# A lintel resting ON the piers, not inside them. Arch action needs
-			# wedges that cannot slip past each other and every piece here is
-			# an axis-aligned rectangle, so the opening gets a lintel and the
-			# arched head is drawn on it instead.
-			#
-			# The first lintel was placed level with the top of the storey,
-			# which put it in the same space as the pier tops it was supposed
-			# to bear on. Two overlapping rigid bodies get pushed apart hard,
-			# and the wall cracked itself worse than the arch had.
-			# Spanning the full bay pitch, so adjacent lintels meet over the
-			# middle of each pier and the course is continuous. At 0.9 of the
-			# pier they stopped just short of each other, leaving a gap over
-			# every pier for the storey above to bridge — and the building
-			# settled into those gaps, 28 px on the tallest seed.
-			blocks.append(_block(centre, y - storey_h - LINTEL_H * 0.5,
-				opening + pier, LINTEL_H, "lintel", Materials.BRICK))
+		# One spandrel across the whole wall, not a lintel per opening.
+		#
+		# A brick wall is monolithic, and this was being assembled out of
+		# discrete members — a frame wearing masonry. Every separate lintel is
+		# two more contact joints, and with a dozen of them the wall bedded
+		# down a fraction at each: 20-28 px of sag with individual pieces
+		# cracking as it went. That was never one member failing, which is why
+		# four rounds of fixing individual members did not move it.
+		#
+		# The course over the openings is one member now, so a storey has two
+		# joints instead of a dozen and the wall above bears on continuous
+		# brick. The arched heads are drawn on it rather than built from it.
+		blocks.append(_block(0.0, y - storey_h - LINTEL_H * 0.5, span,
+			LINTEL_H, "spandrel", Materials.BRICK))
 		# Timber floor spanning between the walls, which is what a warehouse
 		# of this age actually had.
 		# The floor goes in the openings, not across the whole plan, and the
