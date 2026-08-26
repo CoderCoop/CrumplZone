@@ -54,19 +54,21 @@ const TYPES: Array[String] = [
 	CURTAIN_WALL, MASONRY, PANEL, FLAT_SLAB, STACK, SHED,
 ]
 
-## What the generator may actually build. Masonry is held back: it is the only
-## system that still settles into its own contacts more than its height allows
-## — 15 px on a 254 px building, once, damaging nothing, where the other five
-## settle under 2 px.
+## What the generator may actually build.
 ##
-## Held back rather than fixed-in-place or quietly passed. The threshold it
-## misses by is a rounding margin and moving it would have been tuning a check
-## to get green; the system itself is complete and correct in every other
-## respect, so it stays in the codebase, stays in the harness, and comes back
-## the moment it settles like the rest. A level type nobody has got to stand
-## still is not one to put in front of a player.
+## Masonry was held back from this list for a while: it settled 15 px
+## untouched where the others settled under 2, and no amount of retuning its
+## members moved it. It was never settling. Two blocks were being built inside
+## other blocks — every upper pier inside the joists beside it, and the
+## parapet through the whole top floor — and what looked like a wall bedding
+## down was the engine pushing interpenetrating bodies apart. See _masonry,
+## where both are now measured rather than assumed.
+##
+## The thing that found it was a picture. Four rounds of numeric fixes had
+## treated a geometry error as a physics one; shots.gd rendered the building
+## once and the leaning piers were unmistakable.
 const GENERATED: Array[String] = [
-	CURTAIN_WALL, PANEL, FLAT_SLAB, STACK, SHED,
+	CURTAIN_WALL, MASONRY, PANEL, FLAT_SLAB, STACK, SHED,
 ]
 
 ## What each one is called on the level card, and the one-line reason it is
@@ -196,15 +198,34 @@ static func _masonry(rng: RandomNumberGenerator) -> Array:
 		# floor; getting that the wrong way round is the whole difference
 		# between a load-bearing wall and a frame.
 		y -= storey_h + LINTEL_H
+		# A floor belongs between two storeys, so the top one does not get
+		# one — that level is the roof, and the parapet stands on the wall
+		# head above it.
+		if storey == storeys - 1:
+			break
+		# The joists bear on the spandrel and must clear the piers standing on
+		# it, which are the storey above's and so a different thickness from
+		# the ones below. They were sized to the nominal bay and overlapped
+		# those piers by 6 to 14 px on each side at every combination of the
+		# generator's ranges — so every pier above the ground storey was built
+		# inside two joists and shoved sideways out of them on the first
+		# frame. That is what the 15 px of untouched sag was: not a wall
+		# bedding down, a wall being pushed apart. A picture of it showed it
+		# in seconds; four rounds of retuning members had not.
+		var above: float = pier * (1.0 + batter * float(storeys - 2 - storey))
+		var clear: float = opening + pier - above - 6.0
 		for i in bays:
 			var mid := first + pier * 0.5 + opening * 0.5 + float(i) * (opening + pier)
-			blocks.append(_block(mid, y - floor_h * 0.5, opening + pier * 0.4,
+			blocks.append(_block(mid, y - floor_h * 0.5, clear,
 				floor_h, "joist", Materials.TIMBER))
 
 	# A brick parapet, the detail that makes the top read as a warehouse.
-	# The parapet stays deep. Lightening it to save load made the building
-	# settle twice as far, which is the opposite of what was expected — a
-	# heavier top course seats the joints below it rather than loading them.
+	# It stands on the top spandrel, where a wall head is. It used to be put
+	# half a storey up from there, straight through the top floor's joists —
+	# a full-width block sharing space with every one of them. That is why
+	# lightening it made the building settle further instead of less: the
+	# depth was never carrying anything, it was setting how hard the engine
+	# had to push to separate two things built inside each other.
 	blocks.append(_block(0.0, y - 14.0, span, 28.0, "parapet", Materials.BRICK))
 	return blocks
 
@@ -256,13 +277,20 @@ static func _flat_slab(rng: RandomNumberGenerator) -> Array:
 	var slab_h := 20.0
 	var blocks: Array = []
 	var first := -float(columns - 1) * spacing * 0.5
-	var span := float(columns - 1) * spacing + column_w * 3.0
+	var span := float(columns - 1) * spacing + column_w * 3.0 \
+		+ column_w * 0.14 * float(decks - 1)
 	var y := 0.0
 
 	for deck in decks:
+		# Columns get bigger lower down, because there is more above them —
+		# the same reason a masonry wall batters, and the reason the panel
+		# block's ground storey is heavier. A frame of constant column is a
+		# drawing convention, not a building: at five decks on 14 px posts,
+		# gentest caught the ground storey crushing itself untouched.
+		var thickness: float = column_w * (1.0 + 0.14 * float(decks - 1 - deck))
 		for i in columns:
 			blocks.append(_block(first + float(i) * spacing, y - storey_h * 0.5,
-				column_w, storey_h, "post", Materials.CONCRETE))
+				thickness, storey_h, "post", Materials.CONCRETE))
 		y -= storey_h
 		blocks.append(_block(0.0, y - slab_h * 0.5, span, slab_h, "deck",
 			Materials.CONCRETE))

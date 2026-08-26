@@ -11,6 +11,18 @@ extends RefCounted
 
 const NOTES: Array = [
 	{
+		"version": "0.10.1",
+		"date": "2026-08-26",
+		"lines": [
+			"A sixth kind of building — a brick warehouse. It was in the last "
+			+ "version but held back, because it would not stand still.",
+			"Every kind of building is drawn as what it is now: flared columns "
+			+ "on a concrete frame, joints and windows on precast panels, "
+			+ "ribbed cladding on a shed, properly coursed brick. What is "
+			+ "holding a building up should be readable before you touch it.",
+		],
+	},
+	{
 		"version": "0.10.0",
 		"date": "2026-08-26",
 		"lines": [
