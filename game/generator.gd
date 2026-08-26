@@ -57,12 +57,18 @@ const ERA_FOR := {
 }
 
 
-static func generate(level_seed: int) -> Dictionary:
+## A level from a seed. `force_kind` names a structural system instead of
+## letting the seed pick one — for the picture harness, which wants one of
+## each, and for a test that needs to reach a system held back from GENERATED.
+## Play never passes it.
+static func generate(level_seed: int, force_kind := "") -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = level_seed
 
 	var kind: String = Architecture.GENERATED[
 		rng.randi() % Architecture.GENERATED.size()]
+	if force_kind != "":
+		kind = force_kind
 	var built := Architecture.build(kind, rng)
 	var blocks: Array = built["blocks"]
 
