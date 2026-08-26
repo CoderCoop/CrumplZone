@@ -18,8 +18,9 @@ const NOTES: Array = [
 			+ "two above are two and three stars. Get under the first and you "
 			+ "choose: bank it, or keep going with the power you have left.",
 			"Every generated level is a different kind of building — a glazed "
-			+ "frame, a panel block, a flat-slab frame, a chimney, a shed. Each "
-			+ "stands up for a different reason, so each comes down differently.",
+			+ "frame, a brick warehouse, a panel block, a flat-slab frame, a "
+			+ "chimney, a shed. Each stands up for a different reason, so each "
+			+ "comes down differently, and each is drawn as what it is.",
 			"Buildings come from different periods, and the city behind them "
 			+ "matches what you are demolishing.",
 			"The charge is far more destructive where it lands, and costs far "

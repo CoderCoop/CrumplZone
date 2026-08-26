@@ -18,12 +18,17 @@ Nothing since 0.10.0.
   under the first and the level offers you the choice: bank it and move on, or
   keep demolishing with the power you have left and go for the next line. The
   result screen tells you how many pixels of building still stand above it.
-- **Every generated level is a different kind of building.** Five real
+- **Every generated level is a different kind of building.** Six real
   structural systems, each of which stands up for a different reason and so
-  has to be brought down a different way: a glazed steel frame, a large-panel
-  block, a flat-slab frame, a stacked chimney, and a portal-framed shed. What
-  holds a shed up is not what holds a tower up, and the tool that works on one
-  is the wrong tool for the other.
+  has to be brought down a different way: a glazed steel frame, a load-bearing
+  brick warehouse, a large-panel block, a flat-slab frame, a stacked chimney,
+  and a portal-framed shed. What holds a shed up is not what holds a tower up,
+  and the tool that works on one is the wrong tool for the other.
+- **Each system is drawn as what it is.** Flat-slab columns flare where they
+  meet the slab, precast panels have joints all the way round and a window
+  each, shed cladding is ribbed, brick is properly coursed. The trim is not
+  decoration — it is how you tell what is carrying the building before you
+  touch it.
 - **Buildings are of a period.** The same structural system appears as
   riveted steel with brick infill, or as concrete and glass, depending on when
   it was built. It changes what things are made of, not what carries what.
