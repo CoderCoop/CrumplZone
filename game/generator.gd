@@ -86,7 +86,11 @@ static func generate(level_seed: int, force_kind := "") -> Dictionary:
 		b["y"] = float(b["y"]) + FLOOR_Y
 
 	var about: Array = Architecture.ABOUT.get(kind, ["Building", ""])
-	return Levels.finish({
+	# The measured pile if this seed has been baked, and nothing if it has
+	# not — finish() falls back to the estimate, which is what an unbaked seed
+	# deserves and no more.
+	var measured := Pack.for_seed(level_seed)
+	var spec := {
 		"centre_x": CENTRE_X,
 		"floor_y": FLOOR_Y,
 		"blocks": blocks,
@@ -96,7 +100,12 @@ static func generate(level_seed: int, force_kind := "") -> Dictionary:
 		"title": about[0],
 		"about": about[1],
 		"seed": level_seed,
-	})
+	}
+	# Only set when there is a measurement, so finish() can tell "measured at
+	# zero" from "never measured" by whether the key is there at all.
+	if measured >= 0.0:
+		spec["pile"] = measured
+	return Levels.finish(spec)
 
 
 ## Substitutes materials for the era, leaving the structure alone.

@@ -73,6 +73,27 @@ const ESTIMATE_SAFETY := 1.35
 const PACKING := 0.62
 const LINE_MIN := 90.0
 
+## The lowest a star line may ever sit. Rubble is not a mathematical point:
+## one fragment resting on the street stands a few pixels tall, so a line
+## below that cannot be met however well the level is played.
+const LINE_FLOOR := 36.0
+
+## Headroom over a measured pile.
+##
+## Measuring did not remove the need for this, and finding that out is what
+## the first bake was worth. The bake flattens each level several times and
+## keeps the worst, and five of eleven seeds still went on to leave more than
+## that in the very next run — seed 4109 by 35%, 54 px recorded against 73 px
+## produced. The distribution has a tail that a handful of samples does not
+## reach.
+##
+## So the margin stays, but it is now a measured one rather than a modelled
+## one, and that is the whole difference. It pads an accurate number by a
+## factor taken from the observed spread (1.21x to 1.46x between the best and
+## worst run of a seed, and up to 1.35x beyond the bake's worst), instead of
+## padding a per-system guess whose own error nobody had ever quantified.
+const MEASURED_MARGIN := 1.5
+
 ## No line may sit higher than this share of the building's own height. A wide
 ## low building has little material over a large footprint, so its estimated
 ## pile is small and a line set purely as a multiple of it lands near the roof
@@ -131,6 +152,9 @@ static func level(difficulty: String) -> Dictionary:
 
 
 static func _placed(spec: Dictionary, difficulty: String, depth: int) -> Dictionary:
+	var measured := Pack.for_level(difficulty)
+	if measured >= 0.0:
+		spec["pile"] = measured
 	spec["difficulty"] = difficulty
 	spec["moves"] = depth
 	spec["title"] = TITLES.get(difficulty, "Level")
@@ -177,10 +201,24 @@ static func finish(spec: Dictionary) -> Dictionary:
 	for b in blocks:
 		tall = maxf(tall, float(spec["floor_y"]) - (float(b["y"]) - float(b["h"]) * 0.5))
 
-	var pile: float = spec.get("pile", 0.0)
-	if pile <= 0.0:
+	# A measured pile if one was baked for this level, and the estimate only
+	# when there is not. The two are not equivalent and the difference is the
+	# point: a measurement is what the level really leaves, and needs no
+	# safety factor, so nothing pads the winning line. See pack.gd.
+	# Presence decides, not the value: zero is a real measurement — a chimney
+	# can be left with nothing above the street — and testing `pile <= 0`
+	# quietly put exactly that level back on the estimate.
+	var pile: float = 0.0
+	if spec.has("pile"):
+		# The pack records what was measured, unpadded, so it stays a record
+		# of fact. The headroom is applied here, in one visible place.
+		pile = float(spec["pile"]) * MEASURED_MARGIN
+		spec["pile"] = pile
+		spec["pile_measured"] = true
+	else:
 		pile = estimate_pile(blocks, String(spec.get("kind", "")))
 		spec["pile"] = pile
+		spec["pile_measured"] = false
 
 	# The third line is what makes three stars hard; the first is where the
 	# level is won and must sit clear of it. Both are held under a share of the
@@ -192,6 +230,13 @@ static func finish(spec: Dictionary) -> Dictionary:
 	var ceiling: float = maxf(tall * LINE_OVER_HEIGHT, LINE_MIN)
 	var third: float = maxf(minf(pile * THREE_STAR_OVER_PILE, ceiling * 0.62),
 		pile * 1.05)
+	# A line nothing can be under is not a line. Measuring the piles turned
+	# this from theory into seed 4103, a chimney that can be left with nothing
+	# at all above the street: its measured pile is 0, which put all three of
+	# its lines at 0 and made the level unwinnable by construction. Three
+	# stars on a building that flattens completely should mean flattening it,
+	# not clearing a line no fragment can sit under.
+	third = maxf(third, LINE_FLOOR)
 	var win: float = clampf(pile * WIN_LINE_OVER_PILE, third * 1.35,
 		maxf(ceiling, third * 1.5))
 	var second: float = third + (win - third) * TWO_STAR_SHARE

@@ -174,6 +174,17 @@ func _judge() -> void:
 	if third < actual:
 		_failures.append("seed %d (%s) cannot reach three stars: pile %.0f, line %.0f"
 			% [_spec["seed"], _spec["kind"], actual, third])
+	# A winning line above the roof is a level that is won before it is
+	# touched, and nothing here was checking for it. It is the failure at the
+	# opposite end from an unreachable third star, and it comes from the same
+	# place: a building whose rubble sits high relative to its own height
+	# leaves no room to stack three lines above the pile and still be under
+	# the roof. Caught only once the piles were measured and the padding was
+	# applied to a real number.
+	var win: float = floor_y - float(_spec["lines"][0])
+	if win >= tall:
+		_failures.append("seed %d (%s) is won before it is touched: winning line %.0f, building %.0f tall"
+			% [_spec["seed"], _spec["kind"], win, tall])
 
 
 func _report() -> void:
