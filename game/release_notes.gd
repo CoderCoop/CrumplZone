@@ -11,6 +11,18 @@ extends RefCounted
 
 const NOTES: Array = [
 	{
+		"version": "0.11.0",
+		"date": "2026-08-26",
+		"lines": [
+			"Levels are checked by machine before they reach you: each one is "
+			+ "flattened over and over to find out how low it can really go, and "
+			+ "any level whose third star turns out to be unreachable is thrown "
+			+ "away rather than shipped.",
+			"The star lines are measured against the building itself now. Three "
+			+ "stars is exactly as hard as it was.",
+		],
+	},
+	{
 		"version": "0.10.2",
 		"date": "2026-08-26",
 		"lines": [

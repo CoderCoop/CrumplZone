@@ -149,11 +149,20 @@ func _label() -> String:
 
 func _record() -> void:
 	var job: Dictionary = _jobs[_job]
+	var fy: float = float(_spec["floor_y"])
+	var third: float = fy - float(_spec["lines"][2])
+	if third < _worst:
+		_dropped.append("%s: three stars sits at %.0f px inside a %.0f px pile"
+			% [_label(), third, _worst])
+		return
 	if job["kind"] == "authored":
 		_authored[String(job["id"])] = _worst
 	else:
 		_measured[int(job["id"])] = _worst
-	_report_lines.append("%-16s %-13s %3.0f px" % [_label(), _spec.get("kind", ""), _worst])
+	var headroom := 99.0 if _worst <= 0.0 else third / _worst
+	var note := "" if headroom >= Levels.MEASURED_MARGIN else "   TIGHT"
+	_report_lines.append("%-16s %-13s pile %3.0f  three stars %3.0f  headroom %.2fx%s"
+		% [_label(), _spec.get("kind", ""), _worst, third, headroom, note])
 
 
 func _write() -> void:

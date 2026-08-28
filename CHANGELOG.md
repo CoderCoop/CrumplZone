@@ -7,7 +7,29 @@ sections are dated.
 
 ## [Unreleased]
 
-Nothing since 0.10.2.
+Nothing since 0.11.0.
+
+## [0.11.0] - 2026-08-26
+
+### Changed
+
+- **How low a building can go is measured now, not guessed at.** A job in CI
+  flattens every level several times and records the worst rubble it leaves.
+  That number decides whether a level is fit to ship at all — a level whose
+  third star sits inside its own rubble is dropped rather than shipped with a
+  star nobody can earn.
+- **The lines are placed by the building, not by its rubble.** How far down a
+  building has been brought is a fact about the building. Previously every
+  pixel of caution in the rubble estimate pushed the winning line up, toward a
+  level already won on arrival. Difficulty is unchanged: three stars sits
+  exactly where it did.
+
+### Removed
+
+- **Large-panel blocks are held back**, as load-bearing masonry was until its
+  geometry was fixed. They stand perfectly well, but leave rubble 65% as tall
+  as the building, which leaves no room for three lines above the pile and
+  under the roof.
 
 ## [0.10.2] - 2026-08-26
 

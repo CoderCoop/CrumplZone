@@ -27,17 +27,14 @@ extends RefCounted
 ## seed -> the highest rubble that seed left, over every run of the bake.
 const MEASURED := {
 	4100: 95,
-	4101: 106,
 	4102: 64,
-	4103: 89,
-	4104: 94,
-	4105: 50,
-	4106: 59,
-	4107: 100,
-	4108: 102,
-	4109: 61,
-	4110: 118,
-	4111: 49,
+	4103: 85,
+	4104: 76,
+	4106: 60,
+	4107: 105,
+	4108: 98,
+	4109: 48,
+	4111: 58,
 }
 ## difficulty -> the same, for the three authored levels.
 const AUTHORED := {
