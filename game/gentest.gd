@@ -22,8 +22,14 @@ extends Node2D
 ## solver's job and it costs minutes per level; this costs seconds per level
 ## and catches the things that are cheap to catch.
 
-const SAMPLES := 12
-const FIRST_SEED := 4100
+## The seeds the pack actually ships, not a range of its own.
+##
+## It used to walk 4100 upward and judge whatever came out, which meant it
+## failed on levels the bake had already looked at and refused to ship — and
+## it would have passed a pack that had quietly shrunk to nothing. Testing
+## what ships is the point; the bake's own report is where a seed that was
+## rejected gets explained.
+const LEAST_LEVELS := 8
 const STAND_TICKS := 240
 const CHARGE_EVERY := 14
 const SETTLE := 900
@@ -51,10 +57,10 @@ func _ready() -> void:
 
 func _next() -> void:
 	_at += 1
-	if _at >= SAMPLES:
+	if _at >= Pack.seeds().size():
 		_report()
 		return
-	_spec = Generator.generate(FIRST_SEED + _at)
+	_spec = Generator.generate(int(Pack.seeds()[_at]))
 	_level.build(_spec)
 	_seen[_spec["kind"]] = int(_seen.get(_spec["kind"], 0)) + 1
 	_standing_before = _level.standing()
@@ -68,7 +74,7 @@ func _next() -> void:
 
 
 func _physics_process(_delta: float) -> void:
-	if _at >= SAMPLES:
+	if _at >= Pack.seeds().size():
 		return
 	_ticks += 1
 	_level.tick_settle()
@@ -168,12 +174,35 @@ func _judge() -> void:
 	_lines.append("seed %d %-13s %2d blk  pile %3.0f guessed %3.0f (%.2fx)  foot %4.0f tall %3.0f  spread/height needed %.2f"
 		% [_spec["seed"], _spec["kind"], _spec["blocks"].size(), actual, guessed,
 			ratio, footprint, tall, implied])
+	# Reported, not failed on, and the difference matters.
+	#
+	# This used to be a failure, and it was the right one while the lines were
+	# derived from the pile: a pile that came in under reality dragged the
+	# third line down inside the rubble with it. The lines come from the
+	# building's height now, so a run that leaves more than the bake recorded
+	# moves nothing — and failing on it would be asserting that three samples
+	# find the worst of a distribution with a tail, which the first bake
+	# proved false on five seeds out of eleven.
+	#
+	# What actually protects the player is the next check: the third line must
+	# be above what the level really leaves. That one still fails.
 	if guessed < actual:
-		_failures.append("seed %d (%s) makes a %.0f px pile but was estimated at %.0f"
-			% [_spec["seed"], _spec["kind"], actual, guessed])
+		_lines.append("        left %.0f px, over the %.0f px the bake recorded"
+			% [actual, guessed])
 	if third < actual:
 		_failures.append("seed %d (%s) cannot reach three stars: pile %.0f, line %.0f"
 			% [_spec["seed"], _spec["kind"], actual, third])
+	# A winning line above the roof is a level that is won before it is
+	# touched, and nothing here was checking for it. It is the failure at the
+	# opposite end from an unreachable third star, and it comes from the same
+	# place: a building whose rubble sits high relative to its own height
+	# leaves no room to stack three lines above the pile and still be under
+	# the roof. Caught only once the piles were measured and the padding was
+	# applied to a real number.
+	var win: float = floor_y - float(_spec["lines"][0])
+	if win >= tall:
+		_failures.append("seed %d (%s) is won before it is touched: winning line %.0f, building %.0f tall"
+			% [_spec["seed"], _spec["kind"], win, tall])
 
 
 func _report() -> void:
@@ -182,6 +211,9 @@ func _report() -> void:
 		print(line)
 	print("")
 	print("systems seen: %s" % _seen)
+	if Pack.seeds().size() < LEAST_LEVELS:
+		_failures.append("the pack ships only %d levels, under the %d expected — a generator that stopped producing playable levels looks exactly like this"
+			% [Pack.seeds().size(), LEAST_LEVELS])
 	print("closest the estimate came to being too low: %.2fx" % _worst_ratio)
 	var held: Array[String] = []
 	for kind in Architecture.TYPES:

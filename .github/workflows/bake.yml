@@ -1,0 +1,67 @@
+name: bake-levels
+
+# Measuring how low every level can go is minutes of physics, so it does not
+# belong on the pull-request gate and it certainly does not belong in the game.
+# It runs here: on demand, and weekly so that a generator change nobody
+# re-baked shows up on its own rather than waiting to be noticed.
+on:
+  workflow_dispatch:
+  schedule:
+    # Mondays, early. Nothing depends on the hour.
+    - cron: "17 4 * * 1"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  GODOT_VERSION: 4.6-stable
+
+jobs:
+  bake:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Measure every level and rewrite the pack
+        run: |
+          curl -sSL -o godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          unzip -q godot.zip
+          chmod +x "Godot_v${GODOT_VERSION}_linux.x86_64"
+          godot="$PWD/Godot_v${GODOT_VERSION}_linux.x86_64"
+          "$godot" --headless --path game --import >/dev/null 2>&1 || true
+
+          log="$(mktemp)"
+          set -o pipefail
+          "$godot" --headless --fixed-fps 60 --path game res://bakelevels.tscn 2>&1 | tee "$log"
+          if grep -q "SCRIPT ERROR" "$log"; then
+            echo "::error::the bake errored at runtime — the pack it wrote cannot be trusted"
+            exit 1
+          fi
+          # A pack with nothing in it would sail through review as a diff that
+          # merely looks small, and would put every level back on the estimate.
+          if ! grep -qE '^\t[0-9]+: [0-9]' game/pack.gd; then
+            echo "::error::the bake produced an empty pack"
+            exit 1
+          fi
+          # Keep the report for the pull request body.
+          cp "$log" bake-report.txt
+
+      # main is protected and a bot walking around that gate would make the
+      # gate decorative. The bake proposes; review disposes, and the diff in
+      # the pile heights is the thing worth looking at.
+      - name: Open a pull request if the measurements moved
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: bake/level-pack
+          title: "chore: re-bake the level pack"
+          commit-message: |
+            chore: re-bake the level pack
+
+            Measured by .github/workflows/bake.yml. Each level is flattened
+            several times and the worst pile kept, because the same level does
+            not leave the same rubble twice.
+          body-path: bake-report.txt
+          add-paths: game/pack.gd
+          delete-branch: true

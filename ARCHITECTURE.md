@@ -208,10 +208,15 @@ fresh browser always sees the newest build, so no manual test can answer this.
 A level is a shape; everything numeric about it is measured from that shape,
 never chosen by hand:
 
-- **The pile** is how high the rubble would sit if the building were pulverised
-  completely — estimated from its material volume and how far that system's
-  debris spreads, with a safety factor, since nothing is ever deleted.
-- **Three lines** follow from the pile. The third-star line sits just above it,
+- **The pile** is how high the rubble really sits when the building is
+  pulverised completely — measured in CI by `bakelevels.gd`, which flattens
+  each level several times and keeps the worst, and recorded in `pack.gd`. It
+  was estimated from material volume and a per-system guess at how far debris
+  spreads; that model could not be corrected, because its safety factor also
+  scaled the winning line.
+- **Three lines** follow from the building's own height, not from the pile.
+  The measured pile decides something else: whether the level is fit to ship.
+  Formerly they followed from the pile. The third-star line sits just above it,
   so three stars means taking a building to very near the flattest it can
   physically be left. The winning line sits well clear, so bringing a building
   down is never the hard part. The second sits midway. All three are capped

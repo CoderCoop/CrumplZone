@@ -73,6 +73,42 @@ const ESTIMATE_SAFETY := 1.35
 const PACKING := 0.62
 const LINE_MIN := 90.0
 
+## The lowest a star line may ever sit. Rubble is not a mathematical point:
+## one fragment resting on the street stands a few pixels tall, so a line
+## below that cannot be met however well the level is played.
+const LINE_FLOOR := 36.0
+
+## Headroom over a measured pile.
+##
+## Measuring did not remove the need for this, and finding that out is what
+## the first bake was worth. The bake flattens each level several times and
+## keeps the worst, and five of eleven seeds still went on to leave more than
+## that in the very next run — seed 4109 by 35%, 54 px recorded against 73 px
+## produced. The distribution has a tail that a handful of samples does not
+## reach.
+##
+## So the margin stays, but it is now a measured one rather than a modelled
+## one, and that is the whole difference. It pads an accurate number by a
+## factor taken from the observed spread (1.21x to 1.46x between the best and
+## worst run of a seed, and up to 1.35x beyond the bake's worst), instead of
+## padding a per-system guess whose own error nobody had ever quantified.
+## How much clearance over the measured pile a level ought to have before it
+## is comfortable rather than merely possible. A warning threshold, not a
+## multiplier: it is reported, never applied to a line. Sized from the
+## overshoot the first bake missed — five of eleven seeds left more than the
+## worst of three runs, the largest by 35%.
+const MEASURED_MARGIN := 1.35
+
+## Where three stars sits, as a share of the winning line.
+##
+## Chosen to leave the game exactly as it plays today: before the lines were
+## decoupled, the third line landed on `ceiling * 0.62` for every level whose
+## pile did not force it higher, which was all but one. Keeping 0.62 changes
+## the mechanism and not the difficulty. It is the dial to turn if three stars
+## should be harder — lower is harder — and turning it needs a re-bake, since
+## it decides which levels are fit to ship.
+const THIRD_SHARE := 0.62
+
 ## No line may sit higher than this share of the building's own height. A wide
 ## low building has little material over a large footprint, so its estimated
 ## pile is small and a line set purely as a multiple of it lands near the roof
@@ -131,6 +167,9 @@ static func level(difficulty: String) -> Dictionary:
 
 
 static func _placed(spec: Dictionary, difficulty: String, depth: int) -> Dictionary:
+	var measured := Pack.for_level(difficulty)
+	if measured >= 0.0:
+		spec["pile"] = measured
 	spec["difficulty"] = difficulty
 	spec["moves"] = depth
 	spec["title"] = TITLES.get(difficulty, "Level")
@@ -177,10 +216,23 @@ static func finish(spec: Dictionary) -> Dictionary:
 	for b in blocks:
 		tall = maxf(tall, float(spec["floor_y"]) - (float(b["y"]) - float(b["h"]) * 0.5))
 
-	var pile: float = spec.get("pile", 0.0)
-	if pile <= 0.0:
+	# A measured pile if one was baked for this level, and the estimate only
+	# when there is not. The two are not equivalent and the difference is the
+	# point: a measurement is what the level really leaves, and needs no
+	# safety factor, so nothing pads the winning line. See pack.gd.
+	# Presence decides, not the value: zero is a real measurement — a chimney
+	# can be left with nothing above the street — and testing `pile <= 0`
+	# quietly put exactly that level back on the estimate.
+	var pile: float = 0.0
+	if spec.has("pile"):
+		# The pack records what was measured, unpadded, so it stays a record
+		# of fact. The headroom is applied here, in one visible place.
+		pile = float(spec["pile"])
+		spec["pile_measured"] = true
+	else:
 		pile = estimate_pile(blocks, String(spec.get("kind", "")))
 		spec["pile"] = pile
+		spec["pile_measured"] = false
 
 	# The third line is what makes three stars hard; the first is where the
 	# level is won and must sit clear of it. Both are held under a share of the
@@ -189,15 +241,39 @@ static func finish(spec: Dictionary) -> Dictionary:
 	# the pile the level will make, or three stars is unreachable — measured, a
 	# panel block with a 117 px pile had its third line put at 109 by the
 	# height cap alone. So the cap applies, and then the pile wins.
-	var ceiling: float = maxf(tall * LINE_OVER_HEIGHT, LINE_MIN)
-	var third: float = maxf(minf(pile * THREE_STAR_OVER_PILE, ceiling * 0.62),
-		pile * 1.05)
-	var win: float = clampf(pile * WIN_LINE_OVER_PILE, third * 1.35,
-		maxf(ceiling, third * 1.5))
+	# Both outer lines are facts about the building: how far down its own
+	# height it has been brought. Neither depends on its rubble.
+	#
+	# They used to. The pile scaled the winning line, and the pile is an
+	# estimate that must never come in low — so every pixel of caution in it
+	# pushed the winning line up, toward a level already won on arrival. That
+	# is why the panel constant could not be corrected: raising the estimate
+	# to make three stars reachable put one level's winning line above its own
+	# roof. Measuring the piles did not fix it either. At a 1.5x margin on a
+	# measured pile the hard level's winning line moved 204 to 239 and a
+	# single charge cleared it.
+	#
+	# So the rubble no longer places the lines. It decides something else,
+	# below: whether the level is fit to ship at all.
+	var win: float = maxf(tall * LINE_OVER_HEIGHT, LINE_MIN)
+	# A line nothing can be under is not a line. Seed 4103 is a chimney that
+	# can be left with nothing at all above the street, and a line at zero
+	# cannot be met however well the level is played.
+	var third: float = maxf(win * THIRD_SHARE, LINE_FLOOR)
 	var second: float = third + (win - third) * TWO_STAR_SHARE
 	var floor_y: float = float(spec["floor_y"])
 	spec["lines"] = [floor_y - win, floor_y - second, floor_y - third]
 	spec["height_line"] = floor_y - win
+	# Fit to ship, judged against what the level really leaves. Three stars
+	# below the achievable pile is a star nobody can earn; the bake drops such
+	# a level rather than shipping it. Only a measured level can be judged —
+	# an estimated one is marked fit because there is nothing trustworthy to
+	# judge it against, which is itself a reason to bake every level.
+	spec["reachable"] = true
+	spec["headroom"] = 0.0
+	if bool(spec.get("pile_measured", false)):
+		spec["reachable"] = third >= pile
+		spec["headroom"] = 99.0 if pile <= 0.0 else third / pile
 	spec["power"] = maxf(area * POWER_PER_AREA, POWER_MIN)
 	spec["moves"] = int(spec.get("moves", 8))
 	return spec

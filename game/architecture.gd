@@ -72,8 +72,23 @@ const TYPES: Array[String] = [
 ## The thing that found it was a picture. Four rounds of numeric fixes had
 ## treated a geometry error as a physics one; shots.gd rendered the building
 ## once and the leaning piers were unmistakable.
+## Panel is held back, the way masonry was until its geometry was fixed.
+##
+## Not because it falls over — it stands perfectly well — but because it
+## cannot be scored. A large-panel block leaves rubble 65% as tall as the
+## building it came from (measured: 158 px of pile on a 242 px building),
+## which is far more than any other system, and there is no room above a pile
+## like that to stack three lines and still be under the roof. Padded to clear
+## its own rubble, seed 4106's winning line landed at 324 px on a 242 px
+## building: a level won before it is touched.
+##
+## The cause is that a panel block is fifteen big precast slabs where other
+## systems are thirty to sixty smaller members, so its debris is coarse and
+## stacks high. The fix is in the architecture — more, smaller panels, or more
+## storeys to raise the building against its own rubble — not in the scoring,
+## and not in a constant. It comes back when its pile is in proportion.
 const GENERATED: Array[String] = [
-	CURTAIN_WALL, MASONRY, PANEL, FLAT_SLAB, STACK, SHED,
+	CURTAIN_WALL, MASONRY, FLAT_SLAB, STACK, SHED,
 ]
 
 ## What each one is called on the level card, and the one-line reason it is
