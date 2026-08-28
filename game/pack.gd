@@ -5,12 +5,11 @@ extends RefCounted
 ##
 ## GENERATED FILE — regenerate with bakelevels.tscn, do not hand-edit.
 ##
-## How low a building can physically go decides where all three lines sit, and
+## How low a building can physically go decides whether it is fit to ship, and
 ## it used to be modelled: a per-system guess at how far debris spreads, times
 ## a safety factor. The model was wrong in a way that could not be fixed by
-## tuning it. Its safety factor had to be pessimistic so a level's third line
-## never landed inside its own rubble, and the same number scaled the winning
-## line — so every pixel of safety made the level more nearly won before it was
+## tuning it. Its safety factor had to be pessimistic so a level's winning line
+## never landed inside its own rubble, and the same number scaled that line — so every pixel of safety made the level more nearly won before it was
 ## touched. Measured on five panel seeds, the estimate had only 1.08x to 1.30x
 ## of room against the worst run, where curtain walls had 1.65x and sheds 3.42x;
 ## and correcting the panel constant put one level's winning line above its own
@@ -24,24 +23,13 @@ extends RefCounted
 ## A measured pile needs no safety factor, so nothing inflates the winning
 ## line, and there is no per-system constant left to be wrong.
 
-## seed -> the highest rubble that seed left, over every run of the bake.
-const MEASURED := {
-	4100: 95,
-	4102: 64,
-	4103: 85,
-	4104: 76,
-	4106: 60,
-	4107: 105,
-	4108: 98,
-	4109: 48,
-	4111: 58,
-}
+## seed -> {"pile": the worst rubble it left, "par": what the cheapest known
+## clearing costs}. Both measured, neither modelled.
+const MEASURED := {}
+
 ## difficulty -> the same, for the three authored levels.
-const AUTHORED := {
-	"easy": 74,
-	"medium": 81,
-	"hard": 101,
-}
+const AUTHORED := {}
+
 
 ## The measured pile, or -1 for a level the bake has never covered.
 ##
@@ -51,11 +39,22 @@ const AUTHORED := {
 ## silently back on the estimate — the one path this whole change exists to
 ## get levels off.
 static func for_seed(level_seed: int) -> float:
-	return float(MEASURED.get(level_seed, -1.0))
+	return float(MEASURED.get(level_seed, {}).get("pile", -1.0))
 
 
 static func for_level(difficulty: String) -> float:
-	return float(AUTHORED.get(difficulty, -1.0))
+	return float(AUTHORED.get(difficulty, {}).get("pile", -1.0))
+
+
+## What the level is known to cost to clear, or 0 if nobody has measured it.
+## A level with no par can be cleared but not rated: stars() gives it one star
+## rather than inventing a number to compare against.
+static func par_for_seed(level_seed: int) -> float:
+	return float(MEASURED.get(level_seed, {}).get("par", 0.0))
+
+
+static func par_for_level(difficulty: String) -> float:
+	return float(AUTHORED.get(difficulty, {}).get("par", 0.0))
 
 
 ## Every seed the pack covers, in order, so the game and the harnesses agree

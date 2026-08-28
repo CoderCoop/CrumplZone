@@ -64,11 +64,10 @@ func _physics_process(_delta: float) -> void:
 
 func _finish() -> void:
 	var floor_y: float = float(_level.spec["floor_y"])
-	# Judged against the *last* line now, not the first. Three stars means
-	# getting everything under the lowest one, so that is the line the level's
-	# own rubble has to fit beneath — the others are easier by construction.
-	var all := _level.lines()
-	var line: float = float(all[all.size() - 1])
+	# One line again: the level's own rubble has to fit under the line it is
+	# won at, or nobody can finish it. There were three for a while, one per
+	# star, and this judged the lowest of them.
+	var line := _level.height_line()
 	var peak := floor_y
 	for body in _level.live_blocks():
 		var poly: PackedVector2Array = body.get_meta("poly")
@@ -76,12 +75,12 @@ func _finish() -> void:
 			peak = minf(peak, body.global_position.y + point.rotated(body.rotation).y)
 	var pile := floor_y - peak
 	var allowed := floor_y - line
-	_lines.append("%-7s pile %3.0f px, three-star line %3.0f px, %s"
+	_lines.append("%-7s pile %3.0f px, winning line %3.0f px, %s"
 		% [_difficulty, pile, allowed,
 			("%.0f px of room" % (allowed - pile)) if allowed >= pile
 			else ("%.0f px SHORT" % (pile - allowed))])
 	if pile > allowed:
-		_failures.append("%s makes a %.0f px pile but three stars needs everything under %.0f px — unreachable"
+		_failures.append("%s makes a %.0f px pile but must get everything under %.0f px — unwinnable"
 			% [_difficulty, pile, allowed])
 	if _queue.is_empty():
 		_report()
@@ -94,7 +93,7 @@ func _report() -> void:
 	for line in _lines:
 		print(line)
 	print("")
-	print("expected : three stars is reachable — the pile fits under the last line")
+	print("expected : the level can be won — its own pile fits under its line")
 	if _failures.is_empty():
 		print("VERDICT  : PASS")
 		get_tree().quit()

@@ -78,7 +78,7 @@ const TYPES: Array[String] = [
 ## cannot be scored. A large-panel block leaves rubble 65% as tall as the
 ## building it came from (measured: 158 px of pile on a 242 px building),
 ## which is far more than any other system, and there is no room above a pile
-## like that to stack three lines and still be under the roof. Padded to clear
+## like that to put a winning line above it and still be under the roof. Padded to clear
 ## its own rubble, seed 4106's winning line landed at 324 px on a 242 px
 ## building: a level won before it is touched.
 ##

@@ -8,8 +8,8 @@ extends Node2D
 ## how high its rubble will sit is made at build time with nobody watching, and
 ## everything about the rating hangs off it. If that estimate comes out below
 ## what the level really leaves, the lowest line sits inside the rubble and
-## three stars is unreachable; far enough below and the level cannot be won at
-## all. That is the failure the authored levels hit twice.
+## the winning line sits inside the rubble and the level cannot be won at all.
+## That is the failure the authored levels hit twice.
 ##
 ## So this destroys each sampled level completely and holds up a ruler:
 ##
@@ -151,7 +151,7 @@ func _judge() -> void:
 			peak = minf(peak, body.global_position.y + point.rotated(body.rotation).y)
 	var actual := floor_y - peak
 	var guessed: float = float(_spec["pile"])
-	var third: float = floor_y - float(_spec["lines"][2])
+	var win: float = floor_y - float(_spec["height_line"])
 	var ratio := 99.0 if actual <= 0.0 else guessed / actual
 	_worst_ratio = minf(_worst_ratio, ratio)
 	# The numbers the estimate is built from, so a bad estimate can be
@@ -184,22 +184,21 @@ func _judge() -> void:
 	# find the worst of a distribution with a tail, which the first bake
 	# proved false on five seeds out of eleven.
 	#
-	# What actually protects the player is the next check: the third line must
-	# be above what the level really leaves. That one still fails.
+	# What actually protects the player is the next check: the winning line
+	# must be above what the level really leaves. That one still fails.
 	if guessed < actual:
 		_lines.append("        left %.0f px, over the %.0f px the bake recorded"
 			% [actual, guessed])
-	if third < actual:
-		_failures.append("seed %d (%s) cannot reach three stars: pile %.0f, line %.0f"
-			% [_spec["seed"], _spec["kind"], actual, third])
+	if win < actual:
+		_failures.append("seed %d (%s) cannot be won: pile %.0f, winning line %.0f"
+			% [_spec["seed"], _spec["kind"], actual, win])
 	# A winning line above the roof is a level that is won before it is
 	# touched, and nothing here was checking for it. It is the failure at the
-	# opposite end from an unreachable third star, and it comes from the same
+	# opposite end from a level that cannot be won, and it comes from the same
 	# place: a building whose rubble sits high relative to its own height
 	# leaves no room to stack three lines above the pile and still be under
 	# the roof. Caught only once the piles were measured and the padding was
 	# applied to a real number.
-	var win: float = floor_y - float(_spec["lines"][0])
 	if win >= tall:
 		_failures.append("seed %d (%s) is won before it is touched: winning line %.0f, building %.0f tall"
 			% [_spec["seed"], _spec["kind"], win, tall])

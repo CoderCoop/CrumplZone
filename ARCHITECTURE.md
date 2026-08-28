@@ -147,7 +147,7 @@ matters:
   flat-slab frame, because there is more above them.
 - **`levels.gd`** produces hand-built level specs — plain dictionaries of
   blocks — and, in `finish()`, attaches everything that follows from the shape
-  of a building: how much rubble it will leave, where the three lines go, and
+  of a building: how much rubble it will leave, where its winning line goes, and
   how much power bar it gets. Authored and generated levels both come through
   it, so they are rated the same way. **`generator.gd`** picks a system, an era
   and a setting from a seed; the era substitutes materials without touching the
@@ -203,65 +203,61 @@ loads a build, publishes a newer one over the top of it, and checks the page
 ends up running the new one without clearing anything or closing the tab. A
 fresh browser always sees the newest build, so no manual test can answer this.
 
-### Difficulty, the lines, and the rating
+### Difficulty, the line, and the rating
 
-A level is a shape; everything numeric about it is measured from that shape,
-never chosen by hand:
+A level is a shape; everything numeric about it is measured from that shape or
+from a solution, never chosen by hand:
 
 - **The pile** is how high the rubble really sits when the building is
   pulverised completely — measured in CI by `bakelevels.gd`, which flattens
-  each level several times and keeps the worst, and recorded in `pack.gd`. It
-  was estimated from material volume and a per-system guess at how far debris
-  spreads; that model could not be corrected, because its safety factor also
-  scaled the winning line.
-- **Three lines** follow from the building's own height, not from the pile.
-  The measured pile decides something else: whether the level is fit to ship.
-  Formerly they followed from the pile. The third-star line sits just above it,
-  so three stars means taking a building to very near the flattest it can
-  physically be left. The winning line sits well clear, so bringing a building
-  down is never the hard part. The second sits midway. All three are capped
-  under a share of the building's own height, and then the pile wins, or a wide
-  low building would be won before it was touched.
+  each level several times and keeps the worst.
+- **Par** is what the cheapest clearing the solver can find costs, measured by
+  the same bake. Both go in `pack.gd`.
+- **The winning line** follows from the building's own height. It does not
+  follow from the pile: the pile is a number that must never come in low, so
+  every pixel of caution in it used to push the line up, toward a level won on
+  arrival.
 - **The power bar** is a multiple of the building's material area, sized to be
   enough rather than to be exact.
-- **The rating** is how many lines everything is under when the dust settles.
+- **The rating** is what the run cost against par — three stars for within 15%
+  of the best known solution, two for within 55%, one for clearing it at all.
 
-This replaced rating against par — what the solver's best solution costs. Par
-was correct and unmaintainable: it had to be re-measured with the solver
-every time the physics changed what a demolition costs, which happened twice
-in one day. Lines derived from the pile hold their meaning through a physics
-change, are drawn on the level so the player can see what they are aiming at,
-and work on a generated level nobody has ever solved.
+The pile's job is not to place anything. It decides whether a level ships at
+all: a winning line inside the level's own rubble is a level nobody can
+finish, and the bake drops it.
 
-Getting under the first line ends the level only if you want it to. The result
-screen offers the choice: bank it, or go back with the power still in the bar
-and try for the next line.
+Rating against par rather than against a share of the bar is what makes "three
+stars is hard" true on every level instead of on the one that happened to be
+tuned. Par was tried before and abandoned as unmaintainable, because it had to
+be re-measured by hand every time the physics changed what a demolition costs
+— twice in one day, at one point. It is maintainable now for one reason: the
+bake re-measures it weekly without being asked and proposes the new numbers as
+a reviewable diff.
 
-`shots.gd` is the other half of that, and not a gate: it renders one picture
-of each system through a real renderer, which the harnesses deliberately do
-without. A number can say a wall sagged 15 px; only the picture said the wall
-was leaning, which is a different fault with a different cause. Look at the
-pictures when a building misbehaves in a way its measurements do not explain.
+There were three lines for a while, one per star, with the rating being how
+many of them everything got under. That is gone, along with the choice to bank
+a win or go back for another line — under cost-based scoring, every extra
+charge only lowers the rating, so there is nothing to go back for.
 
-`gentest.gd` gates the generated side: it samples a dozen seeds and fails if
-any building damages itself or sags while standing untouched, or if the pile
-estimate comes in under what the level really leaves — which would put the
-third line under reachable and make three stars impossible. `partest.gd` still
-runs the solver over the three authored difficulties, and `oneshottest.gd`
-fails if any single use of any tool clears the hard level on its own.
+`gentest.gd` gates the generated side: it walks the seeds the pack ships and
+fails if any building damages itself, sags untouched, cannot be won, or is won
+before it is touched. `partest.gd` runs the solver over the three authored
+difficulties, and `oneshottest.gd` fails if any single use of any tool clears
+the hard level on its own.
 
 ```mermaid
 flowchart LR
-    shape[Building shape] --> volume[Material volume]
-    shape --> system[Structural system]
-    volume --> pile[Estimated pile height]
-    system --> pile
-    pile --> lines[Three lines: win, 2 star, 3 star]
-    volume --> bar[Power bar]
-    lines --> stars[Stars: lines everything is under]
-    lines --> gentest[gentest gates generated levels in CI]
-    shape --> solver[Solver searches]
-    solver --> partest[partest gates the authored three]
+    shape[Building shape] --> bake[bakelevels in CI]
+    bake --> pile[Measured pile]
+    bake --> par[Measured par]
+    pile --> fit{Winning line<br/>above the pile?}
+    fit -->|no| dropped[Dropped, never shipped]
+    fit -->|yes| pack[pack.gd]
+    par --> pack
+    shape --> tall[Building height]
+    tall --> line[Winning line]
+    pack --> stars[Stars: spend vs par]
+    pack --> gentest[gentest gates what ships]
 ```
 
 ### Staying current

@@ -24,12 +24,18 @@ const SEEDS := 12
 ## The same level does not leave the same pile twice. Three runs and take the
 ## worst: the lines have to clear the unluckiest collapse, not the average one.
 const REPEATS := 3
+## How deep the search for a cheapest clearing goes. Five is what verify_levels
+## established as the useful depth, and one level costs about two minutes at
+## it — which is why this is a scheduled job and not a pull-request gate.
+const SOLVE_MOVES := 5
 const STAND_TICKS := 240
 const CHARGE_EVERY := 14
 const SETTLE := 900
 
 var _level: Level
+var _solver: Solver
 var _spec: Dictionary
+var _par := 0.0
 var _jobs: Array = []
 var _job := -1
 var _run := 0
@@ -48,6 +54,12 @@ var _report_lines: Array[String] = []
 func _ready() -> void:
 	_level = Level.new()
 	add_child(_level)
+	# The same search partest uses, so par here is the number partest checks.
+	_solver = Solver.new()
+	_solver.max_moves = SOLVE_MOVES
+	_solver.verbose = false
+	_solver.finished.connect(_on_solved)
+	add_child(_solver)
 	for d in Levels.ORDER:
 		_jobs.append({"kind": "authored", "id": d})
 	for i in SEEDS:
@@ -113,8 +125,21 @@ func _physics_process(_delta: float) -> void:
 			if _run < REPEATS:
 				_start()
 			else:
-				_record()
-				_next_job()
+				# How low it can go is measured; what it costs to get there is
+				# searched for. Both are measurements, and both used to be
+				# neither: the pile was modelled and par was worked out by
+				# hand and went stale the next time the physics moved.
+				_phase = "solving"
+				_solver.start(_spec_for_job())
+
+
+func _on_solved(result: Dictionary) -> void:
+	_par = 0.0
+	if bool(result["solved"]):
+		for move in result["solution"]:
+			_par += Tools.cost(move["tool"], 1.0)
+	_record()
+	_next_job()
 
 
 ## Why this level is not fit to ship, or "" if it is.
@@ -150,19 +175,27 @@ func _label() -> String:
 func _record() -> void:
 	var job: Dictionary = _jobs[_job]
 	var fy: float = float(_spec["floor_y"])
-	var third: float = fy - float(_spec["lines"][2])
+	var third: float = fy - float(_spec["height_line"])
 	if third < _worst:
-		_dropped.append("%s: three stars sits at %.0f px inside a %.0f px pile"
+		_dropped.append("%s: the winning line sits at %.0f px inside a %.0f px pile"
 			% [_label(), third, _worst])
 		return
+	# A level nobody can clear is not a level. The solver searching to its
+	# depth and finding nothing is the strongest statement available about
+	# that, and it is worth more than any check on the shape of the building.
+	if _par <= 0.0:
+		_dropped.append("%s: no clearing found within %d moves" % [_label(), SOLVE_MOVES])
+		return
+	var entry := {"pile": _worst, "par": _par}
 	if job["kind"] == "authored":
-		_authored[String(job["id"])] = _worst
+		_authored[String(job["id"])] = entry
 	else:
-		_measured[int(job["id"])] = _worst
+		_measured[int(job["id"])] = entry
 	var headroom := 99.0 if _worst <= 0.0 else third / _worst
 	var note := "" if headroom >= Levels.MEASURED_MARGIN else "   TIGHT"
-	_report_lines.append("%-16s %-13s pile %3.0f  three stars %3.0f  headroom %.2fx%s"
-		% [_label(), _spec.get("kind", ""), _worst, third, headroom, note])
+	_report_lines.append("%-16s %-13s pile %3.0f  line %3.0f  headroom %.2fx  par %3.0f of %3.0f bar%s"
+		% [_label(), _spec.get("kind", ""), _worst, third, headroom, _par,
+			float(_spec["power"]), note])
 
 
 func _write() -> void:
@@ -171,12 +204,14 @@ func _write() -> void:
 	var keys: Array = _measured.keys()
 	keys.sort()
 	for k in keys:
-		measured += "\t%d: %.0f,\n" % [k, _measured[k]]
+		measured += "\t%d: {\"pile\": %.0f, \"par\": %.0f},\n" % [
+			k, _measured[k]["pile"], _measured[k]["par"]]
 	measured += "}"
 	var authored := "const AUTHORED := {\n"
 	for d in Levels.ORDER:
 		if _authored.has(d):
-			authored += "\t\"%s\": %.0f,\n" % [d, _authored[d]]
+			authored += "\t\"%s\": {\"pile\": %.0f, \"par\": %.0f},\n" % [
+				d, _authored[d]["pile"], _authored[d]["par"]]
 	authored += "}"
 
 	var out := ""
