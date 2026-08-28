@@ -23,13 +23,26 @@ extends RefCounted
 ## A measured pile needs no safety factor, so nothing inflates the winning
 ## line, and there is no per-system constant left to be wrong.
 
-## seed -> {"pile": the worst rubble it left, "par": what the cheapest known
-## clearing costs}. Both measured, neither modelled.
-const MEASURED := {}
-
+## seed -> {"pile": the worst rubble it left}. Measured, not modelled.
+const MEASURED := {
+	4100: {"pile": 95},
+	4101: {"pile": 106},
+	4102: {"pile": 64},
+	4103: {"pile": 85},
+	4104: {"pile": 76},
+	4105: {"pile": 71},
+	4106: {"pile": 60},
+	4107: {"pile": 105},
+	4108: {"pile": 98},
+	4109: {"pile": 48},
+	4111: {"pile": 58},
+}
 ## difficulty -> the same, for the three authored levels.
-const AUTHORED := {}
-
+const AUTHORED := {
+	"easy": {"pile": 74},
+	"medium": {"pile": 81},
+	"hard": {"pile": 101},
+}
 
 ## The measured pile, or -1 for a level the bake has never covered.
 ##
@@ -44,17 +57,6 @@ static func for_seed(level_seed: int) -> float:
 
 static func for_level(difficulty: String) -> float:
 	return float(AUTHORED.get(difficulty, {}).get("pile", -1.0))
-
-
-## What the level is known to cost to clear, or 0 if nobody has measured it.
-## A level with no par can be cleared but not rated: stars() gives it one star
-## rather than inventing a number to compare against.
-static func par_for_seed(level_seed: int) -> float:
-	return float(MEASURED.get(level_seed, {}).get("par", 0.0))
-
-
-static func par_for_level(difficulty: String) -> float:
-	return float(AUTHORED.get(difficulty, {}).get("par", 0.0))
 
 
 ## Every seed the pack covers, in order, so the game and the harnesses agree

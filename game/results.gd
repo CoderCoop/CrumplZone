@@ -13,13 +13,11 @@ signal next_level_pressed
 
 const STARS := 3
 
-## The rating is what the run cost, against par — the cheapest clearing
-## anyone has found for this level, measured in CI. Within 15% of it is three
-## stars, within 55% is two, and clearing it at all is one.
+## The rating is what the run cost: a third of the bar or less is three stars,
+## under two thirds is two, and clearing it at all is one.
 ##
-## Against par rather than against a share of the bar, so that three stars
-## means the same thing on every level instead of being generous on one and
-## impossible on another.
+## Against the bar rather than against par, because the par the solver
+## measured could not be trusted — see Levels.THREE_STAR_SHARE.
 
 const MARGIN := 16.0
 const BUTTON_HEIGHT := 56.0
@@ -34,10 +32,10 @@ var stars := 0
 var power_left := 0.0
 var power_full := 1.0
 var standing := 0
-## What the run cost, and what the level is known to cost. A rating means
-## nothing without the number it was measured against.
+## What the run cost, and what it had to spend. A rating means nothing
+## without the number it was measured against.
 var spent := 0.0
-var par := 0.0
+var bar := 1.0
 
 var _root: Control
 var _shade: ColorRect
@@ -119,13 +117,11 @@ func _headline() -> String:
 func _advice() -> String:
 	if not cleared:
 		return ""
-	if par <= 0.0:
-		return "Nobody has measured what this level costs, so there is no rating to beat."
+	var share := 0 if bar <= 0.0 else int(round(spent / bar * 100.0))
 	if stars >= 3:
-		return "Brought down for %d, against a best known %d. There is no better rating." % [
-			int(round(spent)), int(round(par))]
-	return "Brought down for %d. The best known way costs %d." % [
-		int(round(spent)), int(round(par))]
+		return "Brought down on %d%% of the bar. There is no better rating." % share
+	return "Brought down on %d%% of the bar. Three stars needs %d%% or less." % [
+		share, int(round(Levels.THREE_STAR_SHARE * 100.0))]
 
 
 ## A button, styled like the rest of the game's controls.

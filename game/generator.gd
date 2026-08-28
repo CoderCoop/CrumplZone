@@ -105,9 +105,6 @@ static func generate(level_seed: int, force_kind := "") -> Dictionary:
 	# zero" from "never measured" by whether the key is there at all.
 	if measured >= 0.0:
 		spec["pile"] = measured
-	var par := Pack.par_for_seed(level_seed)
-	if par > 0.0:
-		spec["par"] = par
 	return Levels.finish(spec)
 
 

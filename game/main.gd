@@ -529,7 +529,7 @@ func _physics_process(_delta: float) -> void:
 func _judge() -> void:
 	var out_of_power := _power < _cheapest()
 	if _level.cleared():
-		_show_results(true, Levels.stars(_spent(), _par()))
+		_show_results(true, Levels.stars(_spent(), _power_full))
 	elif out_of_power:
 		_resolved = "OUT OF POWER"
 		_show_results(false, 0)
@@ -539,9 +539,6 @@ func _judge() -> void:
 func _spent() -> float:
 	return _power_full - _power
 
-
-func _par() -> float:
-	return float(_level.spec.get("par", 0.0))
 
 
 func _show_results(won: bool, earned: int) -> void:
@@ -558,7 +555,7 @@ func _show_results(won: bool, earned: int) -> void:
 	# What it cost, and what it is known to cost. Both, because a rating is
 	# only meaningful next to the number it is measured against.
 	_results.spent = _spent()
-	_results.par = _par()
+	_results.bar = _power_full
 	_results.again_pressed.connect(_restart)
 	_results.next_level_pressed.connect(_next_level)
 	add_child(_results)

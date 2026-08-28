@@ -7,7 +7,28 @@ sections are dated.
 
 ## [Unreleased]
 
-Nothing since 0.11.0.
+Nothing since 0.12.0.
+
+## [0.12.0] - 2026-08-28
+
+### Added
+
+- **Every generated level is playable.** A Levels tab lists all of them
+  alongside the three named ones, each tile coloured by what the building is
+  and saying what kind it is. They had been generated, measured and gated for
+  a while without being reachable from anywhere in the game.
+- **Next level goes on through all of them** instead of stopping at the third.
+
+### Changed
+
+- **One line again, and the rating is what the run cost.** Get everything
+  under the line and the building is down; the stars say how much of the power
+  bar it took — a third or less for three, under two thirds for two. The three
+  lines and the choice to bank a win or go back for another are gone: when the
+  rating is what you spent, going back for more can only make it worse.
+- **The bottom of the intro screen is one Play button** naming the building it
+  will start, rather than three difficulty buttons repeating a choice the
+  Levels tab already offers.
 
 ## [0.11.0] - 2026-08-26
 

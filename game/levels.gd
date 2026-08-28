@@ -189,9 +189,6 @@ static func _placed(spec: Dictionary, difficulty: String, depth: int) -> Diction
 	var measured := Pack.for_level(difficulty)
 	if measured >= 0.0:
 		spec["pile"] = measured
-	var par := Pack.par_for_level(difficulty)
-	if par > 0.0:
-		spec["par"] = par
 	spec["difficulty"] = difficulty
 	spec["moves"] = depth
 	spec["title"] = TITLES.get(difficulty, "Level")
@@ -214,33 +211,43 @@ const POWER_MIN := 140.0
 
 ## Where the second and third stars sit, between the winning line and the pile
 ## the level makes when it is pulverised completely.
-## What a run has to cost to earn each star, as a multiple of par — the
-## cheapest clearing the solver could find, measured in CI by the same bake
-## that measures the rubble.
+## What share of the power bar a run may spend and still earn each star.
 ##
-## Against par rather than against a share of the bar, because a share of the
-## bar means something different on every level and nothing at all on a level
-## nobody has measured. Within 15% of the best known solution means the same
-## thing everywhere.
+## Against the bar rather than against par, and that is a retreat from
+## something better that did not survive being measured.
 ##
-## Par was tried before and abandoned as unmaintainable: it had to be
-## re-measured by hand with the solver every time the physics changed what a
-## demolition costs, which happened twice in one day. It is maintainable now
-## for one reason — the bake re-measures it weekly without being asked, and
-## proposes the new numbers as a reviewable diff.
-const THREE_STAR_OVER_PAR := 1.15
-const TWO_STAR_OVER_PAR := 1.55
+## Par — what the cheapest clearing the solver can find costs — is the right
+## thing to rate against in principle, because it means the same on every
+## level. The bake measured it, and the numbers said not to trust it: the
+## medium authored level priced at 238 while the harder one priced at 104,
+## which is not a thing that can be true, and the search found no clearing at
+## all for six of twelve generated levels at depth five — levels gentest has
+## separately shown are winnable, their rubble fitting under their line. A
+## par that is too high hands out three stars; one that is too low makes them
+## impossible. Rating against a number wrong in both directions is worse than
+## rating against a cruder one that is right.
+##
+## The bar is sized from the building's own material, so a share of it is at
+## least proportionate to what is there to knock down. That is the honest
+## claim for it, and it is weaker than par's: two levels are comparable only
+## as far as their bars are.
+##
+## What would fix this is a search that clears every level and finds a route
+## worth calling best. Until there is one, this is measured against something
+## real rather than something invented.
+const THREE_STAR_SHARE := 0.34
+const TWO_STAR_SHARE := 0.62
 
 
-## How many stars a finished run earned: what it spent against what the level
-## is known to cost. A level with no measured par can only be cleared, never
-## rated, which is the honest answer rather than a flattering guess.
-static func stars(spent: float, par: float) -> int:
-	if par <= 0.0:
+## How many stars a finished run earned: what it spent against the bar it was
+## given.
+static func stars(spent: float, bar: float) -> int:
+	if bar <= 0.0:
 		return 1
-	if spent <= par * THREE_STAR_OVER_PAR:
+	var share := spent / bar
+	if share <= THREE_STAR_SHARE:
 		return 3
-	if spent <= par * TWO_STAR_OVER_PAR:
+	if share <= TWO_STAR_SHARE:
 		return 2
 	return 1
 
