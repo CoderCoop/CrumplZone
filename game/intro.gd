@@ -34,11 +34,16 @@ var _column: VBoxContainer
 var _scroll: ScrollContainer
 var _play: Button
 var _plays: Array[Button] = []
+## The level the Play button will start. Tiles set it, and the button says so,
+## so the primary action is never a mystery.
+var _selected: String = Levels.MEDIUM
 var _install: Button
 var _install_note: Label
 var _install_poll := 0.0
 var _how: VBoxContainer
 var _news: VBoxContainer
+var _levels: VBoxContainer
+var _levels_button: Button
 var _how_button: Button
 var _news_button: Button
 
@@ -79,8 +84,10 @@ func _ready() -> void:
 
 	_how = _how_to_play()
 	_news = _whats_new()
+	_levels = _level_list()
 	_column.add_child(_how)
 	_column.add_child(_news)
+	_column.add_child(_levels)
 
 	# Offered rather than advertised: the button only exists when the browser
 	# has an install prompt in hand for it.
@@ -92,27 +99,33 @@ func _ready() -> void:
 	_install.visible = false
 	_root.add_child(_install)
 
-	# One button per difficulty rather than a Play button and a setting to
-	# find: three targets side by side is the whole choice, in thumb reach,
-	# with nothing to open first.
-	for difficulty in Levels.ORDER:
-		var button := Button.new()
-		button.text = Levels.TITLES[difficulty]
-		button.focus_mode = Control.FOCUS_NONE
-		button.clip_text = true
-		button.add_theme_font_size_override("font_size", 19)
-		button.add_theme_stylebox_override("normal", _play_style(difficulty))
-		button.add_theme_stylebox_override("hover", _play_style(difficulty))
-		button.add_theme_stylebox_override("pressed", _play_style(difficulty, true))
-		button.add_theme_stylebox_override("hover_pressed", _play_style(difficulty, true))
-		button.add_theme_color_override("font_color", Color(0.10, 0.10, 0.12))
-		button.add_theme_color_override("font_pressed_color", Color(0.10, 0.10, 0.12))
-		button.pressed.connect(func() -> void: play_pressed.emit(difficulty))
-		_root.add_child(button)
-		_plays.append(button)
-	_play = _plays[0]
+	# One Play button, not one per difficulty.
+	#
+	# There were three — Easy, Medium, Hard, side by side in thumb reach — and
+	# that was right while three was the whole game. It is fifteen now, so the
+	# list moved into its own tab, and leaving the three along the bottom as
+	# well would have put the same choice on screen twice. Duplicated controls
+	# are the thing this project has already been told off for once, when the
+	# power and tool readouts appeared top-left and again along the bottom.
+	#
+	# So the bottom is the one action — play the building you last picked —
+	# and the Levels tab is where you pick a different one.
+	_play = Button.new()
+	_play.focus_mode = Control.FOCUS_NONE
+	_play.clip_text = true
+	_play.add_theme_font_size_override("font_size", 21)
+	_play.add_theme_stylebox_override("normal", _play_style(_selected))
+	_play.add_theme_stylebox_override("hover", _play_style(_selected))
+	_play.add_theme_stylebox_override("pressed", _play_style(_selected, true))
+	_play.add_theme_stylebox_override("hover_pressed", _play_style(_selected, true))
+	_play.add_theme_color_override("font_color", Color(0.10, 0.10, 0.12))
+	_play.add_theme_color_override("font_pressed_color", Color(0.10, 0.10, 0.12))
+	_play.pressed.connect(func() -> void: play_pressed.emit(_selected))
+	_root.add_child(_play)
+	_plays = [_play]
+	_refresh_play()
 
-	_show_how(true)
+	_show(_how)
 	_refresh_install()
 	relayout()
 	get_viewport().size_changed.connect(relayout)
@@ -164,6 +177,19 @@ func _on_install() -> void:
 
 ## Warmer as it gets harder, so the three read as a scale rather than as three
 ## unrelated buttons.
+## The Play button wears the name and the colour of what it will start.
+func _refresh_play() -> void:
+	if _play == null:
+		return
+	var spec := Levels.by_id(_selected)
+	var kind := String(spec.get("kind", ""))
+	_play.text = "Play  %s — %s" % [Levels.title_for(_selected),
+		Architecture.ABOUT.get(kind, ["Building", ""])[0]]
+	for state in ["normal", "hover", "pressed", "hover_pressed"]:
+		_play.add_theme_stylebox_override(state,
+			_tile_style(kind, state.contains("pressed")))
+
+
 func _play_style(difficulty: String, held := false) -> StyleBoxFlat:
 	var box := StyleBoxFlat.new()
 	var tint := {
@@ -220,10 +246,12 @@ func _title_row() -> HBoxContainer:
 func _tab_row() -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
-	_how_button = _tab("How to play", func() -> void: _show_how(true))
+	_how_button = _tab("How to play", func() -> void: _show(_how))
 	row.add_child(_how_button)
-	_news_button = _tab("What's new", func() -> void: _show_how(false))
+	_news_button = _tab("What's new", func() -> void: _show(_news))
 	row.add_child(_news_button)
+	_levels_button = _tab("Levels", func() -> void: _show(_levels))
+	row.add_child(_levels_button)
 	return row
 
 
@@ -243,11 +271,97 @@ func _tab(text: String, on_press: Callable) -> Button:
 	return button
 
 
-func _show_how(how: bool) -> void:
-	_how.visible = how
-	_news.visible = not how
-	_how_button.button_pressed = how
-	_news_button.button_pressed = not how
+## Switch tabs by name, for the picture harness. The panes themselves are
+## private; this is the one seam it needs.
+func show_tab(which: String) -> void:
+	match which:
+		"levels":
+			_show(_levels)
+		"news":
+			_show(_news)
+		_:
+			_show(_how)
+
+
+func _show(pane: Control) -> void:
+	_how.visible = pane == _how
+	_news.visible = pane == _news
+	_levels.visible = pane == _levels
+	_how_button.button_pressed = _how.visible
+	_news_button.button_pressed = _news.visible
+	_levels_button.button_pressed = _levels.visible
+
+
+## Every level the game has, as a grid of tiles.
+##
+## The three named difficulties are also the three buttons along the bottom,
+## and they are repeated here so the list is the whole game in one place
+## rather than the leftovers. Generated levels are numbered: a seed is not
+## something a player can use, and their real identity is the building, which
+## the tile says underneath.
+func _level_list() -> VBoxContainer:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_child(_label("Pick a building", HEADING_SIZE, BRIGHT))
+	box.add_child(_label(
+		"Each one is a different way of standing up, so each comes down "
+		+ "differently. Every level here has been demolished by machine "
+		+ "before it reached you, so all of them can be finished.",
+		BODY_SIZE, DIM, true))
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 8)
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for id in Levels.all_ids():
+		grid.add_child(_level_tile(String(id)))
+	box.add_child(grid)
+	return box
+
+
+func _level_tile(id: String) -> Button:
+	var spec := Levels.by_id(id)
+	var kind := String(spec.get("kind", ""))
+	var button := Button.new()
+	button.text = "%s\n%s" % [Levels.title_for(id), Architecture.ABOUT.get(kind, ["", ""])[0]]
+	button.focus_mode = Control.FOCUS_NONE
+	button.clip_text = true
+	button.autowrap_mode = TextServer.AUTOWRAP_OFF
+	# Comfortably over the 44 px floor in both directions, and the grid puts
+	# 8 px between them so a thumb cannot land on two at once.
+	button.custom_minimum_size = Vector2(0.0, 62.0)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.add_theme_font_size_override("font_size", 15)
+	for state in ["normal", "hover", "pressed", "hover_pressed"]:
+		button.add_theme_stylebox_override(state,
+			_tile_style(kind, state.contains("pressed")))
+	button.add_theme_color_override("font_color", Color(0.10, 0.10, 0.12))
+	button.add_theme_color_override("font_pressed_color", Color(0.10, 0.10, 0.12))
+	button.pressed.connect(func() -> void:
+		_selected = id
+		_refresh_play()
+		play_pressed.emit(id))
+	return button
+
+
+## A tile takes the colour of what it is made of, so the list reads as a row
+## of different buildings rather than a row of numbers.
+func _tile_style(kind: String, held := false) -> StyleBoxFlat:
+	var tint: Color = {
+		Architecture.CURTAIN_WALL: Color(0.62, 0.78, 0.92),
+		Architecture.MASONRY: Color(0.86, 0.55, 0.44),
+		Architecture.FLAT_SLAB: Color(0.78, 0.80, 0.83),
+		Architecture.STACK: Color(0.84, 0.62, 0.46),
+		Architecture.SHED: Color(0.70, 0.76, 0.72),
+	}.get(kind, Color(0.95, 0.78, 0.34)) as Color
+	var style := StyleBoxFlat.new()
+	style.bg_color = tint.darkened(0.18) if held else tint
+	style.corner_radius_top_left = 10
+	style.corner_radius_top_right = 10
+	style.corner_radius_bottom_left = 10
+	style.corner_radius_bottom_right = 10
+	return style
 
 
 func _how_to_play() -> VBoxContainer:

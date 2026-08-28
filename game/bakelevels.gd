@@ -150,18 +150,24 @@ func _label() -> String:
 func _record() -> void:
 	var job: Dictionary = _jobs[_job]
 	var fy: float = float(_spec["floor_y"])
-	var third: float = fy - float(_spec["lines"][2])
+	var third: float = fy - float(_spec["height_line"])
 	if third < _worst:
-		_dropped.append("%s: three stars sits at %.0f px inside a %.0f px pile"
+		_dropped.append("%s: the winning line sits at %.0f px inside a %.0f px pile"
 			% [_label(), third, _worst])
 		return
+	# The solver used to run here too, to price the level. It was taken out:
+	# it rejected six of twelve levels that gentest shows are winnable, and
+	# priced the medium authored level at more than twice the hard one. A
+	# search that cannot clear half the levels is not one to gate on or rate
+	# against. See Levels.THREE_STAR_SHARE.
+	var entry := {"pile": _worst}
 	if job["kind"] == "authored":
-		_authored[String(job["id"])] = _worst
+		_authored[String(job["id"])] = entry
 	else:
-		_measured[int(job["id"])] = _worst
+		_measured[int(job["id"])] = entry
 	var headroom := 99.0 if _worst <= 0.0 else third / _worst
 	var note := "" if headroom >= Levels.MEASURED_MARGIN else "   TIGHT"
-	_report_lines.append("%-16s %-13s pile %3.0f  three stars %3.0f  headroom %.2fx%s"
+	_report_lines.append("%-16s %-13s pile %3.0f  line %3.0f  headroom %.2fx%s"
 		% [_label(), _spec.get("kind", ""), _worst, third, headroom, note])
 
 
@@ -171,12 +177,12 @@ func _write() -> void:
 	var keys: Array = _measured.keys()
 	keys.sort()
 	for k in keys:
-		measured += "\t%d: %.0f,\n" % [k, _measured[k]]
+		measured += "\t%d: {\"pile\": %.0f},\n" % [k, _measured[k]["pile"]]
 	measured += "}"
 	var authored := "const AUTHORED := {\n"
 	for d in Levels.ORDER:
 		if _authored.has(d):
-			authored += "\t\"%s\": %.0f,\n" % [d, _authored[d]]
+			authored += "\t\"%s\": {\"pile\": %.0f},\n" % [d, _authored[d]["pile"]]
 	authored += "}"
 
 	var out := ""

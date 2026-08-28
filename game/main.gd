@@ -84,9 +84,8 @@ var _bar: ProgressBar
 var _pending: ProgressBar
 var _results: Results
 ## Which of the three the player picked.
-var _difficulty: String = Levels.MEDIUM
+var _level_id: String = Levels.MEDIUM
 ## The best rating already offered, so the same one is not offered twice.
-var _shown_stars := 0
 var _buttons: Array[Button] = []
 var _art: Array[Control] = []
 var _intro: Intro
@@ -126,7 +125,7 @@ func _start() -> void:
 	# game with no level at all if the reload never came.
 	if UI.update_ready():
 		UI.apply_update()
-	var spec := Levels.level(_difficulty)
+	var spec := Levels.by_id(_level_id)
 	_level.build(spec)
 	# The place the level stands in comes with the level, and the city has to
 	# be rebuilt for it — it is baked once from a fixed seed so the skyline
@@ -136,7 +135,6 @@ func _start() -> void:
 	_power_full = float(spec["power"])
 	_power = _power_full
 	_resolved = ""
-	_shown_stars = 0
 	_busy = false
 	_holding = false
 	_charge = 0.0
@@ -357,8 +355,8 @@ func _close_intro(difficulty := "") -> void:
 	_intro = null
 	# Picked from the help screen, so the level has to be rebuilt for it. Help
 	# opened mid-level closes with no choice made and leaves the level alone.
-	if difficulty != "" and difficulty != _difficulty:
-		_difficulty = difficulty
+	if difficulty != "" and difficulty != _level_id:
+		_level_id = difficulty
 		_start()
 
 
@@ -525,20 +523,25 @@ func _physics_process(_delta: float) -> void:
 	queue_redraw()
 
 
+## The level is over the moment the building is down, and what it cost is the
+## rating. There is no going back for more: every extra charge is spend, and
+## spend is the only thing the stars measure.
 func _judge() -> void:
-	var earned := _level.stars_earned()
-	var spent := _power < _cheapest()
-	if earned > 0 and earned > _shown_stars and not spent:
-		# Down far enough to count, with power left: offered rather than
-		# imposed. The player can bank it or go back for the next line.
-		_shown_stars = earned
-		_show_results(true, earned, true)
-	elif spent:
-		_resolved = "OUT OF POWER — %d star%s" % [earned, "" if earned == 1 else "s"]
-		_show_results(earned > 0, earned, false)
+	var out_of_power := _power < _cheapest()
+	if _level.cleared():
+		_show_results(true, Levels.stars(_spent(), _power_full))
+	elif out_of_power:
+		_resolved = "OUT OF POWER"
+		_show_results(false, 0)
 
 
-func _show_results(won: bool, earned: int, may_continue: bool) -> void:
+## What this run has cost so far.
+func _spent() -> float:
+	return _power_full - _power
+
+
+
+func _show_results(won: bool, earned: int) -> void:
 	if _results != null:
 		return
 	_holding = false
@@ -549,33 +552,24 @@ func _show_results(won: bool, earned: int, may_continue: bool) -> void:
 	_results.power_left = _power
 	_results.power_full = _power_full
 	_results.standing = _level.standing()
-	# How much further the next star is, in pixels of building. A number the
-	# player can act on, rather than a rating they cannot influence any more.
-	_results.to_next = _level.gap_to_next_star()
-	_results.may_continue = may_continue
+	# What it cost, and what it is known to cost. Both, because a rating is
+	# only meaningful next to the number it is measured against.
+	_results.spent = _spent()
+	_results.bar = _power_full
 	_results.again_pressed.connect(_restart)
-	_results.keep_going_pressed.connect(_keep_going)
 	_results.next_level_pressed.connect(_next_level)
 	add_child(_results)
-
-
-## Back to the rubble with the bar as it stands. The level is not over until
-## the power is.
-func _keep_going() -> void:
-	if _results != null:
-		_results.queue_free()
-		_results = null
-	_resolved = ""
-	_busy = false
 
 
 func _next_level() -> void:
 	if _results != null:
 		_results.queue_free()
 		_results = null
-	var at := Levels.ORDER.find(_difficulty)
-	_difficulty = Levels.ORDER[mini(at + 1, Levels.ORDER.size() - 1)]
-	_shown_stars = 0
+	# Onward through everything the game has, authored then generated, rather
+	# than stopping at the third authored level as it used to.
+	var all := Levels.all_ids()
+	var at := all.find(_level_id)
+	_level_id = String(all[mini(at + 1, all.size() - 1)])
 	_start()
 
 
@@ -616,21 +610,11 @@ func _refresh() -> void:
 
 
 func _draw() -> void:
-	# Three survey lines, spanning whatever the camera can see. The top one is
-	# what the level is won at; each one below is another star. Drawn together
-	# so the next one down is visible while you are still playing — that is the
-	# whole point of rating by lines instead of by what is left in the bar.
-	var earned := _level.stars_earned()
-	var all := _level.lines()
-	for i in all.size():
-		var line: float = float(all[i])
-		var got := i < earned
-		draw_dashed_line(Vector2(_view.position.x, line), Vector2(_view.end.x, line),
-			STAR_LINE[i].darkened(0.45) if got else STAR_LINE[i],
-			3.0 if i == 0 else 2.0, 12.0)
-		# A pip per star at the left end, so a line says which one it is
-		# without a word on it.
-		for pip in i + 1:
-			Icons.star(self,
-				Vector2(_view.position.x + 14.0 + float(pip) * 15.0, line - 11.0),
-				5.5, STAR_LINE[i].darkened(0.45) if got else STAR_LINE[i])
+	# One line: get everything under it and the building is down. There were
+	# three, one per star, while the rating was how far the building came
+	# down. The rating is what the run cost now, and a cost has nothing to
+	# draw on the level.
+	var line := _level.height_line()
+	var under := _level.standing() == 0
+	draw_dashed_line(Vector2(_view.position.x, line), Vector2(_view.end.x, line),
+		STAR_LINE[0].darkened(0.45) if under else STAR_LINE[0], 3.0, 12.0)

@@ -849,44 +849,11 @@ func height_line() -> float:
 	return spec["height_line"]
 
 
-## The three survey lines, highest first. Getting everything under the first
-## is one star, under the second is two, under the third is three.
-##
-## A rating made of lines rather than of power left is a rating you can see on
-## the way down, and one you can choose to go back for: a building resting just
-## over the second line is an invitation, and a number in a bar is not.
+## The line the level is won at, as a list, because the drawing code walks it.
+## There were three of these — one per star — until the rating went back to
+## being what the run cost rather than how far the building came down.
 func lines() -> Array:
-	var found: Array = spec.get("lines", [])
-	if found.is_empty():
-		return [height_line()]
-	return found
-
-
-## How far the highest remaining piece still has to come down to earn the next
-## star, in pixels. Zero once all three are earned.
-func gap_to_next_star() -> float:
-	var highest := INF
-	for body in live_blocks():
-		highest = minf(highest, _top_of(body))
-	if highest == INF:
-		return 0.0
-	for line in lines():
-		if highest < float(line):
-			return float(line) - highest
-	return 0.0
-
-
-## How many stars the level is currently worth: the number of lines everything
-## is under.
-func stars_earned() -> int:
-	var highest := INF
-	for body in live_blocks():
-		highest = minf(highest, _top_of(body))
-	var earned := 0
-	for line in lines():
-		if highest >= float(line):
-			earned += 1
-	return earned
+	return [height_line()]
 
 
 ## The world rectangle worth looking at: everything the level was built from,

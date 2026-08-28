@@ -73,10 +73,6 @@ const ESTIMATE_SAFETY := 1.35
 const PACKING := 0.62
 const LINE_MIN := 90.0
 
-## The lowest a star line may ever sit. Rubble is not a mathematical point:
-## one fragment resting on the street stands a few pixels tall, so a line
-## below that cannot be met however well the level is played.
-const LINE_FLOOR := 36.0
 
 ## Headroom over a measured pile.
 ##
@@ -99,15 +95,6 @@ const LINE_FLOOR := 36.0
 ## worst of three runs, the largest by 35%.
 const MEASURED_MARGIN := 1.35
 
-## Where three stars sits, as a share of the winning line.
-##
-## Chosen to leave the game exactly as it plays today: before the lines were
-## decoupled, the third line landed on `ceiling * 0.62` for every level whose
-## pile did not force it higher, which was all but one. Keeping 0.62 changes
-## the mechanism and not the difficulty. It is the dial to turn if three stars
-## should be harder — lower is harder — and turning it needs a re-bake, since
-## it decides which levels are fit to ship.
-const THIRD_SHARE := 0.62
 
 ## No line may sit higher than this share of the building's own height. A wide
 ## low building has little material over a large footprint, so its estimated
@@ -130,7 +117,7 @@ static func estimate_pile(blocks: Array, kind := "") -> float:
 		top = minf(top, float(b["y"]) - float(b["h"]) * 0.5)
 		bottom = maxf(bottom, float(b["y"]) + float(b["h"]) * 0.5)
 	if area <= 0.0:
-		return LINE_MIN / WIN_LINE_OVER_PILE
+		return LINE_MIN * 0.42
 	var height: float = maxf(bottom - top, 1.0)
 	var per_height: float = float(SPREAD_PER_HEIGHT.get(kind, SPREAD_DEFAULT))
 	var spread: float = maxf(right - left, 1.0) + height * per_height * 2.0
@@ -154,6 +141,38 @@ const TITLES := {
 	MEDIUM: "Medium",
 	HARD: "Hard",
 }
+
+
+## Every level the game can offer, in the order it offers them: the three
+## authored ones, then the generated ones the bake measured and kept.
+##
+## Generated levels were built, verified and gated for a while without being
+## reachable from anywhere in the game — the pack existed and no player could
+## play any of it. One list, and one way to ask for a level by name, is what
+## closed that gap.
+static func all_ids() -> Array:
+	var ids: Array = ORDER.duplicate()
+	for level_seed in Pack.seeds():
+		ids.append(str(level_seed))
+	return ids
+
+
+## A level by id: one of the authored difficulties, or the seed of a generated
+## one written as a string. Everything downstream takes a finished spec and
+## cannot tell which kind it was handed, which is the point.
+static func by_id(id: String) -> Dictionary:
+	if id.is_valid_int():
+		return Generator.generate(id.to_int())
+	return level(id)
+
+
+## What to call a level in a list. Generated ones are numbered from one in
+## pack order, because a seed is not a name a player can use.
+static func title_for(id: String) -> String:
+	if not id.is_valid_int():
+		return TITLES.get(id, "Level")
+	var at := Pack.seeds().find(id.to_int())
+	return "%d" % (at + 1) if at >= 0 else id
 
 
 static func level(difficulty: String) -> Dictionary:
@@ -192,20 +211,51 @@ const POWER_MIN := 140.0
 
 ## Where the second and third stars sit, between the winning line and the pile
 ## the level makes when it is pulverised completely.
+## What share of the power bar a run may spend and still earn each star.
 ##
-## The third is a third of a pile's height above that pile — three stars means
-## taking the building to very near the flattest it can physically be left,
-## which makes it demanding on every level by construction rather than by
-## tuning. The second sits midway. The first is where the level is won, and is
-## set well clear so that bringing a building down is never the hard part.
-const THREE_STAR_OVER_PILE := 1.35
-const TWO_STAR_SHARE := 0.5
-const WIN_LINE_OVER_PILE := 2.4
+## Against the bar rather than against par, and that is a retreat from
+## something better that did not survive being measured.
+##
+## Par — what the cheapest clearing the solver can find costs — is the right
+## thing to rate against in principle, because it means the same on every
+## level. The bake measured it, and the numbers said not to trust it: the
+## medium authored level priced at 238 while the harder one priced at 104,
+## which is not a thing that can be true, and the search found no clearing at
+## all for six of twelve generated levels at depth five — levels gentest has
+## separately shown are winnable, their rubble fitting under their line. A
+## par that is too high hands out three stars; one that is too low makes them
+## impossible. Rating against a number wrong in both directions is worse than
+## rating against a cruder one that is right.
+##
+## The bar is sized from the building's own material, so a share of it is at
+## least proportionate to what is there to knock down. That is the honest
+## claim for it, and it is weaker than par's: two levels are comparable only
+## as far as their bars are.
+##
+## What would fix this is a search that clears every level and finds a route
+## worth calling best. Until there is one, this is measured against something
+## real rather than something invented.
+const THREE_STAR_SHARE := 0.34
+const TWO_STAR_SHARE := 0.62
+
+
+## How many stars a finished run earned: what it spent against the bar it was
+## given.
+static func stars(spent: float, bar: float) -> int:
+	if bar <= 0.0:
+		return 1
+	var share := spent / bar
+	if share <= THREE_STAR_SHARE:
+		return 3
+	if share <= TWO_STAR_SHARE:
+		return 2
+	return 1
 
 
 ## Attaches everything that follows from the shape of the building: how much
-## material it has, how high its rubble will sit, where the three lines go, and
-## how much bar it gets. Authored and generated levels both come through here.
+## material it has, how high its rubble will sit, where its winning line goes,
+## and how much bar it gets. Authored and generated levels both come through
+## here.
 static func finish(spec: Dictionary) -> Dictionary:
 	var blocks: Array = spec["blocks"]
 	var area := 0.0
@@ -241,39 +291,33 @@ static func finish(spec: Dictionary) -> Dictionary:
 	# the pile the level will make, or three stars is unreachable — measured, a
 	# panel block with a 117 px pile had its third line put at 109 by the
 	# height cap alone. So the cap applies, and then the pile wins.
-	# Both outer lines are facts about the building: how far down its own
-	# height it has been brought. Neither depends on its rubble.
+	# One line, and it is a fact about the building: how far down its own
+	# height it has been brought. It does not depend on the rubble.
 	#
-	# They used to. The pile scaled the winning line, and the pile is an
-	# estimate that must never come in low — so every pixel of caution in it
-	# pushed the winning line up, toward a level already won on arrival. That
-	# is why the panel constant could not be corrected: raising the estimate
-	# to make three stars reachable put one level's winning line above its own
-	# roof. Measuring the piles did not fix it either. At a 1.5x margin on a
-	# measured pile the hard level's winning line moved 204 to 239 and a
-	# single charge cleared it.
+	# It used to. The pile scaled it, and the pile is a number that must never
+	# come in low — so every pixel of caution pushed the winning line up,
+	# toward a level already won on arrival. Measuring the piles did not fix
+	# that either: at a 1.5x margin on a measured pile the hard level's line
+	# moved 204 to 239 and one charge cleared it.
 	#
-	# So the rubble no longer places the lines. It decides something else,
-	# below: whether the level is fit to ship at all.
+	# There were three lines here for a while, and the rating was how many of
+	# them everything got under. That is gone. The rating is what the run
+	# cost, so the only line that matters is the one that says the building is
+	# down.
 	var win: float = maxf(tall * LINE_OVER_HEIGHT, LINE_MIN)
-	# A line nothing can be under is not a line. Seed 4103 is a chimney that
-	# can be left with nothing at all above the street, and a line at zero
-	# cannot be met however well the level is played.
-	var third: float = maxf(win * THIRD_SHARE, LINE_FLOOR)
-	var second: float = third + (win - third) * TWO_STAR_SHARE
 	var floor_y: float = float(spec["floor_y"])
-	spec["lines"] = [floor_y - win, floor_y - second, floor_y - third]
 	spec["height_line"] = floor_y - win
-	# Fit to ship, judged against what the level really leaves. Three stars
-	# below the achievable pile is a star nobody can earn; the bake drops such
-	# a level rather than shipping it. Only a measured level can be judged —
-	# an estimated one is marked fit because there is nothing trustworthy to
-	# judge it against, which is itself a reason to bake every level.
+	# Fit to ship, judged against what the level really leaves. A winning line
+	# below the achievable pile is a level nobody can finish, and the bake
+	# drops such a level rather than shipping it. Only a measured level can be
+	# judged — an estimated one is marked fit because there is nothing
+	# trustworthy to judge it against, which is itself a reason to bake every
+	# level.
 	spec["reachable"] = true
 	spec["headroom"] = 0.0
 	if bool(spec.get("pile_measured", false)):
-		spec["reachable"] = third >= pile
-		spec["headroom"] = 99.0 if pile <= 0.0 else third / pile
+		spec["reachable"] = win >= pile
+		spec["headroom"] = 99.0 if pile <= 0.0 else win / pile
 	spec["power"] = maxf(area * POWER_PER_AREA, POWER_MIN)
 	spec["moves"] = int(spec.get("moves", 8))
 	return spec

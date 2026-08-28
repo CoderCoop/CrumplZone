@@ -11,6 +11,17 @@ extends RefCounted
 
 const NOTES: Array = [
 	{
+		"version": "0.12.0",
+		"date": "2026-08-28",
+		"lines": [
+			"Every generated level is playable now — the Levels tab lists them "
+			+ "all, and each one is a different kind of building.",
+			"One line again. Get everything under it and the building is down, "
+			+ "and the stars are how much of the bar it took: a third or less "
+			+ "for three.",
+		],
+	},
+	{
 		"version": "0.11.0",
 		"date": "2026-08-26",
 		"lines": [
