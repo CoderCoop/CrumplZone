@@ -44,14 +44,14 @@ const MEASURED := {
 	4112: {"pile": 85, "system": "shed"},
 	4113: {"pile": 54, "system": "shed"},
 	4114: {"pile": 40, "system": "shed"},
-	4115: {"pile": 24, "system": "house"},
-	4117: {"pile": 25, "system": "house"},
-	4118: {"pile": 41, "system": "retail"},
-	4119: {"pile": 41, "system": "retail"},
-	4120: {"pile": 41, "system": "retail"},
-	4121: {"pile": 60, "system": "overpass"},
-	4122: {"pile": 70, "system": "overpass"},
-	4123: {"pile": 47, "system": "overpass"},
+	4115: {"pile": 23, "system": "house"},
+	4117: {"pile": 23, "system": "house"},
+	4118: {"pile": 43, "system": "retail"},
+	4119: {"pile": 50, "system": "retail"},
+	4120: {"pile": 47, "system": "retail"},
+	4121: {"pile": 54, "system": "overpass"},
+	4122: {"pile": 67, "system": "overpass"},
+	4123: {"pile": 32, "system": "overpass"},
 }
 ## difficulty -> the same, for the three authored levels.
 const AUTHORED := {

@@ -523,10 +523,21 @@ static func _house(rng: RandomNumberGenerator) -> Array:
 		if storey == 0:
 			blocks.append(_block(0.0, y - storey_h * 0.5, wall * 0.7, storey_h,
 				"pier", Materials.BRICK))
+		# Windows on sills, not floating in the opening.
+		#
+		# They used to hang 30 px above the floor with nothing under them, so
+		# every one of them fell on the course below the moment the level
+		# started and sat there loading it. A window in a masonry wall bears
+		# on a sill; this is that, and it is also why the glass in a house
+		# reads as part of the wall rather than as something suspended in it.
+		var sill_h := 10.0
+		var glass_h := storey_h * 0.44
 		for i in 2:
 			var mid := (-1.0 if i == 0 else 1.0) * (open_w * 0.5 + wall * 0.35)
-			blocks.append(_block(mid, y - storey_h * 0.62, open_w * 0.62,
-				storey_h * 0.44, "glazing", Materials.GLASS))
+			blocks.append(_block(mid, y - sill_h * 0.5, open_w * 0.62, sill_h,
+				"plinth", Materials.STONE))
+			blocks.append(_block(mid, y - sill_h - glass_h * 0.5, open_w * 0.62,
+				glass_h, "glazing", Materials.GLASS))
 		# A stone lintel course over the openings, then the floor.
 		y -= storey_h
 		blocks.append(_block(0.0, y - 9.0, width, 18.0, "spandrel", Materials.STONE))
@@ -576,13 +587,29 @@ static func _retail(rng: RandomNumberGenerator) -> Array:
 			height - 14.0, "column", Materials.STEEL))
 	for i in units:
 		var mid := first + float(i) * unit_w
-		# Full-height glazing, clear of the columns so it braces nothing —
-		# the lesson the curtain wall's bays taught, applied from the start.
-		blocks.append(_block(mid, -14.0 - (height - 14.0) * 0.5,
-			unit_w - column_w - 22.0, height - 34.0, "glazing", Materials.GLASS))
-		# An awning over each shopfront, which is the detail that says shops.
-		blocks.append(_block(mid, -height + 14.0, unit_w - column_w - 10.0,
-			9.0, "awning", Materials.SHEET))
+		# Glazing standing on the footing and stopping short of the deck:
+		# clear of the columns either side so it braces nothing, and bearing
+		# on something so it is not suspended.
+		#
+		# It was sized to neither. Sitting 10 px above the footing with
+		# nothing under it, every pane in every shop dropped onto the slab the
+		# moment the level started and sat there loading it — measured at
+		# sixteen times what glass tolerates at rest. A shopfront pane stands
+		# in a frame on the slab; this is that.
+		var glass_top := -height + 10.0
+		var glass_bottom := -14.0
+		blocks.append(_block(mid, (glass_top + glass_bottom) * 0.5,
+			unit_w - column_w - 22.0, glass_bottom - glass_top,
+			"glazing", Materials.GLASS))
+		# An awning over each shopfront, clear of the glass below it.
+		#
+		# It was built 8.5 px inside the glazing at every height the generator
+		# makes — the fourth time in this file that two blocks have been put
+		# in the same place, and the reason a shopfront pane was reading
+		# fifteen times its resting tolerance. An awning hangs off the fascia
+		# above the window, not through it.
+		blocks.append(_block(mid, -height + 4.0, unit_w - column_w - 10.0,
+			8.0, "awning", Materials.SHEET))
 	var y := -height
 	blocks.append(_block(0.0, y - deck_h * 0.5, span, deck_h, "deck",
 		Materials.CONCRETE))
