@@ -30,9 +30,8 @@ extends Node2D
 ## what ships is the point; the bake's own report is where a seed that was
 ## rejected gets explained.
 const LEAST_LEVELS := 8
-const STAND_TICKS := 240
-## A further window, after it has bedded in, over which nothing may change.
-const WATCH_TICKS := 90
+
+
 const CHARGE_EVERY := 14
 const SETTLE := 900
 
@@ -67,7 +66,7 @@ func _next() -> void:
 	_level.build(_spec)
 	_seen[_spec["kind"]] = int(_seen.get(_spec["kind"], 0)) + 1
 	_standing_before = _level.standing()
-	_top_at_build = _top_now()
+	_top_at_build = StandCheck.top_of(_level, _spec)
 	_spots = []
 	for b in _spec["blocks"]:
 		_spots.append(Vector2(float(b["x"]), float(b["y"])))
@@ -83,50 +82,19 @@ func _physics_process(_delta: float) -> void:
 	_level.tick_settle()
 	match _phase:
 		"standing":
-			if _ticks == STAND_TICKS:
-				_settled_damage = _damage_total()
-			if _ticks < STAND_TICKS + WATCH_TICKS:
+			if _ticks == StandCheck.SETTLE_TICKS:
+				_settled_damage = StandCheck.damage_total(_level)
+			if _ticks < StandCheck.SETTLE_TICKS + StandCheck.WATCH_TICKS:
 				return
-			# Judged on what it does after it has settled, and on how far the top
-			# has dropped — not on the count above the line, because when a line
-			# sits near a low building's roof ordinary settling moves pieces
-			# across it and a count reads that as a collapse.
-			#
-			# Damage is read twice: once the moment it has settled, once a second
-			# and a half later. It used to be read once, counting everything since
-			# the level was built — which includes the first frames, where pieces
-			# built a hair apart resolve into contact. That is bedding in, and
-			# every building does it once and no building does it twice.
-			#
-			# Measured before changing it: at rest after settling, 0.3% of every
-			# piece in the game reads over its tolerance and the worst is 1.03x.
-			# The model is healthy standing still. What the gate was catching was
-			# the sitting down.
-			var culprits := {}
-			for body in _level.live_blocks():
-				if int(body.get_meta("damage", 0)) > 0:
-					var what := "%s %s" % [body.get_meta("role", "?"),
-						body.get_meta("material", "?")]
-					culprits[what] = int(culprits.get(what, 0)) + 1
-			if not culprits.is_empty():
-				_lines.append("        bedded in with: %s" % culprits)
-			var carried_on := _damage_total() - _settled_damage
-			# Printed for every level, not only the failures, so the spread is
-			# visible and the threshold can come from it.
-			_lines.append("        after settling: %d more points over %d ticks"
-				% [carried_on, WATCH_TICKS])
-			if carried_on > 0:
-				_failures.append("seed %d (%s) keeps damaging itself after it has settled: %d more points"
-					% [_spec["seed"], _spec["kind"], carried_on])
-			var dropped := _top_now() - _top_at_build
-			# The check is for collapse, not for settling. Twelve pixels flat was
-			# invented here without calibration and is unfair to a tall heavy
-			# building: every system settles into its contacts once, under its own
-			# weight, and the amount scales with how much is stacked up.
-			var allowed: float = maxf(12.0, _top_at_build * 0.06)
-			if dropped > allowed:
-				_failures.append("seed %d (%s) sags %.0f px untouched, over %.0f allowed for its height"
-					% [_spec["seed"], _spec["kind"], dropped, allowed])
+			# One check, shared with the bake. See standcheck.gd.
+			var bedded := StandCheck.culprits(_level)
+			if not bedded.is_empty():
+				_lines.append("        bedded in with: %s" % bedded)
+			var why := StandCheck.verdict(_level, _spec, _top_at_build,
+				_settled_damage)
+			if why != "":
+				_failures.append("seed %d (%s) %s"
+					% [_spec["seed"], _spec["kind"], why])
 			_phase = "flatten"
 			_ticks = 0
 		"flatten":
@@ -137,26 +105,6 @@ func _physics_process(_delta: float) -> void:
 				return
 			_judge()
 			_next()
-
-
-## Every point of damage in the level, added up.
-func _damage_total() -> int:
-	var total := 0
-	for body in _level.live_blocks():
-		total += int(body.get_meta("damage", 0))
-	return total
-
-
-## The highest point of anything still in the level, as a depth below the
-## street rather than a world coordinate.
-func _top_now() -> float:
-	var floor_y: float = float(_spec["floor_y"])
-	var peak := floor_y
-	for body in _level.live_blocks():
-		var poly: PackedVector2Array = body.get_meta("poly")
-		for point in poly:
-			peak = minf(peak, body.global_position.y + point.rotated(body.rotation).y)
-	return floor_y - peak
 
 
 func _judge() -> void:
