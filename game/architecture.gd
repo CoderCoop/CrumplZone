@@ -192,7 +192,13 @@ static func _masonry(rng: RandomNumberGenerator) -> Array:
 	# the limit is not.
 	var storeys := rng.randi_range(2, 3)
 	var bays := rng.randi_range(3, 5)
-	var pier := rng.randf_range(32.0, 42.0)
+	# Thicker piers than the range started at. A pier is the whole structure
+	# here and it was reading 1.8 times what brick tolerates standing still —
+	# measured, and the recurring culprit in every run of the gate. Brick's
+	# tolerance was already raised once for this same piece; raising it again
+	# would be tuning the material to excuse the building. A load-bearing wall
+	# carrying three storeys is thick, and this is that.
+	var pier := rng.randf_range(40.0, 52.0)
 	# Walls thicken toward the base, as every load-bearing masonry building's
 	# do — there is more above them down there. Measured before they did: the
 	# tallest warehouse crushed 15 of its own piers standing untouched, because

@@ -16,6 +16,14 @@ extends Node2D
 ## a building genuinely at its limit or a reading that wobbles across a line.
 
 const SETTLE_TICKS := 240
+## Only the last stretch counts.
+##
+## The first version of this sampled the whole window and kept the worst
+## reading, which meant it was recording the moment a piece landed and then
+## comparing that against the tolerance for a piece standing still. Those are
+## the two cases level.gd deliberately tells apart. It reported 27.7% of the
+## game over tolerance; almost all of that was pieces arriving, not resting.
+const WATCH_FROM := 200
 
 var _level: Level
 var _queue: Array = []
@@ -50,7 +58,8 @@ func _physics_process(_delta: float) -> void:
 		return
 	_ticks += 1
 	_level.tick_settle()
-	_sample()
+	if _ticks >= WATCH_FROM:
+		_sample()
 	if _ticks < SETTLE_TICKS:
 		return
 	_finish()
@@ -63,6 +72,10 @@ func _sample() -> void:
 		var state := PhysicsServer2D.body_get_direct_state(body.get_rid())
 		if state == null:
 			continue
+		# Resting only. A piece still moving is judged by level.gd against the
+		# impact tolerance, which is a different and much larger number.
+		if body.linear_velocity.length() > 8.0:
+			continue
 		var load := 0.0
 		var contacts := state.get_contact_count()
 		for i in contacts:
@@ -70,7 +83,11 @@ func _sample() -> void:
 		if load <= 0.0:
 			continue
 		var made_of: String = body.get_meta("material", Materials.CONCRETE)
-		var limit := Materials.rest_limit(made_of)
+		# The same effective limit level.gd applies, self-carry included.
+		var gravity := float(ProjectSettings.get_setting(
+			"physics/2d/default_gravity", 980.0))
+		var limit := maxf(Materials.rest_limit(made_of),
+			body.mass * gravity / 60.0 * Level.SELF_CARRY)
 		var ratio := load / maxf(limit, 0.001)
 		var key := body.get_instance_id()
 		var seen: Dictionary = _worst.get(key, {})
@@ -93,11 +110,13 @@ func _finish() -> void:
 		return float(a["ratio"]) > float(b["ratio"]))
 	if over.is_empty():
 		return
-	var worst: Dictionary = over[0]
-	_rows.append("seed %s %-13s %d of %d pieces over tolerance, worst %s at %.2fx (load %.0f, limit %.0f, %d contacts)"
+	_rows.append("seed %s %-13s %d of %d pieces over tolerance at rest"
 		% [_spec.get("seed", "?"), _spec.get("kind", "?"), over.size(),
-			_worst.size(), worst["what"], worst["ratio"], worst["load"],
-			worst["limit"], worst["contacts"]])
+			_worst.size()])
+	for row in over:
+		_rows.append("      %-22s %.2fx  load %6.0f  limit %5.0f  %d contacts"
+			% [row["what"], row["ratio"], row["load"], row["limit"],
+				row["contacts"]])
 	_spec = {}
 
 

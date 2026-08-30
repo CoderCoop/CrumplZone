@@ -32,6 +32,10 @@ const PER_SYSTEM := 3
 ## worst: the lines have to clear the unluckiest collapse, not the average one.
 const REPEATS := 3
 const STAND_TICKS := 240
+## A further window after it has settled, over which nothing may change. Same
+## reasoning as gentest: counting damage from the moment a level is built
+## counts it bedding in, which every building does once.
+const WATCH_TICKS := 90
 const CHARGE_EVERY := 14
 const SETTLE := 900
 
@@ -46,6 +50,7 @@ var _ticks := 0
 var _charge_at := 0
 var _spots: Array[Vector2] = []
 var _top_at_build := 0.0
+var _settled_damage := 0
 var _measured := {}
 var _authored := {}
 var _dropped: Array[String] = []
@@ -101,7 +106,9 @@ func _physics_process(_delta: float) -> void:
 	_level.tick_settle()
 	match _phase:
 		"standing":
-			if _ticks < STAND_TICKS:
+			if _ticks == STAND_TICKS:
+				_settled_damage = _damage_total()
+			if _ticks < STAND_TICKS + WATCH_TICKS:
 				return
 			# Checked on every run, not just the first.
 			#
@@ -136,24 +143,31 @@ func _physics_process(_delta: float) -> void:
 
 ## Why this level is not fit to ship, or "" if it is.
 func _why_it_will_not_do() -> String:
-	var damaged := 0
 	var culprits := {}
 	for body in _level.live_blocks():
 		if int(body.get_meta("damage", 0)) > 0:
-			damaged += 1
 			var what := "%s %s" % [body.get_meta("role", "?"),
 				body.get_meta("material", "?")]
 			culprits[what] = int(culprits.get(what, 0)) + 1
-	if damaged > 0:
-		# Which piece, not just how many. A count says a building is broken;
-		# the role and material say where to look, and that is the difference
-		# between a diagnosis and another guess.
-		return "%d pieces damage themselves standing still: %s" % [damaged, culprits]
+	# What it took after it had already settled. Which piece, not just how
+	# many: a count says a building is broken; the role and material say where
+	# to look, and that is the difference between a diagnosis and a guess.
+	var carried_on := _damage_total() - _settled_damage
+	if carried_on > 0:
+		return "keeps damaging itself after settling: %d more points, %s" % [
+			carried_on, culprits]
 	var dropped := _top_now() - _top_at_build
 	var allowed: float = maxf(12.0, _top_at_build * 0.06)
 	if dropped > allowed:
 		return "sags %.0f px untouched, over %.0f allowed for its height" % [dropped, allowed]
 	return ""
+
+
+func _damage_total() -> int:
+	var total := 0
+	for body in _level.live_blocks():
+		total += int(body.get_meta("damage", 0))
+	return total
 
 
 func _top_now() -> float:

@@ -64,6 +64,22 @@ const SLOW_CONTACT := 25.0
 ## solver search up from 97 seconds to 322, because a collapse has a couple of
 ## hundred awake bodies in it and the solver replays the level hundreds of
 ## times.
+## How much of its own weight a piece may always carry, whatever its
+## material's absolute tolerance says.
+##
+## Just over one, and the margin matters. Measured on a plain stack of
+## identical blocks, a piece reads exactly (2k+1) times one block's weight
+## with k blocks above it — so a piece bearing on the ground carrying nothing
+## reads precisely one of itself. That is the number this has to clear, and
+## nothing more.
+##
+## It was 2.4 first, on the reasoning that a piece with a neighbour reads
+## about two. That is true and it is the wrong reason: a neighbour resting on
+## a piece is exactly the load the tolerances exist to judge. At 2.4 a
+## shopfront pane could hold up a concrete floor, which stresstest caught
+## immediately — it is the one mechanic glass has.
+const SELF_CARRY := 1.3
+
 const STRESS_TICKS := 2
 const RESTING_STRESS_TICKS := 8
 const REST_TICKS := 40
@@ -993,6 +1009,14 @@ func standing() -> int:
 	return count
 
 
+## What this piece weighs, as the contact impulse holding it up for one step —
+## the same units the stress readings are in.
+func _own_weight(body: RigidBody2D) -> float:
+	var gravity := float(ProjectSettings.get_setting(
+		"physics/2d/default_gravity", 980.0))
+	return body.mass * gravity / 60.0
+
+
 ## The highest point of a piece, from its actual outline in its actual
 ## orientation.
 func _top_of(body: RigidBody2D) -> float:
@@ -1089,6 +1113,25 @@ func _stress_pass() -> void:
 		var made_of: String = body.get_meta("material", Materials.CONCRETE)
 		var limit := lerpf(Materials.rest_limit(made_of),
 			Materials.stress_limit(made_of), severity)
+		# Nothing is overloaded by its own weight alone.
+		#
+		# The tolerances are absolute forces, and they are compared against
+		# pieces of wildly different size. Calibrated on a curtain wall's
+		# glazing — 44x50, which rests at 0.54 of what glass tolerates — they
+		# do not survive a bigger pane: a shopfront window is 84x92 and its
+		# own weight reads 76 against a tolerance of 40. It cannot stand up
+		# without the model calling it overloaded. Glass takes one point of
+		# damage to shatter, so every shopfront broke while the level was
+		# settling, and the shards then read over tolerance too, which is what
+		# kept gentest failing.
+		#
+		# The honest fix is stress rather than force — load per unit of
+		# section — and that is a rewrite of every tuned number in the table.
+		# This is the narrow version of the same idea: whatever else it says,
+		# a piece may always carry itself. Everything the tolerances were
+		# actually tuned for is a load arriving from somewhere else, and that
+		# is untouched.
+		limit = maxf(limit, _own_weight(body) * SELF_CARRY)
 		if load <= limit:
 			# Carrying what it was built to carry: let it rest.
 			body.can_sleep = true
