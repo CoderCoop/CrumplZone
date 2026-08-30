@@ -17,6 +17,8 @@ const REINFORCED := "reinforced"
 ## weak, and the only material a jackhammer goes through in one blow — a
 ## timber-framed building is a different demolition from a concrete one.
 const TIMBER := "timber"
+const STONE := "stone"
+const SHEET := "sheet"
 
 ## `durability` is how much damage a piece absorbs before it comes apart, on a
 ## scale where one jackhammer blow is Tools.JACKHAMMER_DAMAGE. Read it as hits:
@@ -75,6 +77,29 @@ const SPEC := {
 		"colour": Color(0.55, 0.40, 0.25),
 		"density": 0.0005,
 	},
+	# Cut stone. Heavy and hard to break — three blows, between concrete and
+	# steel — but it shatters rather than parting, because a stone block under
+	# a hammer splits along its bedding rather than shearing. It is the
+	# opposite trade from timber: expensive to remove, and it carries a great
+	# deal standing still, so a stone base is something to bring a building
+	# down around rather than through.
+	STONE: {
+		"durability": 30,
+		"pieces": 4,
+		"brittle": true,
+		"colour": Color(0.60, 0.58, 0.52),
+		"density": 0.0017,
+	},
+	# Corrugated sheet. Almost nothing: one blow, and light enough that it
+	# holds nothing up and hurts nothing when it lands. Cladding that reads as
+	# cladding — the thing a shed or a shopfront is wrapped in rather than
+	# built from.
+	SHEET: {
+		"durability": 2,
+		"pieces": 4,
+		"colour": Color(0.58, 0.60, 0.61),
+		"density": 0.0003,
+	},
 }
 
 ## How much contact load a piece carries before it starts to suffer, in the
@@ -103,6 +128,12 @@ const STRESS := {
 	STEEL: 1000.0,
 	REINFORCED: 1400.0,
 	TIMBER: 120.0,
+	# Stone carries more standing still than concrete and takes a shock about
+	# as well, which is why it was built with before anyone could make either.
+	STONE: 420.0,
+	# Sheet holds nothing up, so its tolerance only has to keep it from
+	# tearing under its own weight.
+	SHEET: 60.0,
 }
 
 ## How fast overload turns into damage: three points a second at twice a
@@ -139,6 +170,11 @@ const REST_TOLERANCE := {
 	STEEL: 3.0,
 	REINFORCED: 3.0,
 	TIMBER: 2.0,
+	# The widest margin of anything here, and the reason cathedrals stand.
+	# Stone under steady compression is very nearly indestructible; the same
+	# block struck is brittle. That gap is the material.
+	STONE: 4.5,
+	SHEET: 1.5,
 }
 
 ## The speed at which a contact counts as a full-strength impact, in px/s.

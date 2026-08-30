@@ -20,7 +20,14 @@ extends Node2D
 ## shipping it is how the gate stops meaning anything.
 
 const SEEDS_FROM := 4100
-const SEEDS := 12
+## How many levels of each structural system the pack carries.
+##
+## Deliberate coverage, not a random draw. Twenty-four random seeds produced
+## six curtain walls, six strip malls and not a single grandstand — a system
+## can be written, gated and shipped and still never appear, and nobody would
+## know. The districts a player picks levels from need every kind of building
+## to exist reliably, so the pack asks for each by name.
+const PER_SYSTEM := 3
 ## The same level does not leave the same pile twice. Three runs and take the
 ## worst: the lines have to clear the unluckiest collapse, not the average one.
 const REPEATS := 3
@@ -50,8 +57,11 @@ func _ready() -> void:
 	add_child(_level)
 	for d in Levels.ORDER:
 		_jobs.append({"kind": "authored", "id": d})
-	for i in SEEDS:
-		_jobs.append({"kind": "seed", "id": SEEDS_FROM + i})
+	var at := SEEDS_FROM
+	for system in Architecture.GENERATED:
+		for i in PER_SYSTEM:
+			_jobs.append({"kind": "seed", "id": at, "system": system})
+			at += 1
 	_next_job()
 
 
@@ -69,7 +79,7 @@ func _spec_for_job() -> Dictionary:
 	var job: Dictionary = _jobs[_job]
 	if job["kind"] == "authored":
 		return Levels.level(String(job["id"]))
-	return Generator.generate(int(job["id"]))
+	return Generator.generate(int(job["id"]), String(job.get("system", "")))
 
 
 func _start() -> void:
@@ -93,13 +103,20 @@ func _physics_process(_delta: float) -> void:
 		"standing":
 			if _ticks < STAND_TICKS:
 				return
-			# Only checked on the first run; if it stands once it stands.
-			if _run == 0:
-				var why := _why_it_will_not_do()
-				if why != "":
-					_dropped.append("%s: %s" % [_label(), why])
-					_next_job()
-					return
+			# Checked on every run, not just the first.
+			#
+			# "If it stands once it stands" is not true here. Physics does not
+			# reproduce across runs, and a marginal building stands on one
+			# roll and crushes a piece on the next — measured, three levels
+			# the bake had passed and shipped were then failed by gentest on
+			# its own roll of the same level. The pack promises these stand,
+			# so it has to check that as often as it checks anything else.
+			var why := _why_it_will_not_do()
+			if why != "":
+				_dropped.append("%s (%s): %s on run %d of %d"
+					% [_label(), _spec.get("kind", "?"), why, _run + 1, REPEATS])
+				_next_job()
+				return
 			_phase = "flatten"
 			_ticks = 0
 		"flatten":
@@ -120,11 +137,18 @@ func _physics_process(_delta: float) -> void:
 ## Why this level is not fit to ship, or "" if it is.
 func _why_it_will_not_do() -> String:
 	var damaged := 0
+	var culprits := {}
 	for body in _level.live_blocks():
 		if int(body.get_meta("damage", 0)) > 0:
 			damaged += 1
+			var what := "%s %s" % [body.get_meta("role", "?"),
+				body.get_meta("material", "?")]
+			culprits[what] = int(culprits.get(what, 0)) + 1
 	if damaged > 0:
-		return "%d pieces damage themselves standing still" % damaged
+		# Which piece, not just how many. A count says a building is broken;
+		# the role and material say where to look, and that is the difference
+		# between a diagnosis and another guess.
+		return "%d pieces damage themselves standing still: %s" % [damaged, culprits]
 	var dropped := _top_now() - _top_at_build
 	var allowed: float = maxf(12.0, _top_at_build * 0.06)
 	if dropped > allowed:
@@ -152,15 +176,21 @@ func _record() -> void:
 	var fy: float = float(_spec["floor_y"])
 	var third: float = fy - float(_spec["height_line"])
 	if third < _worst:
-		_dropped.append("%s: the winning line sits at %.0f px inside a %.0f px pile"
-			% [_label(), third, _worst])
+		_dropped.append("%s (%s): the winning line sits at %.0f px inside a %.0f px pile"
+			% [_label(), _spec.get("kind", "?"), third, _worst])
 		return
 	# The solver used to run here too, to price the level. It was taken out:
 	# it rejected six of twelve levels that gentest shows are winnable, and
 	# priced the medium authored level at more than twice the hard one. A
 	# search that cannot clear half the levels is not one to gate on or rate
 	# against. See Levels.THREE_STAR_SHARE.
-	var entry := {"pile": _worst}
+	# The system goes in the pack with the measurement, because the pack is
+	# what the game rebuilds from. The bake asks for a system by name; if the
+	# game then regenerated from the seed alone it would draw whatever that
+	# seed happens to pick and build a different building than the one that
+	# was measured — same seed, different level, and every number in the pack
+	# describing something else.
+	var entry := {"pile": _worst, "system": String(_spec.get("kind", ""))}
 	if job["kind"] == "authored":
 		_authored[String(job["id"])] = entry
 	else:
@@ -177,7 +207,8 @@ func _write() -> void:
 	var keys: Array = _measured.keys()
 	keys.sort()
 	for k in keys:
-		measured += "\t%d: {\"pile\": %.0f},\n" % [k, _measured[k]["pile"]]
+		measured += "\t%d: {\"pile\": %.0f, \"system\": \"%s\"},\n" % [
+			k, _measured[k]["pile"], _measured[k]["system"]]
 	measured += "}"
 	var authored := "const AUTHORED := {\n"
 	for d in Levels.ORDER:
