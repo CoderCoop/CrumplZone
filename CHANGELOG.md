@@ -7,7 +7,17 @@ sections are dated.
 
 ## [Unreleased]
 
-Nothing since 0.12.0.
+Nothing since 0.12.1.
+
+## [0.12.1] - 2026-08-28
+
+### Fixed
+
+- **Damage cracks stay on the piece they belong to.** A quarter of every crack
+  drawn had a corner outside its own piece, the worst by 62 px — a damage line
+  hanging in the air beside the thing it was meant to be damage on. It showed
+  on the slivers and wedges a real demolition makes, and not on the squares
+  the drawing code had been reasoned about with.
 
 ## [0.12.0] - 2026-08-28
 
