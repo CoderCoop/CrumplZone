@@ -625,37 +625,88 @@ func _repaint(body: RigidBody2D, wear: float) -> void:
 		body.add_child(_crack(polygon, _seed_for(body) + i, i))
 
 
-## A thin dark split running in from the edge towards the middle. Both ends lie
-## inside a convex piece, so a crack never draws outside the shape it belongs
-## to, and it is deterministic in the piece so it does not wander when redrawn.
+## A thin dark split running in from the edge towards the middle, every corner
+## of it inside the piece, and deterministic so it does not wander when
+## redrawn.
+##
+## It used to claim that and not do it. Measured across six levels' worth of
+## real fragments, a quarter of every crack corner drawn sat outside the piece
+## it belonged to, the worst by 62 px — a damage line floating in open air
+## beside the thing it was meant to be damage on.
+##
+## Three separate reasons, and only the first had any guard at all:
+##
+##   * the near end walked in from beyond the edge in steps of 0.85, twelve of
+##     them, and simply gave up outside if that was not enough;
+##   * the far end was placed at a quarter of the piece's reach in a direction
+##     of its own and never checked at all, which is fine on a square and
+##     wrong as soon as fragments are slivers and wedges;
+##   * the width was added perpendicular afterwards, which pushes a corner out
+##     through an edge even when both ends are inside.
+##
+## All three are answered the same way: everything is measured from a point
+## known to be inside, and every corner is pulled back in before it is drawn.
 func _crack(polygon: PackedVector2Array, salt: int, index: int) -> Polygon2D:
+	# The average of a convex polygon's vertices is inside it. That is the one
+	# point here that needs no checking, so everything else is built from it.
+	var centre := Vector2.ZERO
+	for point in polygon:
+		centre += point
+	centre /= float(maxi(polygon.size(), 1))
+
 	var angle := float(absi(salt * 37 + index * 911) % 360) * (PI / 180.0)
 	var out := Vector2(cos(angle), sin(angle))
 	var span := Fracture.reach(polygon)
-	# Walk in from beyond the edge until inside: the boundary along that
-	# direction, without solving for it.
-	var start := out * span
-	for _step in 12:
+	var start := centre + out * span
+	for _step in 24:
 		if Fracture._contains(polygon, start):
 			break
-		start *= 0.85
-	var end := out.rotated(PI * 0.7) * span * 0.25
+		start = start.lerp(centre, 0.18)
+	# Inward, toward a point already known to be inside, rather than off at an
+	# angle of its own.
+	var end := start.lerp(centre, 0.62)
 	var width: float = clampf(span * 0.09, 0.7, 2.6)
 	var across := (end - start).orthogonal().normalized() * width
 
+	var quad := PackedVector2Array([
+		start + across, end + across * 0.35, end - across * 0.35, start - across])
+	for i in quad.size():
+		quad[i] = _pulled_inside(polygon, quad[i], centre)
+
 	var crack := Polygon2D.new()
 	crack.name = "crack_%d" % index
-	crack.polygon = PackedVector2Array([
-		start + across, end + across * 0.35, end - across * 0.35, start - across])
+	crack.polygon = quad
 	crack.color = Color(0.06, 0.06, 0.07, 0.75)
 	return crack
+
+
+## A point moved toward the middle until it is inside the shape. The last
+## guard, and the only one that holds for every shape a fracture can make
+## rather than for the ones that were thought of.
+func _pulled_inside(polygon: PackedVector2Array, point: Vector2,
+		centre: Vector2) -> Vector2:
+	# Twenty-four steps of a fifth leaves it within half a percent of the
+	# middle, which is inside any shape this is called on.
+	var moved := point
+	for _step in 24:
+		if Fracture._contains(polygon, moved):
+			return moved
+		moved = moved.lerp(centre, 0.2)
+	return centre
 
 
 func destroy(body: RigidBody2D) -> void:
 	if not is_instance_valid(body):
 		return
 	blocks.erase(body)
-	remove_child(body)
+	# Only if it is still ours. queue_free is deferred to the end of the
+	# frame, so a body destroyed earlier this frame is still "valid" and can
+	# arrive here a second time — which the explosive does routinely, because
+	# it damages a snapshot of the pieces and some of them are gone by the
+	# time it reaches them. Removing a child twice is an engine error every
+	# time it happens; it printed on every blast and nothing was watching.
+	if body.get_parent() == self:
+		remove_child(body)
 	body.queue_free()
 
 

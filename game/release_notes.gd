@@ -11,6 +11,15 @@ extends RefCounted
 
 const NOTES: Array = [
 	{
+		"version": "0.12.1",
+		"date": "2026-08-28",
+		"lines": [
+			"Damage cracks stay on the piece they belong to. A quarter of them "
+			+ "had a corner hanging outside it, worst of all on the odd shapes "
+			+ "left over once a building starts coming apart.",
+		],
+	},
+	{
 		"version": "0.12.0",
 		"date": "2026-08-28",
 		"lines": [

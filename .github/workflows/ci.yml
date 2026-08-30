@@ -147,6 +147,12 @@ jobs:
           # by retuning a tool, and neither is visible in a diff.
           run_harness "crack test" res://cracktest.tscn
 
+          # A damage line has to be on the piece it is damage on. A quarter of
+          # them were not, and nothing was looking: the shapes a real
+          # demolition makes are slivers and wedges, and the drawing code had
+          # only ever been reasoned about on squares.
+          run_harness "inside test" res://insidetest.tscn
+
           run_harness "hull test" res://hulltest.tscn
 
           # The solver rebuilds one level hundreds of times. If a rebuild does
