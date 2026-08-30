@@ -111,6 +111,10 @@ func _physics_process(_delta: float) -> void:
 			if not culprits.is_empty():
 				_lines.append("        bedded in with: %s" % culprits)
 			var carried_on := _damage_total() - _settled_damage
+			# Printed for every level, not only the failures, so the spread is
+			# visible and the threshold can come from it.
+			_lines.append("        after settling: %d more points over %d ticks"
+				% [carried_on, WATCH_TICKS])
 			if carried_on > 0:
 				_failures.append("seed %d (%s) keeps damaging itself after it has settled: %d more points"
 					% [_spec["seed"], _spec["kind"], carried_on])

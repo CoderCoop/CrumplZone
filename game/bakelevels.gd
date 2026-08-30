@@ -28,9 +28,16 @@ const SEEDS_FROM := 4100
 ## know. The districts a player picks levels from need every kind of building
 ## to exist reliably, so the pack asks for each by name.
 const PER_SYSTEM := 3
-## The same level does not leave the same pile twice. Three runs and take the
+## The same level does not leave the same pile twice. Five runs and take the
 ## worst: the lines have to clear the unluckiest collapse, not the average one.
-const REPEATS := 3
+##
+## Five rather than three because the standing check rides on the same runs,
+## and three was letting levels through that gentest then failed. Measured on
+## the pack, a level either accrues nothing at all after settling — twenty of
+## twenty-two do — or it accrues two to six points. There is no marginal band
+## in between, so the levels slipping through are genuinely degrading and the
+## only question was how many rolls it takes to see it.
+const REPEATS := 5
 const STAND_TICKS := 240
 ## A further window after it has settled, over which nothing may change. Same
 ## reasoning as gentest: counting damage from the moment a level is built

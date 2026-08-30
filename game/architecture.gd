@@ -99,8 +99,26 @@ const TYPES: Array[String] = [
 ## across three different attempts at the base. The shape is right and the
 ## foundations are not, and a level that falls over before the player arrives
 ## is not one to ship.
+## Load-bearing masonry is held back, with the panel block and the grandstand.
+##
+## It shipped for a while and it should not have. It fails more than anything
+## else here: three of its four seeds are dropped by the bake for carrying on
+## damaging themselves after they have settled, and the survivor is failed by
+## gentest on its own run. Always the same piece, a brick pier, and always
+## while standing still.
+##
+## Widening the piers was tried — they read 1.8 times what brick tolerates —
+## and it changed nothing, so it has been taken back out rather than left in
+## looking like a fix. Brick's rest tolerance was already raised once for this
+## exact piece, from 2.0 to 3.5, and raising it again would be tuning the
+## material to excuse the building.
+##
+## What is actually wrong is that a masonry wall is being modelled as a stack
+## of separate piers and courses when the real thing is monolithic — the
+## spandrel was made continuous for that reason and it was not enough. That is
+## a rebuild of the system, not an adjustment to it.
 const GENERATED: Array[String] = [
-	CURTAIN_WALL, MASONRY, FLAT_SLAB, STACK, SHED,
+	CURTAIN_WALL, FLAT_SLAB, STACK, SHED,
 	HOUSE, RETAIL, OVERPASS,
 ]
 
@@ -192,13 +210,7 @@ static func _masonry(rng: RandomNumberGenerator) -> Array:
 	# the limit is not.
 	var storeys := rng.randi_range(2, 3)
 	var bays := rng.randi_range(3, 5)
-	# Thicker piers than the range started at. A pier is the whole structure
-	# here and it was reading 1.8 times what brick tolerates standing still —
-	# measured, and the recurring culprit in every run of the gate. Brick's
-	# tolerance was already raised once for this same piece; raising it again
-	# would be tuning the material to excuse the building. A load-bearing wall
-	# carrying three storeys is thick, and this is that.
-	var pier := rng.randf_range(40.0, 52.0)
+	var pier := rng.randf_range(32.0, 42.0)
 	# Walls thicken toward the base, as every load-bearing masonry building's
 	# do — there is more above them down there. Measured before they did: the
 	# tallest warehouse crushed 15 of its own piers standing untouched, because
