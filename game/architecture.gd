@@ -380,7 +380,8 @@ static func _stack(rng: RandomNumberGenerator) -> Array:
 	# A concrete plinth rather than brick. Measured, the bottom of a ten-course
 	# brick shaft sits within a few percent of what brick carries standing
 	# still, and cracked itself on some seeds before being touched.
-	blocks.append(_block(0.0, -16.0, base_w * 1.5, 32.0, "plinth", Materials.CONCRETE))
+	blocks.append(_block(0.0, -16.0, base_w * 1.5, 32.0, "plinth",
+		Materials.CONCRETE, true))
 	y = -32.0
 	for course in courses:
 		var t := float(course) / float(maxi(courses - 1, 1))
@@ -388,10 +389,11 @@ static func _stack(rng: RandomNumberGenerator) -> Array:
 		# Built as two half-shafts per course rather than one block, so there
 		# is a vertical joint down the middle. A stack does not crush — it
 		# hinges and goes over — and it needs somewhere to hinge.
-		var made_of: String = Materials.CONCRETE if course < 2 else Materials.BRICK
+		var low: bool = course < 2
+		var made_of: String = Materials.CONCRETE if low else Materials.BRICK
 		for side in [-1.0, 1.0]:
 			blocks.append(_block(side * w * 0.25, y - course_h * 0.5,
-				w * 0.5 - 1.0, course_h, "shaft", made_of))
+				w * 0.5 - 1.0, course_h, "shaft", made_of, low))
 		y -= course_h
 	blocks.append(_block(0.0, y - 9.0, top_w * 1.25, 18.0, "cap", Materials.CONCRETE))
 	return blocks
@@ -815,6 +817,22 @@ static func _stand(rng: RandomNumberGenerator) -> Array:
 	return blocks
 
 
+## `fixed` marks a material that was chosen because a measurement said so,
+## rather than for character. generator.gd's era substitution leaves those
+## alone, the same way it already leaves reinforced concrete alone.
+##
+## The chimney is why this exists. Its plinth and the bottom two courses of
+## its shaft are concrete because brick there sits within a few percent of
+## what brick carries standing still — and the victorian era swaps concrete
+## for timber, so it replaced the whole base of a 700 to 950 px stack with
+## the softest material in the game. Every victorian chimney fell over
+## untouched, five seeds out of five, and all three that reached the pack
+## were dropped by the bake for it. The era is supposed to change what a
+## building is made of without changing whether it stands up.
 static func _block(x: float, y: float, w: float, h: float, role: String,
-		material: String) -> Dictionary:
-	return {"x": x, "y": y, "w": w, "h": h, "role": role, "material": material}
+		material: String, fixed := false) -> Dictionary:
+	var block := {"x": x, "y": y, "w": w, "h": h, "role": role,
+		"material": material}
+	if fixed:
+		block["fixed"] = true
+	return block

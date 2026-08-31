@@ -7,7 +7,18 @@ sections are dated.
 
 ## [Unreleased]
 
-Nothing since 0.14.4.
+Nothing since 0.14.5.
+
+## [0.14.5] - 2026-08-31
+
+### Fixed
+
+- **The waterfront gets its chimneys back.** Every Victorian chimney fell over
+  on its own, so the bake dropped all of them and the waterfront was left with
+  no levels at all — the district quietly vanished from the city. The era that
+  makes a building Victorian was replacing the concrete at the foot of the
+  stack with timber, which is the softest thing in the game, and a 700 px
+  brick chimney does not stand on that.
 
 ## [0.14.4] - 2026-08-31
 
