@@ -40,10 +40,15 @@ const WATCH_TICKS := 90
 ## in the physics still turns CI red.
 const DEGRADING := 25
 
-## How far the top may sink while bedding in, as a share of the building's
+## How far the top may move while bedding in, as a share of the building's
 ## height, never less than this many pixels. Every system settles into its
 ## contacts once under its own weight and the amount scales with how much is
 ## stacked up; a building that actually falls over loses tens of percent.
+##
+## Both directions, and it took a measurement to notice that it had only ever
+## been one. Bedding in moves the top either way — pieces built a hair apart
+## drop into contact, pieces built a hair overlapping are pushed out of it and
+## rise — so the bound is the same size on each side.
 const SAG_FLOOR := 12.0
 const SAG_SHARE := 0.06
 
@@ -92,9 +97,25 @@ static func verdict(level: Level, spec: Dictionary, top_at_build: float,
 	if carried_on > 0:
 		return "keeps damaging itself after settling: %d more points, %s" % [
 			carried_on, culprits(level)]
-	var dropped := top_of(level, spec) - top_at_build
+	# top_of is a height above the street, so a building that sinks makes this
+	# smaller and one that lifts makes it larger. That sign is the whole of the
+	# bug this replaces: the comparison read `moved > allowed`, which fires
+	# only when a building gets taller, under a message that said it sagged.
+	# The check had never once caught a building sinking.
+	#
+	# What it let through, measured: seed 4106 is a chimney whose cap ends the
+	# settle on the street — 406 px down to 18 — and the verdict was that it
+	# holds. It is in the pack. A player would open that level and watch it
+	# fall over before touching it.
+	var moved := top_of(level, spec) - top_at_build
 	var allowed: float = maxf(SAG_FLOOR, top_at_build * SAG_SHARE)
-	if dropped > allowed:
+	if moved < -allowed:
 		return "sags %.0f px untouched, over %.0f allowed for its height" % [
-			dropped, allowed]
+			-moved, allowed]
+	# Kept, because it is a real failure and not only an accident of the sign:
+	# a cantilever roof whose back support gives way see-saws, and its far end
+	# is higher than it was built. That is what this arm has been catching.
+	if moved > allowed:
+		return "lifts %.0f px untouched, over %.0f allowed for its height" % [
+			moved, allowed]
 	return ""
