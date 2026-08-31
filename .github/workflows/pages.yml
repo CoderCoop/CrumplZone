@@ -53,6 +53,18 @@ jobs:
           test -s build/web/index.html
           test -s build/web/index.wasm
 
+          # What is in this build, in a file anything can read.
+          #
+          # The version is otherwise only inside the packed data, which means
+          # the one question worth asking from outside — is what players have
+          # the same as what main says — needs a binary download and a string
+          # search. deploy-drift.yml asks it every few hours, and it could not
+          # until this existed.
+          sed -n 's/^config\/version="\(.*\)"$/\1/p' game/project.godot \
+            > build/web/version.txt
+          test -s build/web/version.txt
+          echo "built $(cat build/web/version.txt)"
+
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
