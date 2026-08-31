@@ -80,12 +80,24 @@ const TYPES: Array[String] = [
 ## Panel is held back, the way masonry was until its geometry was fixed.
 ##
 ## Not because it falls over — it stands perfectly well — but because it
-## cannot be scored. A large-panel block leaves rubble 65% as tall as the
-## building it came from (measured: 158 px of pile on a 242 px building),
-## which is far more than any other system, and there is no room above a pile
-## like that to put a winning line above it and still be under the roof. Padded to clear
-## its own rubble, seed 4106's winning line landed at 324 px on a 242 px
-## building: a level won before it is touched.
+## cannot be scored. A large-panel block's rubble is a big share of its own
+## height, and there is no room above a pile like that to put a winning line
+## and still be under the roof. Padded to clear its own rubble, one seed's
+## winning line landed at 324 px on a 242 px building: a level won before it
+## is touched.
+##
+## Re-measured with pilespread, worst of six runs on three seeds, as a share
+## of the building's own height:
+##
+##     house           9%
+##     curtain wall   21%
+##     shed           28%
+##     panel        46-51%
+##
+## The note here used to say 65%, from a single measurement taken long ago.
+## The share is smaller now and the conclusion is the same: panel is roughly
+## double the worst system that ships. It stays out, and it now stays out on
+## a comparison rather than on one number nobody had checked since.
 ##
 ## The cause is that a panel block is fifteen big precast slabs where other
 ## systems are thirty to sixty smaller members, so its debris is coarse and
