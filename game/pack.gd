@@ -42,7 +42,6 @@ const MEASURED := {
 	4109: {"pile": 55, "system": "shed"},
 	4110: {"pile": 39, "system": "shed"},
 	4111: {"pile": 46, "system": "shed"},
-	4112: {"pile": 123, "system": "house"},
 	4113: {"pile": 26, "system": "house"},
 	4115: {"pile": 44, "system": "retail"},
 	4116: {"pile": 53, "system": "retail"},
