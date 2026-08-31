@@ -109,6 +109,16 @@ if (process.env.CHROMIUM_PATH) launch.executablePath = process.env.CHROMIUM_PATH
   }
   const noisy = logs.filter(l => /^error/i.test(l));
   if (noisy.length) console.log('console errors      :', noisy.slice(0, 8));
+  // On a failure, print what the browser actually said rather than only the
+  // lines typed "error". This check went red for five releases saying nothing
+  // but "no change after a click", and the cause — the game's first level
+  // collapsing on its own before the click landed — prints as an ordinary log
+  // line, not an error. A verdict with no evidence behind it costs hours.
+  if (!checks.every(c => c[1])) {
+    console.log('--- last console lines from the page ---');
+    for (const line of logs.slice(-25)) console.log('  ' + line);
+    console.log(`--- screenshots: ${out}-before.png, ${out}-after.png ---`);
+  }
 
   const ok = checks.every(c => c[1]);
   console.log(`VERDICT             : ${ok ? 'PASS' : 'FAIL'}`);
