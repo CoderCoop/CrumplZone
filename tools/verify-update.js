@@ -105,20 +105,45 @@ setTimeout(() => {
   // Now behave like a player: bring the app back to the foreground and wait.
   // No cache clearing, no hard refresh, no closing the tab.
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  // Polled from here in short bursts rather than in one long evaluate inside
+  // the page, and a destroyed execution context counts as a pass.
+  //
+  // That is not leniency, it is the behaviour under test. Since the worker
+  // was patched to skipWaiting on install, a new build takes over and
+  // navigates its clients without being asked — which is the whole point, and
+  // which destroys the execution context of any evaluate still running. The
+  // old shape polled inside one twenty-second evaluate and waited to be told
+  // it could apply the update, so the very success it was checking for threw
+  // it. It survived only as long as the timing happened to favour it: nothing
+  // about the app changed between the deploy that passed and the two that
+  // failed, only the browser CI downloads afresh each run.
   at('waiting for the page to notice');
-  const noticed = await page.evaluate(async () => {
-    const reg = await navigator.serviceWorker.getRegistration();
-    for (let i = 0; i < 40; i += 1) {
-      await reg.update().catch(() => {});
-      if (window.__cz_update_ready && window.__cz_update_ready()) { return true; }
-      await new Promise((r) => setTimeout(r, 500));
+  let noticed = false;
+  let tookOverItself = false;
+  for (let i = 0; i < 40 && !noticed; i += 1) {
+    try {
+      noticed = await page.evaluate(async () => {
+        const reg = await navigator.serviceWorker.getRegistration();
+        await reg.update().catch(() => {});
+        return !!(window.__cz_update_ready && window.__cz_update_ready());
+      });
+    } catch (err) {
+      if (!/context was destroyed|Target closed|Execution context/i.test(String(err))) {
+        throw err;
+      }
+      // The new worker navigated the page out from under us, which is the
+      // update arriving on its own.
+      tookOverItself = true;
+      noticed = true;
+      await page.waitForLoadState('load', { timeout: 60000 }).catch(() => {});
     }
-    return false;
-  });
-  checks.push(['the page notices the new build', noticed, String(noticed)]);
+    if (!noticed) { await page.waitForTimeout(500); }
+  }
+  checks.push(['the page notices the new build', noticed,
+    tookOverItself ? 'the worker took over on its own' : String(noticed)]);
 
   let after = before;
-  if (noticed) {
+  if (noticed && !tookOverItself) {
     at('applying the update and reloading');
     // The game applies this itself at its next safe moment; drive it directly
     // so the test measures the delivery and not the game's own timing.
@@ -129,6 +154,8 @@ setTimeout(() => {
       page.evaluate(() => window.__cz_apply_update()).catch(() => {}),
     ]);
     await page.waitForLoadState('load', { timeout: 60000 }).catch(() => {});
+  }
+  if (noticed) {
     for (let i = 0; i < 40; i += 1) {
       after = await served(page).catch(() => after);
       if (after === 'BUILD-TWO') { break; }
