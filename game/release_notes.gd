@@ -11,6 +11,14 @@ extends RefCounted
 
 const NOTES: Array = [
 	{
+		"version": "0.14.1",
+		"date": "2026-08-31",
+		"lines": [
+			"The city is a map now — water, roads, and a pin on each district. "
+			+ "Tap a part of town to see what is standing in it.",
+		],
+	},
+	{
 		"version": "0.14.0",
 		"date": "2026-08-31",
 		"lines": [
