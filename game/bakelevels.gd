@@ -111,7 +111,11 @@ func _start() -> void:
 
 
 func _physics_process(_delta: float) -> void:
-	if _job >= _jobs.size():
+	# Validation runs after the job list is exhausted, so this guard has to
+	# know about it. It did not, and the validating phase never received a
+	# tick: the bake sat in a loop doing nothing for two hours and printed
+	# not one line, because it only reports at the end.
+	if _job >= _jobs.size() and not _validating:
 		return
 	_ticks += 1
 	_level.tick_settle()
@@ -183,6 +187,10 @@ func _physics_process(_delta: float) -> void:
 func _begin_validation() -> void:
 	_validating = true
 	_round += 1
+	# Printed as it goes, not at the end. A job that reports only on success
+	# is indistinguishable from a job that has hung, which is exactly how the
+	# loop above went unnoticed.
+	print("validation round %d over %d levels" % [_round, _measured.size()])
 	_check_at = -1
 	_dropped_this_round = 0
 	_order = []
@@ -207,6 +215,7 @@ func _next_check() -> void:
 			_report_lines.append("validation round %d: every level held" % _round)
 		_write()
 		return
+	print("  checking %d of %d" % [_check_at + 1, _order.size()])
 	_spec = Generator.generate(_order[_check_at],
 		Pack.system_for(_order[_check_at]))
 	_level.build(_spec)
