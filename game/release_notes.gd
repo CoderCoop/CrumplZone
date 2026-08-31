@@ -11,6 +11,15 @@ extends RefCounted
 
 const NOTES: Array = [
 	{
+		"version": "0.14.5",
+		"date": "2026-08-31",
+		"lines": [
+			"The waterfront gets its chimneys back. The older ones were "
+			+ "being built on timber and falling over before you touched "
+			+ "them.",
+		],
+	},
+	{
 		"version": "0.14.4",
 		"date": "2026-08-31",
 		"lines": [

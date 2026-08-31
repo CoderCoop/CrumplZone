@@ -124,6 +124,13 @@ static func _weather(blocks: Array, era: String) -> Array:
 		# remove the only piece no tool goes through.
 		if made_of == Materials.REINFORCED:
 			continue
+		# Nor is anything the architecture marked fixed. That flag means the
+		# material is carrying something and was chosen by measurement, not for
+		# character — see Architecture._block. Substituting it does not change
+		# what the building is made of, it changes whether it stands up, which
+		# is the one thing an era is documented not to touch.
+		if bool(b.get("fixed", false)):
+			continue
 		if swap.has(made_of):
 			b["material"] = swap[made_of]
 	return blocks
