@@ -24,7 +24,9 @@ graph TD
         materials["materials.gd<br/>durability and colour"]
         fracture["fracture.gd<br/>how a shape comes apart"]
         tools["tools.gd<br/>the three verbs"]
-        levels["levels.gd<br/>hand-built specs<br/>lines, pile, power"]
+        levels["levels.gd<br/>specs, lines, power<br/>difficulty and run order"]
+        districts["districts.gd<br/>the city and its parts"]
+        progress["progress.gd<br/>stars, unlocks, saved"]
         architecture["architecture.gd<br/>real structural systems"]
         standcheck["standcheck.gd<br/>does a building stand up<br/>one answer, both harnesses"]
         generator["generator.gd<br/>seeded specs"]
@@ -75,6 +77,9 @@ graph TD
     architecture -->|blocks for one system| generator
     generator -->|level spec| solver
     levels -->|lines, pile, power| generator
+    districts -->|which part of town| levels
+    progress -->|what is open| intro
+    districts -->|which sky| backdrop
     solver -->|drives headlessly| level
     partest -->|drives headlessly| level
     verifylv -->|drives| solver

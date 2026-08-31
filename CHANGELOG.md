@@ -7,7 +7,30 @@ sections are dated.
 
 ## [Unreleased]
 
-Nothing since 0.13.0.
+Nothing since 0.14.0.
+
+## [0.14.0] - 2026-08-31
+
+### Added
+
+- **The levels are a city.** They are grouped into districts — a waterfront, a
+  downtown, the works, an interchange, a retail park, an old town — and each
+  level is in the part of town where that kind of building actually gets
+  built. The sky over a level is the district's, not the seed's.
+- **A run that gets harder.** Levels are ordered by how hard they measure,
+  climbing across the city with steps back in it, so a hard one arrives after
+  something easier rather than at the end of a treadmill.
+- **Clearing a level opens the next**, and every level shows the stars earned
+  on it. Progress is kept between sessions.
+- **Experimental mode**, a toggle on the city screen that opens every level at
+  once — for looking around without playing through first.
+
+### Removed
+
+- **Easy, Medium and Hard are gone.** Three hand-built curtain walls were a
+  reasonable way to offer a game with three levels and a poor one for a city
+  of seventeen buildings of seven kinds. Difficulty is where a level sits in
+  the run now.
 
 ## [0.13.0] - 2026-08-31
 
