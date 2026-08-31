@@ -11,6 +11,16 @@ extends RefCounted
 
 const NOTES: Array = [
 	{
+		"version": "0.14.3",
+		"date": "2026-08-31",
+		"lines": [
+			"Every district has its own sky now, with something on the "
+			+ "horizon that says where you are — cranes over the water, "
+			+ "chimneys at the works, a flyover behind the interchange, "
+			+ "floodlights at the ground.",
+		],
+	},
+	{
 		"version": "0.14.2",
 		"date": "2026-08-31",
 		"lines": [

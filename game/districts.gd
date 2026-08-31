@@ -75,17 +75,22 @@ const HOME := {
 	Architecture.STAND: STADIUM,
 }
 
-## The backdrop each district is seen against. backdrop.gd already knows these
-## names; this is what ties a level's sky to the part of town it is in rather
-## than to the seed that made it.
+## The backdrop each district is seen against — one each, not one shared
+## between three. Seven districts once shared four settings, so the Retail Park
+## and the Old Town were seen against the same sky and the Interchange against
+## downtown's; a district you cannot tell apart from another is not a place.
+##
+## Every name here has to exist in Backdrop.SETTINGS. A name that does not is
+## not an error: it falls back to downtown and the level simply looks wrong
+## somewhere nobody is looking, which is what skytest.gd is for.
 const SKY := {
 	DOWNTOWN: "downtown",
 	RESIDENTIAL: "estate",
-	STRIP: "estate",
-	HIGHWAY: "downtown",
+	STRIP: "strip",
+	HIGHWAY: "highway",
 	WATERFRONT: "waterfront",
 	WORKS: "works",
-	STADIUM: "works",
+	STADIUM: "stadium",
 }
 
 
