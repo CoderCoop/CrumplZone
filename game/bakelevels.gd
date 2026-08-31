@@ -216,8 +216,21 @@ func _next_check() -> void:
 		_write()
 		return
 	print("  checking %d of %d" % [_check_at + 1, _order.size()])
-	_spec = Generator.generate(_order[_check_at],
-		Pack.system_for(_order[_check_at]))
+	# The system comes from what was just measured, not from Pack.system_for.
+	#
+	# That reads the pack committed in the repository, which by definition does
+	# not know about a seed this run has only just added — it returns "" and
+	# the generator then draws whatever that seed happens to pick. Measured on
+	# the run that first shipped grandstands: seed 4121 was validated as an
+	# overpass, 4122 as a chimney, and only 4123 as the grandstand it is. 4122
+	# was then dropped for sagging 345 px, which is something a chimney did.
+	#
+	# So the pass that this file calls "the last word" was checking different
+	# buildings than the ones it ships, for every seed the pack did not already
+	# carry — the newest ones, which are exactly the ones worth validating.
+	var level_seed: int = int(_order[_check_at])
+	_spec = Generator.generate(level_seed,
+		String(_measured[level_seed]["system"]))
 	_level.build(_spec)
 	_top_at_build = StandCheck.top_of(_level, _spec)
 	_ticks = 0

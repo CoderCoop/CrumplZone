@@ -45,6 +45,7 @@ graph TD
         fittest["fittest.gd<br/>nothing is built inside<br/>anything else"]
         shots["shots.gd<br/>a picture of each system<br/>looked at, not asserted"]
         skyshot["skyshot.gd<br/>a picture of each sky<br/>same building, different town"]
+        benchprobe["benchprobe.gd<br/>which piece moves, and which way<br/>measured, not gated"]
         verifylv["verify_levels.gd<br/>generate-and-verify measurement"]
     end
 
@@ -90,6 +91,7 @@ graph TD
     fittest -->|reads specs from| architecture
     fittest -->|gates| ci
     skyshot -->|drives| backdrop
+    benchprobe -->|drives| level
     solver -->|drives headlessly| level
     partest -->|drives headlessly| level
     verifylv -->|drives| solver
