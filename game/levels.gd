@@ -162,7 +162,9 @@ static func all_ids() -> Array:
 ## cannot tell which kind it was handed, which is the point.
 static func by_id(id: String) -> Dictionary:
 	if id.is_valid_int():
-		return Generator.generate(id.to_int())
+		# The system comes from the pack, not from the seed, so the game
+		# builds the building the bake measured.
+		return Generator.generate(id.to_int(), Pack.system_for(id.to_int()))
 	return level(id)
 
 

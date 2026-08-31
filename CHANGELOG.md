@@ -7,7 +7,33 @@ sections are dated.
 
 ## [Unreleased]
 
-Nothing since 0.12.1.
+Nothing since 0.13.0.
+
+## [0.13.0] - 2026-08-31
+
+### Added
+
+- **Three new kinds of building.** A brick house with timber floors, a stepped
+  gable and a chimney; a strip mall that is almost entirely shopfront glass;
+  and an overpass of precast spans dropped on piers, tied to nothing — take a
+  pier and its two spans drop while the rest barely notice.
+- **Stone and sheet metal.** Stone is heavy and hard to break and carries a
+  great deal standing still, so a stone base is something to bring a building
+  down around. Sheet is almost nothing: cladding that reads as cladding.
+- **Cracks show where a piece will actually break.** They are the real
+  fracture lines now, not decoration — glass shows the radiating shatter it
+  will make, steel the sloped face it will part on, and the pattern fills in
+  as the damage mounts. You can see the break coming and decide whether it is
+  the one you want.
+
+### Fixed
+
+- **Large panes of glass no longer shatter under their own weight.** A
+  shopfront window was heavy enough that the game considered it overloaded
+  just standing there, so every shop front broke while the level was still
+  settling.
+- **A strip mall's awning no longer sits inside its own window**, and house
+  windows sit on sills instead of hanging in mid-air.
 
 ## [0.12.1] - 2026-08-28
 

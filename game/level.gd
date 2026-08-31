@@ -64,6 +64,22 @@ const SLOW_CONTACT := 25.0
 ## solver search up from 97 seconds to 322, because a collapse has a couple of
 ## hundred awake bodies in it and the solver replays the level hundreds of
 ## times.
+## How much of its own weight a piece may always carry, whatever its
+## material's absolute tolerance says.
+##
+## Just over one, and the margin matters. Measured on a plain stack of
+## identical blocks, a piece reads exactly (2k+1) times one block's weight
+## with k blocks above it — so a piece bearing on the ground carrying nothing
+## reads precisely one of itself. That is the number this has to clear, and
+## nothing more.
+##
+## It was 2.4 first, on the reasoning that a piece with a neighbour reads
+## about two. That is true and it is the wrong reason: a neighbour resting on
+## a piece is exactly the load the tolerances exist to judge. At 2.4 a
+## shopfront pane could hold up a concrete floor, which stresstest caught
+## immediately — it is the one mechanic glass has.
+const SELF_CARRY := 1.3
+
 const STRESS_TICKS := 2
 const RESTING_STRESS_TICKS := 8
 const REST_TICKS := 40
@@ -280,7 +296,7 @@ func _visual(polygon: PackedVector2Array, colour: Color,
 			sheen.polygon = _diagonal(polygon, band.x, band.y)
 			sheen.color = Color(1.0, 1.0, 1.0, 0.10)
 			face.add_child(sheen)
-	_add_detail(face, polygon, role, colour)
+	_add_detail(face, polygon, role, colour, made_of)
 	return face
 
 
@@ -299,7 +315,7 @@ func _visual(polygon: PackedVector2Array, colour: Color,
 ## Only whole pieces get it. A fragment is a fragment, and trim drawn across a
 ## shard would be trim that survived being broken off.
 func _add_detail(face: Polygon2D, polygon: PackedVector2Array, role: String,
-		colour: Color) -> void:
+		colour: Color, made_of := Materials.CONCRETE) -> void:
 	if role == "":
 		return
 	var half := _half_extent(polygon)
@@ -393,15 +409,28 @@ func _add_detail(face: Polygon2D, polygon: PackedVector2Array, role: String,
 			_bar(face, Rect2(-half.x, 0.0, half.x * 2.0, half.y),
 				colour.darkened(0.32))
 		"pier", "shaft":
-			_courses(face, half, colour)
+			# Coursing only on things laid in courses. A steel stanchion or a
+			# sheet-metal sign band with brick bond drawn across it reads as a
+			# mistake, and both exist now.
+			if made_of == Materials.BRICK or made_of == Materials.STONE:
+				_courses(face, half, colour)
+			else:
+				_bar(face, Rect2(-half.x + 2.0, -half.y, 2.0, half.y * 2.0),
+					colour.lightened(0.22))
 		"spandrel":
-			_courses(face, half, colour)
+			if made_of == Materials.BRICK or made_of == Materials.STONE:
+				_courses(face, half, colour)
 			# A stone band on top, where the course carrying the openings
 			# meets the wall above it.
 			_bar(face, Rect2(-half.x, -half.y, half.x * 2.0, 3.5),
 				colour.lightened(0.24))
 		"parapet":
-			_courses(face, half, colour)
+			if made_of == Materials.BRICK or made_of == Materials.STONE:
+				_courses(face, half, colour)
+			else:
+				# A sign band: a lit strip across it rather than brickwork.
+				_bar(face, Rect2(-half.x + 6.0, -half.y * 0.35,
+					half.x * 2.0 - 12.0, half.y * 0.7), colour.lightened(0.26))
 			# A coping stone, which is what stops a parapet reading as one
 			# more course of wall.
 			_bar(face, Rect2(-half.x - 3.0, -half.y - 3.0, half.x * 2.0 + 6.0, 5.0),
@@ -523,6 +552,10 @@ func damage(body: RigidBody2D, amount: int, at: Vector2) -> bool:
 	var durability: int = int(body.get_meta("durability", 1))
 	if taken < durability:
 		body.set_meta("damage", taken)
+		# Where it was hit, in the piece's own frame — the same value shatter
+		# will use if the next blow finishes it, so the cracks drawn from it
+		# are the cuts that will really be made.
+		body.set_meta("impact", (at - body.global_position).rotated(-body.rotation))
 		_repaint(body, float(taken) / float(maxi(1, durability)))
 		return true
 	return shatter(body, at)
@@ -618,58 +651,99 @@ func _repaint(body: RigidBody2D, wear: float) -> void:
 				if part is Polygon2D and String(part.name) == "bevel":
 					(part as Polygon2D).color = _panel_colour(base, made_of)
 
-	# A crack from the first blow, and more as it nears failing — the point is
-	# that a blow never reads as nothing happening.
-	var cracks := 1 + int(clampf(wear, 0.0, 1.0) * 4.0)
-	for i in cracks:
-		body.add_child(_crack(polygon, _seed_for(body) + i, i))
+	# The cracks are the fracture. Not lines that suggest damage — the actual
+	# cuts this piece will come apart along, from the same function, the same
+	# seed and the same impact point shatter will use when the next blow
+	# finishes it. A player reading the cracks is reading what is about to
+	# happen, and can decide whether that is the break they want.
+	#
+	# They arrive longest first as the damage mounts: the main split from the
+	# first blow, the smaller ones as it nears failing, the whole pattern on a
+	# piece one blow from going.
+	var seams := _seams(body, polygon)
+	var shown := 1 + int(clampf(wear, 0.0, 1.0) * float(maxi(seams.size() - 1, 0)))
+	for i in mini(shown, seams.size()):
+		body.add_child(_crack_along(polygon, seams[i], i))
 
 
-## A thin dark split running in from the edge towards the middle, every corner
-## of it inside the piece, and deterministic so it does not wander when
-## redrawn.
+## Where this piece will actually split, longest cut first.
 ##
-## It used to claim that and not do it. Measured across six levels' worth of
-## real fragments, a quarter of every crack corner drawn sat outside the piece
-## it belonged to, the worst by 62 px — a damage line floating in open air
-## beside the thing it was meant to be damage on.
+## Asks Fracture for the pieces it would break into and keeps the edges that
+## are not on the original outline — those are the cuts. Each internal edge
+## belongs to two fragments and so comes back twice; one copy is kept.
+func _seams(body: RigidBody2D, polygon: PackedVector2Array) -> Array:
+	var made_of: String = body.get_meta("material", Materials.CONCRETE)
+	var made := Materials.of(made_of)
+	var impact: Vector2 = body.get_meta("impact", Vector2.ZERO)
+	var pieces := Fracture.fragments(polygon, impact, int(made["pieces"]),
+		bool(made.get("brittle", false)), Materials.MIN_AREA, _seed_for(body))
+	var seen := {}
+	var found: Array = []
+	for shard in pieces:
+		for i in shard.size():
+			var a: Vector2 = shard[i]
+			var b: Vector2 = shard[(i + 1) % shard.size()]
+			if _on_outline(polygon, a, b):
+				continue
+			# Snapped so the two fragments either side of a cut agree it is
+			# the same cut, and ordered so it keys the same from both.
+			var one := Vector2(snappedf(a.x, 0.1), snappedf(a.y, 0.1))
+			var two := Vector2(snappedf(b.x, 0.1), snappedf(b.y, 0.1))
+			var key := ""
+			if one.x < two.x or (one.x == two.x and one.y <= two.y):
+				key = "%v|%v" % [one, two]
+			else:
+				key = "%v|%v" % [two, one]
+			if seen.has(key):
+				continue
+			seen[key] = true
+			found.append(PackedVector2Array([a, b]))
+	found.sort_custom(func(x: PackedVector2Array, y: PackedVector2Array) -> bool:
+		return x[0].distance_to(x[1]) > y[0].distance_to(y[1]))
+	return found
+
+
+## Is this edge part of the piece's own outline rather than a cut through it?
 ##
-## Three separate reasons, and only the first had any guard at all:
+## Tested on the midpoint: the fragments are convex and share whole edges with
+## the shape, so an edge lies on the outline exactly when its middle does.
+func _on_outline(polygon: PackedVector2Array, a: Vector2, b: Vector2) -> bool:
+	var middle := (a + b) * 0.5
+	for i in polygon.size():
+		var p := polygon[i]
+		var q := polygon[(i + 1) % polygon.size()]
+		var edge := q - p
+		if edge.length_squared() < 0.0001:
+			continue
+		if absf(edge.normalized().cross(middle - p)) >= 0.35:
+			continue
+		var along := edge.normalized().dot(middle - p)
+		if along >= -0.35 and along <= edge.length() + 0.35:
+			return true
+	return false
+
+
+## One cut, drawn as a thin dark split with every corner inside the piece.
 ##
-##   * the near end walked in from beyond the edge in steps of 0.85, twelve of
-##     them, and simply gave up outside if that was not enough;
-##   * the far end was placed at a quarter of the piece's reach in a direction
-##     of its own and never checked at all, which is fine on a square and
-##     wrong as soon as fragments are slivers and wedges;
-##   * the width was added perpendicular afterwards, which pushes a corner out
-##     through an edge even when both ends are inside.
-##
-## All three are answered the same way: everything is measured from a point
-## known to be inside, and every corner is pulled back in before it is drawn.
-func _crack(polygon: PackedVector2Array, salt: int, index: int) -> Polygon2D:
-	# The average of a convex polygon's vertices is inside it. That is the one
-	# point here that needs no checking, so everything else is built from it.
+## The corner-pulling below is the guard from the containment fix, kept
+## because it is still needed: the seam itself lies in the piece by
+## construction, but the width added across it can still push a corner out
+## through an edge the seam ends on.
+func _crack_along(polygon: PackedVector2Array, seam: PackedVector2Array,
+		index: int) -> Polygon2D:
 	var centre := Vector2.ZERO
 	for point in polygon:
 		centre += point
 	centre /= float(maxi(polygon.size(), 1))
 
-	var angle := float(absi(salt * 37 + index * 911) % 360) * (PI / 180.0)
-	var out := Vector2(cos(angle), sin(angle))
+	var start: Vector2 = seam[0]
+	var finish: Vector2 = seam[1]
 	var span := Fracture.reach(polygon)
-	var start := centre + out * span
-	for _step in 24:
-		if Fracture._contains(polygon, start):
-			break
-		start = start.lerp(centre, 0.18)
-	# Inward, toward a point already known to be inside, rather than off at an
-	# angle of its own.
-	var end := start.lerp(centre, 0.62)
-	var width: float = clampf(span * 0.09, 0.7, 2.6)
-	var across := (end - start).orthogonal().normalized() * width
+	var width: float = clampf(span * 0.055, 0.7, 2.2)
+	var across := (finish - start).orthogonal().normalized() * width
 
 	var quad := PackedVector2Array([
-		start + across, end + across * 0.35, end - across * 0.35, start - across])
+		start + across, finish + across, finish - across, start - across])
 	for i in quad.size():
 		quad[i] = _pulled_inside(polygon, quad[i], centre)
 
@@ -935,6 +1009,14 @@ func standing() -> int:
 	return count
 
 
+## What this piece weighs, as the contact impulse holding it up for one step —
+## the same units the stress readings are in.
+func _own_weight(body: RigidBody2D) -> float:
+	var gravity := float(ProjectSettings.get_setting(
+		"physics/2d/default_gravity", 980.0))
+	return body.mass * gravity / 60.0
+
+
 ## The highest point of a piece, from its actual outline in its actual
 ## orientation.
 func _top_of(body: RigidBody2D) -> float:
@@ -1031,6 +1113,25 @@ func _stress_pass() -> void:
 		var made_of: String = body.get_meta("material", Materials.CONCRETE)
 		var limit := lerpf(Materials.rest_limit(made_of),
 			Materials.stress_limit(made_of), severity)
+		# Nothing is overloaded by its own weight alone.
+		#
+		# The tolerances are absolute forces, and they are compared against
+		# pieces of wildly different size. Calibrated on a curtain wall's
+		# glazing — 44x50, which rests at 0.54 of what glass tolerates — they
+		# do not survive a bigger pane: a shopfront window is 84x92 and its
+		# own weight reads 76 against a tolerance of 40. It cannot stand up
+		# without the model calling it overloaded. Glass takes one point of
+		# damage to shatter, so every shopfront broke while the level was
+		# settling, and the shards then read over tolerance too, which is what
+		# kept gentest failing.
+		#
+		# The honest fix is stress rather than force — load per unit of
+		# section — and that is a rewrite of every tuned number in the table.
+		# This is the narrow version of the same idea: whatever else it says,
+		# a piece may always carry itself. Everything the tolerances were
+		# actually tuned for is a load arriving from somewhere else, and that
+		# is untouched.
+		limit = maxf(limit, _own_weight(body) * SELF_CARRY)
 		if load <= limit:
 			# Carrying what it was built to carry: let it rest.
 			body.can_sleep = true

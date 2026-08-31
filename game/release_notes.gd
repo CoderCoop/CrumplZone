@@ -11,6 +11,21 @@ extends RefCounted
 
 const NOTES: Array = [
 	{
+		"version": "0.13.0",
+		"date": "2026-08-31",
+		"lines": [
+			"Cracks show you where a piece is going to break. They are the "
+			+ "real fracture lines, so you can see the break coming and decide "
+			+ "whether it is the one you want.",
+			"Three new kinds of building: a brick house, a strip mall that is "
+			+ "nearly all glass, and an overpass whose spans are tied to "
+			+ "nothing.",
+			"Stone and sheet metal, which behave nothing like each other.",
+			"Big shop windows no longer shatter under their own weight before "
+			+ "you touch them.",
+		],
+	},
+	{
 		"version": "0.12.1",
 		"date": "2026-08-28",
 		"lines": [

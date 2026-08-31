@@ -26,6 +26,7 @@ graph TD
         tools["tools.gd<br/>the three verbs"]
         levels["levels.gd<br/>hand-built specs<br/>lines, pile, power"]
         architecture["architecture.gd<br/>real structural systems"]
+        standcheck["standcheck.gd<br/>does a building stand up<br/>one answer, both harnesses"]
         generator["generator.gd<br/>seeded specs"]
         solver["solver.gd<br/>searches for a solution"]
     end
@@ -89,6 +90,7 @@ graph TD
     fracture -->|cuts a piece in two| level
     gentest -->|drives| generator
     shots -->|renders| generator
+    standcheck -->|used by| gentest
     gentest -->|gates| ci
     verifylv -->|gates| ci
     main -->|exported as WASM| pages
@@ -238,6 +240,16 @@ There were three lines for a while, one per star, with the rating being how
 many of them everything got under. That is gone, along with the choice to bank
 a win or go back for another line — under cost-based scoring, every extra
 charge only lowers the rating, so there is nothing to go back for.
+
+**Whether a building stands up is decided once, in `standcheck.gd`.** The bake
+runs it five times per level and then again over the whole accepted pack until
+a round drops nothing; `gentest` runs it too but only fails past a large
+margin. That split is measured, not a convenience: physics carries state
+between builds in a process, so two harnesses running the same check in
+different orders genuinely disagree about whichever level is nearest the edge.
+The bake is the gate because it samples far more; `gentest` still fails
+outright on a level that cannot be won, one won before it is touched, a pack
+that has shrunk, or a building actually coming apart.
 
 `gentest.gd` gates the generated side: it walks the seeds the pack ships and
 fails if any building damages itself, sags untouched, cannot be won, or is won

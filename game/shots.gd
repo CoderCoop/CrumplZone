@@ -16,6 +16,7 @@ const SHOT := Vector2i(430, 780)
 var _level: Level
 var _cam: Camera2D
 var _out := "shots"
+var _hits := 0
 var _queue: Array = []
 var _waited := 0
 
@@ -24,6 +25,8 @@ func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	if args.size() > 0:
 		_out = args[0]
+	if args.size() > 1 and String(args[1]).is_valid_int():
+		_hits = String(args[1]).to_int()
 	DirAccess.make_dir_recursive_absolute(_out)
 	get_window().size = SHOT
 	_level = Level.new()
@@ -44,6 +47,12 @@ func _process(_delta: float) -> void:
 		var kind: String = _queue.pop_front()
 		var spec := Generator.generate(hash(kind), kind)
 		_level.build(spec)
+		# Optional second argument: damage everything by this much first, so
+		# the picture shows the crack pattern rather than a pristine building.
+		if _hits > 0:
+			for body in _level.live_blocks():
+				_level.damage(body, _hits, body.global_position
+					+ Vector2(6.0, -4.0))
 		var want: Rect2 = _level.frame()
 		# The project stretches canvas items from an 800x600 base, so the
 		# units the camera works in are the visible rect's, not the window's.
@@ -60,6 +69,6 @@ func _process(_delta: float) -> void:
 		return
 	var image := get_viewport().get_texture().get_image()
 	var name := String(_level.spec.get("kind", "level"))
-	image.save_png("%s/%s.png" % [_out, name])
+	image.save_png("%s/%s%s.png" % [_out, name, "" if _hits == 0 else "-cracked"])
 	print("  %s  %d blocks" % [name, _level.spec["blocks"].size()])
 	_waited = 0

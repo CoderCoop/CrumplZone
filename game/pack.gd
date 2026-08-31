@@ -23,25 +23,37 @@ extends RefCounted
 ## A measured pile needs no safety factor, so nothing inflates the winning
 ## line, and there is no per-system constant left to be wrong.
 
-## seed -> {"pile": the worst rubble it left}. Measured, not modelled.
+## seed -> {"pile": the worst rubble it left, "system": which kind of building
+## it is}. Measured, not modelled.
+##
+## The system is recorded rather than re-drawn from the seed. The bake asks
+## for each system by name so that every one of them is covered, so the seed
+## alone no longer decides what gets built — and rebuilding from the seed
+## alone would give the game a different building than the one measured.
 const MEASURED := {
-	4100: {"pile": 95},
-	4101: {"pile": 106},
-	4102: {"pile": 64},
-	4103: {"pile": 85},
-	4104: {"pile": 76},
-	4105: {"pile": 71},
-	4106: {"pile": 60},
-	4107: {"pile": 105},
-	4108: {"pile": 98},
-	4109: {"pile": 48},
-	4111: {"pile": 58},
+	4100: {"pile": 119, "system": "curtain_wall"},
+	4101: {"pile": 89, "system": "curtain_wall"},
+	4102: {"pile": 92, "system": "curtain_wall"},
+	4103: {"pile": 101, "system": "flat_slab"},
+	4104: {"pile": 59, "system": "flat_slab"},
+	4105: {"pile": 109, "system": "flat_slab"},
+	4106: {"pile": 44, "system": "stack"},
+	4107: {"pile": 72, "system": "stack"},
+	4109: {"pile": 55, "system": "shed"},
+	4110: {"pile": 39, "system": "shed"},
+	4111: {"pile": 46, "system": "shed"},
+	4113: {"pile": 26, "system": "house"},
+	4115: {"pile": 44, "system": "retail"},
+	4116: {"pile": 53, "system": "retail"},
+	4117: {"pile": 56, "system": "retail"},
+	4119: {"pile": 62, "system": "overpass"},
+	4120: {"pile": 47, "system": "overpass"},
 }
 ## difficulty -> the same, for the three authored levels.
 const AUTHORED := {
-	"easy": {"pile": 74},
-	"medium": {"pile": 81},
-	"hard": {"pile": 101},
+	"easy": {"pile": 76},
+	"medium": {"pile": 68},
+	"hard": {"pile": 87},
 }
 
 ## The measured pile, or -1 for a level the bake has never covered.
@@ -57,6 +69,11 @@ static func for_seed(level_seed: int) -> float:
 
 static func for_level(difficulty: String) -> float:
 	return float(AUTHORED.get(difficulty, {}).get("pile", -1.0))
+
+
+## Which kind of building a baked seed is, or "" if it is not in the pack.
+static func system_for(level_seed: int) -> String:
+	return String(MEASURED.get(level_seed, {}).get("system", ""))
 
 
 ## Every seed the pack covers, in order, so the game and the harnesses agree

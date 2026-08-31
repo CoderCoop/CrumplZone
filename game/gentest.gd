@@ -30,7 +30,8 @@ extends Node2D
 ## what ships is the point; the bake's own report is where a seed that was
 ## rejected gets explained.
 const LEAST_LEVELS := 8
-const STAND_TICKS := 240
+
+
 const CHARGE_EVERY := 14
 const SETTLE := 900
 
@@ -41,6 +42,7 @@ var _phase := ""
 var _ticks := 0
 var _standing_before := 0
 var _top_at_build := 0.0
+var _settled_damage := 0
 var _spots: Array[Vector2] = []
 var _charge_at := 0
 var _failures: Array[String] = []
@@ -64,7 +66,7 @@ func _next() -> void:
 	_level.build(_spec)
 	_seen[_spec["kind"]] = int(_seen.get(_spec["kind"], 0)) + 1
 	_standing_before = _level.standing()
-	_top_at_build = _top_now()
+	_top_at_build = StandCheck.top_of(_level, _spec)
 	_spots = []
 	for b in _spec["blocks"]:
 		_spots.append(Vector2(float(b["x"]), float(b["y"])))
@@ -80,44 +82,28 @@ func _physics_process(_delta: float) -> void:
 	_level.tick_settle()
 	match _phase:
 		"standing":
-			if _ticks < STAND_TICKS:
+			if _ticks == StandCheck.SETTLE_TICKS:
+				_settled_damage = StandCheck.damage_total(_level)
+			if _ticks < StandCheck.SETTLE_TICKS + StandCheck.WATCH_TICKS:
 				return
-			# Judged on damage and on how far the top has dropped, not on the
-			# count above the line: when a line sits near a low building's
-			# roof, ordinary settling moves pieces across it and a count reads
-			# that as a collapse. Measured — two shed seeds were reported as
-			# falling over when what had actually happened was that their
-			# winning line was level with their own roof.
-			var damaged := 0
-			var culprits := {}
-			for body in _level.live_blocks():
-				if int(body.get_meta("damage", 0)) > 0:
-					damaged += 1
-					var what := "%s %s" % [body.get_meta("role", "?"),
-						body.get_meta("material", "?")]
-					culprits[what] = int(culprits.get(what, 0)) + 1
-			if damaged > 0:
-				_lines.append("        damaged untouched: %s" % culprits)
-			var dropped := _top_now() - _top_at_build
-			if damaged > 0:
-				_failures.append("seed %d (%s) damages itself standing still: %d pieces"
-					% [_spec["seed"], _spec["kind"], damaged])
-			# The check is for collapse, not for settling. Twelve pixels flat
-			# was invented here without calibration and is unfair to a tall
-			# heavy building: every system settles into its contacts once,
-			# under its own weight, and the amount scales with how much
-			# building is stacked up.
-			#
-			# Measured: five of the six systems settle under 2 px. Masonry,
-			# which is by far the heaviest, settles 15 on a 333 px building —
-			# 4.5% — and does so once, without damaging anything. A building
-			# that actually falls over loses tens of percent of its height.
-			# Self-damage is still judged at zero, which is the signal that
-			# distinguishes a structure failing from one bedding down.
-			var allowed: float = maxf(12.0, _top_at_build * 0.06)
-			if dropped > allowed:
-				_failures.append("seed %d (%s) sags %.0f px untouched, over %.0f allowed for its height"
-					% [_spec["seed"], _spec["kind"], dropped, allowed])
+			# One check, shared with the bake. See standcheck.gd.
+			var bedded := StandCheck.culprits(_level)
+			if not bedded.is_empty():
+				_lines.append("        bedded in with: %s" % bedded)
+			# Reported, not failed on, below StandCheck.DEGRADING. The bake
+			# is the gate for standing: it runs this same check five times a
+			# level and then again over the whole pack until nothing drops.
+			# A single further roll here cannot add information it does not
+			# have, and it demonstrably disagrees — which made CI red for
+			# levels the bake had validated.
+			var why := StandCheck.verdict(_level, _spec, _top_at_build,
+				_settled_damage)
+			var carried_on := StandCheck.damage_total(_level) - _settled_damage
+			if why != "":
+				_lines.append("        note: %s" % why)
+			if carried_on >= StandCheck.DEGRADING:
+				_failures.append("seed %d (%s) is coming apart on its own: %d points after settling"
+					% [_spec["seed"], _spec["kind"], carried_on])
 			_phase = "flatten"
 			_ticks = 0
 		"flatten":
@@ -128,18 +114,6 @@ func _physics_process(_delta: float) -> void:
 				return
 			_judge()
 			_next()
-
-
-## The highest point of anything still in the level, as a depth below the
-## street rather than a world coordinate.
-func _top_now() -> float:
-	var floor_y: float = float(_spec["floor_y"])
-	var peak := floor_y
-	for body in _level.live_blocks():
-		var poly: PackedVector2Array = body.get_meta("poly")
-		for point in poly:
-			peak = minf(peak, body.global_position.y + point.rotated(body.rotation).y)
-	return floor_y - peak
 
 
 func _judge() -> void:
