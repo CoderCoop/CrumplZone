@@ -188,6 +188,14 @@ jobs:
           # districts shared a setting for months for the same reason.
           run_harness "sky test" res://skytest.tscn
 
+          # Nothing may be built inside anything else. Three separate failures
+          # here have turned out to be exactly this and were each chased for
+          # rounds as physics — a material retuned, a tolerance raised, a
+          # footing widened — when the geometry was wrong before the
+          # simulation started. The engine hides it by shoving the pieces
+          # apart, which looks like a structure that is too weak.
+          run_harness "fit test" res://fittest.tscn
+
           # partest supersedes the old single-level playtest: it runs the same
           # search over all three difficulties and additionally checks each
           # level's par against what a solution really costs.

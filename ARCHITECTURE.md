@@ -42,6 +42,7 @@ graph TD
         collapsetest["collapsetest.gd<br/>broken columns stop carrying"]
         gentest["gentest.gd<br/>generated levels stand up<br/>and stay winnable"]
         skytest["skytest.gd<br/>every district has a sky<br/>and no two share one"]
+        fittest["fittest.gd<br/>nothing is built inside<br/>anything else"]
         shots["shots.gd<br/>a picture of each system<br/>looked at, not asserted"]
         skyshot["skyshot.gd<br/>a picture of each sky<br/>same building, different town"]
         verifylv["verify_levels.gd<br/>generate-and-verify measurement"]
@@ -86,6 +87,8 @@ graph TD
     progress -->|what is open| intro
     districts -->|which sky| backdrop
     skytest -->|gates| ci
+    fittest -->|reads specs from| architecture
+    fittest -->|gates| ci
     skyshot -->|drives| backdrop
     solver -->|drives headlessly| level
     partest -->|drives headlessly| level

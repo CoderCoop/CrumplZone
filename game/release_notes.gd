@@ -11,6 +11,17 @@ extends RefCounted
 
 const NOTES: Array = [
 	{
+		"version": "0.14.4",
+		"date": "2026-08-31",
+		"lines": [
+			"Houses look like houses: the upstairs windows sit on the floor "
+			+ "rather than inside it, and the roof is slate rather than an "
+			+ "office block's parapet.",
+			"The grandstand is rebuilt and joins the city with the next pack "
+			+ "of levels.",
+		],
+	},
+	{
 		"version": "0.14.3",
 		"date": "2026-08-31",
 		"lines": [
