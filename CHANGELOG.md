@@ -7,7 +7,17 @@ sections are dated.
 
 ## [Unreleased]
 
-Nothing since 0.14.0.
+Nothing since 0.14.1.
+
+## [0.14.1] - 2026-08-31
+
+### Changed
+
+- **The city screen is a drawn map.** Water along one edge, a road grid, the
+  interchange cutting across it, and a pin on each district coloured by what
+  stands there. Tap a district to see the levels in it. It was a list of
+  headed sections, which told you which part of town a building was in and
+  showed you nothing of where that is.
 
 ## [0.14.0] - 2026-08-31
 

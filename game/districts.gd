@@ -38,7 +38,7 @@ const PLACES := {
 		"about": "sheds and stacks, long and low",
 	},
 	HIGHWAY: {
-		"title": "The Interchange", "at": Vector2(0.30, 0.58),
+		"title": "Interchange", "at": Vector2(0.30, 0.58),
 		"about": "spans on piers, tied to nothing",
 	},
 	STRIP: {

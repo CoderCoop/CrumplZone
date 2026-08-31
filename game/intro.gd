@@ -47,6 +47,9 @@ var _how: VBoxContainer
 var _news: VBoxContainer
 var _levels: VBoxContainer
 var _levels_button: Button
+var _map: CityMap
+## Which part of town the map is showing the levels of.
+var _district := ""
 var _how_button: Button
 var _news_button: Button
 
@@ -288,16 +291,12 @@ func _show(pane: Control) -> void:
 	_levels_button.button_pressed = _levels.visible
 
 
-## The city, as a map.
+## The city: a drawn map with a pin on each district, and the levels of
+## whichever district is picked listed underneath.
 ##
-## Levels are grouped by the part of town they are in, in map order, and each
-## is a tile carrying its number, what the building is, and the stars earned on
-## it. A district with nothing in it is not drawn.
-##
-## A grid of numbers was here before. It worked and it said nothing: a level
-## was a number and the city was a list. This is the same information arranged
-## the way the game talks about it — you are demolishing the waterfront, not
-## level three.
+## Two steps rather than one, on purpose. A map small enough to sit in a
+## thumb's reach on a phone cannot also carry seventeen legible level tiles,
+## and pan-and-zoom is a worse answer than a tap.
 func _level_list() -> VBoxContainer:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
@@ -310,17 +309,29 @@ func _level_list() -> VBoxContainer:
 			% [done["cleared"], done["of"], done["stars"], done["possible"]],
 		BODY_SIZE, DIM, true))
 
-	for district in Districts.inhabited():
+	var districts := Districts.inhabited()
+	if _district == "" or not districts.has(_district):
+		_district = String(districts[0]) if not districts.is_empty() else ""
+
+	_map = CityMap.new()
+	_map.selected = _district
+	_map.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_map.district_picked.connect(func(picked: String) -> void:
+		_district = picked
+		_rebuild_levels())
+	box.add_child(_map)
+
+	if _district != "":
 		box.add_child(_spacer(6))
-		box.add_child(_label(Districts.title(district), BODY_SIZE, ACCENT))
-		box.add_child(_label(Districts.about(district), 14, DIM, true))
+		box.add_child(_label(Districts.title(_district), BODY_SIZE, ACCENT))
+		box.add_child(_label(Districts.about(_district), 14, DIM, true))
 		var grid := GridContainer.new()
 		grid.columns = 3
 		grid.add_theme_constant_override("h_separation", 8)
 		grid.add_theme_constant_override("v_separation", 8)
 		grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		for id in Levels.all_ids():
-			if Levels.district_of(String(id)) == district:
+			if Levels.district_of(String(id)) == _district:
 				grid.add_child(_level_tile(String(id)))
 		box.add_child(grid)
 
@@ -329,16 +340,32 @@ func _level_list() -> VBoxContainer:
 	# is not a cheat: the levels are generated and re-baked, and looking at all
 	# of them without playing seventeen demolitions first is a reasonable thing
 	# to want — for a player and for anyone reviewing the generator.
-	var free_play := CheckBox.new()
-	free_play.text = "Experimental mode — open every level"
+	# A toggle button rather than a checkbox. Godot's checkbox draws its mark
+	# from the theme's icons, and against this background it came out as a
+	# bare line of text with nothing to say whether it was on — which is the
+	# same class of problem as a font glyph the build does not ship.
+	var on := Progress.experimental()
+	var free_play := Button.new()
+	free_play.text = ("Experimental mode: ON — every level open" if on
+		else "Experimental mode: off")
 	free_play.focus_mode = Control.FOCUS_NONE
-	free_play.button_pressed = Progress.experimental()
+	free_play.toggle_mode = true
+	free_play.button_pressed = on
 	free_play.add_theme_font_size_override("font_size", BODY_SIZE)
-	free_play.add_theme_color_override("font_color", DIM)
-	free_play.add_theme_color_override("font_pressed_color", BRIGHT)
-	free_play.custom_minimum_size = Vector2(0.0, 44.0)
-	free_play.toggled.connect(func(on: bool) -> void:
-		Progress.set_experimental(on)
+	free_play.custom_minimum_size = Vector2(0.0, 46.0)
+	for state in ["normal", "hover", "pressed", "hover_pressed"]:
+		var box_style := StyleBoxFlat.new()
+		box_style.bg_color = (Color(0.36, 0.52, 0.40) if on
+			else Color(0.20, 0.21, 0.25))
+		box_style.corner_radius_top_left = 8
+		box_style.corner_radius_top_right = 8
+		box_style.corner_radius_bottom_left = 8
+		box_style.corner_radius_bottom_right = 8
+		free_play.add_theme_stylebox_override(state, box_style)
+	free_play.add_theme_color_override("font_color", BRIGHT if on else DIM)
+	free_play.add_theme_color_override("font_pressed_color", BRIGHT if on else DIM)
+	free_play.pressed.connect(func() -> void:
+		Progress.set_experimental(not Progress.experimental())
 		_rebuild_levels())
 	box.add_child(free_play)
 	return box
