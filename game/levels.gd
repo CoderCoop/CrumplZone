@@ -150,11 +150,94 @@ const TITLES := {
 ## reachable from anywhere in the game — the pack existed and no player could
 ## play any of it. One list, and one way to ask for a level by name, is what
 ## closed that gap.
+## Which part of town a level is in, from what kind of building it is.
+static func district_of(id: String) -> String:
+	if not id.is_valid_int():
+		return Districts.DOWNTOWN
+	return Districts.of_system(Pack.system_for(id.to_int()))
+
+
+## How hard a level is, on a scale where the numbers only matter next to each
+## other.
+##
+## Built from the building rather than from a solution, for the same reason the
+## lines are: a solved difficulty has to be re-measured every time the physics
+## moves, and this does not. Four things, and each is something a player would
+## also name if asked why one building was harder than another:
+##
+##   * how much of it there is — material area, the dominant term
+##   * how tough it is — the mean durability of what it is made of, so a steel
+##     frame outranks the same shape in timber
+##   * how far it has to come down — the winning line against its own height
+##   * how much is in the way — a reinforced piece cannot be removed at all,
+##     and having to work around one is most of what makes a level a puzzle
+static func difficulty_of(id: String) -> float:
+	var spec := by_id(id)
+	var area := 0.0
+	var toughness := 0.0
+	var reinforced := 0
+	var blocks: Array = spec.get("blocks", [])
+	for b in blocks:
+		var size := float(b["w"]) * float(b["h"])
+		area += size
+		var made_of := String(b.get("material", CONCRETE_NAME))
+		toughness += size * float(Materials.of(made_of).get("durability", 1))
+		if made_of == Materials.REINFORCED:
+			reinforced += 1
+	if area <= 0.0:
+		return 0.0
+	var mean_durability := toughness / area
+	var floor_y: float = float(spec["floor_y"])
+	var tall := 0.0
+	for b in blocks:
+		tall = maxf(tall, floor_y - (float(b["y"]) - float(b["h"]) * 0.5))
+	var line: float = floor_y - float(spec["height_line"])
+	# How much of its own height has to come off. A building whose line sits
+	# near its roof is barely a demolition; one that has to lose most of
+	# itself is.
+	var drop: float = 1.0 - clampf(line / maxf(tall, 1.0), 0.0, 1.0)
+	return area * 0.0016 * (0.55 + mean_durability * 0.06) \
+		* (0.65 + drop) * (1.0 + float(reinforced) * 0.16)
+
+
+const CONCRETE_NAME := "concrete"
+
+
+## Every level in the order the city is played, easiest first but not
+## monotonically.
+##
+## A run of levels that each edge past the last is a treadmill; the ups and
+## downs are what make a hard one feel hard. So the sequence is sorted by
+## difficulty and then given a gentle sawtooth: every third level steps back to
+## something easier before climbing again. The trend is upward and the local
+## shape is not.
+##
+## The authored three are gone. Easy, Medium and Hard were three hand-built
+## curtain walls in a game that now has seven kinds of building, and a named
+## difficulty is exactly the thing this ordering replaces.
 static func all_ids() -> Array:
-	var ids: Array = ORDER.duplicate()
+	if not _ordered.is_empty():
+		return _ordered
+	var ids: Array = []
 	for level_seed in Pack.seeds():
 		ids.append(str(level_seed))
-	return ids
+	ids.sort_custom(func(a: String, b: String) -> bool:
+		return difficulty_of(a) < difficulty_of(b))
+	# The sawtooth: every third level swaps with the one before it, so the
+	# climb has a step back in it without ever going far backwards.
+	var i := 2
+	while i < ids.size():
+		var keep: String = ids[i]
+		ids[i] = ids[i - 1]
+		ids[i - 1] = keep
+		i += 3
+	_ordered = ids
+	return _ordered
+
+
+## Worked out once. difficulty_of builds every level to measure it, which is
+## cheap but not free, and all_ids is asked on every frame the map is drawn.
+static var _ordered: Array = []
 
 
 ## A level by id: one of the authored difficulties, or the seed of a generated
@@ -173,7 +256,11 @@ static func by_id(id: String) -> Dictionary:
 static func title_for(id: String) -> String:
 	if not id.is_valid_int():
 		return TITLES.get(id, "Level")
-	var at := Pack.seeds().find(id.to_int())
+	# Numbered by where it falls in the run, not by where its seed falls in
+	# the pack. Those were the same thing while the order was the pack's; they
+	# stopped being the same the moment the run was sorted by difficulty, and
+	# the first level of the city was showing as level 7.
+	var at := all_ids().find(id)
 	return "%d" % (at + 1) if at >= 0 else id
 
 

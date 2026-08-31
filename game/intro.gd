@@ -36,7 +36,10 @@ var _play: Button
 var _plays: Array[Button] = []
 ## The level the Play button will start. Tiles set it, and the button says so,
 ## so the primary action is never a mystery.
-var _selected: String = Levels.MEDIUM
+## The level the Play button will start. The furthest the player has got,
+## rather than a fixed one: coming back to the game should offer the level they
+## are actually on.
+var _selected: String = ""
 var _install: Button
 var _install_note: Label
 var _install_poll := 0.0
@@ -114,10 +117,7 @@ func _ready() -> void:
 	_play.focus_mode = Control.FOCUS_NONE
 	_play.clip_text = true
 	_play.add_theme_font_size_override("font_size", 21)
-	_play.add_theme_stylebox_override("normal", _play_style(_selected))
-	_play.add_theme_stylebox_override("hover", _play_style(_selected))
-	_play.add_theme_stylebox_override("pressed", _play_style(_selected, true))
-	_play.add_theme_stylebox_override("hover_pressed", _play_style(_selected, true))
+	_selected = _furthest()
 	_play.add_theme_color_override("font_color", Color(0.10, 0.10, 0.12))
 	_play.add_theme_color_override("font_pressed_color", Color(0.10, 0.10, 0.12))
 	_play.pressed.connect(func() -> void: play_pressed.emit(_selected))
@@ -190,18 +190,14 @@ func _refresh_play() -> void:
 			_tile_style(kind, state.contains("pressed")))
 
 
-func _play_style(difficulty: String, held := false) -> StyleBoxFlat:
-	var box := StyleBoxFlat.new()
-	var tint := {
-		Levels.EASY: Color(0.58, 0.80, 0.52),
-		Levels.MEDIUM: Color(0.95, 0.78, 0.34),
-		Levels.HARD: Color(0.93, 0.51, 0.36),
-	}.get(difficulty, Color(0.95, 0.78, 0.34)) as Color
-	box.bg_color = tint.lightened(0.18) if held else tint
-	box.set_corner_radius_all(10)
-	box.set_border_width_all(2)
-	box.border_color = tint.lightened(0.35)
-	return box
+## The level to offer: the first one not yet cleared, or the last if the whole
+## city is done.
+func _furthest() -> String:
+	var all := Levels.all_ids()
+	for id in all:
+		if not Progress.cleared(String(id)):
+			return String(id)
+	return String(all[all.size() - 1])
 
 
 func relayout() -> void:
@@ -292,62 +288,120 @@ func _show(pane: Control) -> void:
 	_levels_button.button_pressed = _levels.visible
 
 
-## Every level the game has, as a grid of tiles.
+## The city, as a map.
 ##
-## The three named difficulties are also the three buttons along the bottom,
-## and they are repeated here so the list is the whole game in one place
-## rather than the leftovers. Generated levels are numbered: a seed is not
-## something a player can use, and their real identity is the building, which
-## the tile says underneath.
+## Levels are grouped by the part of town they are in, in map order, and each
+## is a tile carrying its number, what the building is, and the stars earned on
+## it. A district with nothing in it is not drawn.
+##
+## A grid of numbers was here before. It worked and it said nothing: a level
+## was a number and the city was a list. This is the same information arranged
+## the way the game talks about it — you are demolishing the waterfront, not
+## level three.
 func _level_list() -> VBoxContainer:
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 8)
+	box.add_theme_constant_override("separation", 6)
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	box.add_child(_label("Pick a building", HEADING_SIZE, BRIGHT))
+
+	var done := Progress.summary()
+	box.add_child(_label("The city", HEADING_SIZE, BRIGHT))
 	box.add_child(_label(
-		"Each one is a different way of standing up, so each comes down "
-		+ "differently. Every level here has been demolished by machine "
-		+ "before it reached you, so all of them can be finished.",
+		"%d of %d cleared, %d stars of %d. Bring one down to open the next."
+			% [done["cleared"], done["of"], done["stars"], done["possible"]],
 		BODY_SIZE, DIM, true))
-	var grid := GridContainer.new()
-	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 8)
-	grid.add_theme_constant_override("v_separation", 8)
-	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	for id in Levels.all_ids():
-		grid.add_child(_level_tile(String(id)))
-	box.add_child(grid)
+
+	for district in Districts.inhabited():
+		box.add_child(_spacer(6))
+		box.add_child(_label(Districts.title(district), BODY_SIZE, ACCENT))
+		box.add_child(_label(Districts.about(district), 14, DIM, true))
+		var grid := GridContainer.new()
+		grid.columns = 3
+		grid.add_theme_constant_override("h_separation", 8)
+		grid.add_theme_constant_override("v_separation", 8)
+		grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		for id in Levels.all_ids():
+			if Levels.district_of(String(id)) == district:
+				grid.add_child(_level_tile(String(id)))
+		box.add_child(grid)
+
+	box.add_child(_spacer(10))
+	# Everything open at once. A toggle rather than a hidden code, because it
+	# is not a cheat: the levels are generated and re-baked, and looking at all
+	# of them without playing seventeen demolitions first is a reasonable thing
+	# to want — for a player and for anyone reviewing the generator.
+	var free_play := CheckBox.new()
+	free_play.text = "Experimental mode — open every level"
+	free_play.focus_mode = Control.FOCUS_NONE
+	free_play.button_pressed = Progress.experimental()
+	free_play.add_theme_font_size_override("font_size", BODY_SIZE)
+	free_play.add_theme_color_override("font_color", DIM)
+	free_play.add_theme_color_override("font_pressed_color", BRIGHT)
+	free_play.custom_minimum_size = Vector2(0.0, 44.0)
+	free_play.toggled.connect(func(on: bool) -> void:
+		Progress.set_experimental(on)
+		_rebuild_levels())
+	box.add_child(free_play)
 	return box
+
+
+## The map again, after something changed what it should say.
+func _rebuild_levels() -> void:
+	if _levels == null or _column == null:
+		return
+	var was_visible := _levels.visible
+	var at := _levels.get_index()
+	_column.remove_child(_levels)
+	_levels.queue_free()
+	_levels = _level_list()
+	_column.add_child(_levels)
+	_column.move_child(_levels, at)
+	_levels.visible = was_visible
+	relayout()
 
 
 func _level_tile(id: String) -> Button:
 	var spec := Levels.by_id(id)
 	var kind := String(spec.get("kind", ""))
+	var open := Progress.unlocked(id)
+	var earned := Progress.stars(id)
 	var button := Button.new()
-	button.text = "%s\n%s" % [Levels.title_for(id), Architecture.ABOUT.get(kind, ["", ""])[0]]
+	# Stars as filled and hollow pips, drawn in text rather than as glyphs the
+	# font may not have — the tofu-box trap this project has hit twice. A
+	# locked level says so instead of showing an empty rating it cannot earn.
+	var rating := "· · ·"
+	if open:
+		rating = ""
+		for i in 3:
+			rating += ("*" if i < earned else "·") + (" " if i < 2 else "")
+	button.text = "%s\n%s\n%s" % [Levels.title_for(id),
+		Architecture.ABOUT.get(kind, ["", ""])[0], rating]
+	button.disabled = not open
 	button.focus_mode = Control.FOCUS_NONE
 	button.clip_text = true
 	button.autowrap_mode = TextServer.AUTOWRAP_OFF
 	# Comfortably over the 44 px floor in both directions, and the grid puts
 	# 8 px between them so a thumb cannot land on two at once.
-	button.custom_minimum_size = Vector2(0.0, 62.0)
+	button.custom_minimum_size = Vector2(0.0, 74.0)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button.add_theme_font_size_override("font_size", 15)
-	for state in ["normal", "hover", "pressed", "hover_pressed"]:
+	button.add_theme_font_size_override("font_size", 14)
+	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
 		button.add_theme_stylebox_override(state,
-			_tile_style(kind, state.contains("pressed")))
-	button.add_theme_color_override("font_color", Color(0.10, 0.10, 0.12))
-	button.add_theme_color_override("font_pressed_color", Color(0.10, 0.10, 0.12))
-	button.pressed.connect(func() -> void:
-		_selected = id
-		_refresh_play()
-		play_pressed.emit(id))
+			_tile_style(kind, state.contains("pressed"), not open))
+	var ink := Color(0.10, 0.10, 0.12) if open else Color(0.55, 0.57, 0.62)
+	button.add_theme_color_override("font_color", ink)
+	button.add_theme_color_override("font_pressed_color", ink)
+	button.add_theme_color_override("font_disabled_color", ink)
+	if open:
+		button.pressed.connect(func() -> void:
+			_selected = id
+			_refresh_play()
+			play_pressed.emit(id))
 	return button
 
 
 ## A tile takes the colour of what it is made of, so the list reads as a row
 ## of different buildings rather than a row of numbers.
-func _tile_style(kind: String, held := false) -> StyleBoxFlat:
+func _tile_style(kind: String, held := false, locked := false) -> StyleBoxFlat:
 	var tint: Color = {
 		Architecture.CURTAIN_WALL: Color(0.62, 0.78, 0.92),
 		Architecture.MASONRY: Color(0.86, 0.55, 0.44),
@@ -357,6 +411,11 @@ func _tile_style(kind: String, held := false) -> StyleBoxFlat:
 	}.get(kind, Color(0.95, 0.78, 0.34)) as Color
 	var style := StyleBoxFlat.new()
 	style.bg_color = tint.darkened(0.18) if held else tint
+	if locked:
+		# Still its own colour, so the map reads as a city of different
+		# buildings even where it has not been played — just dimmed, rather
+		# than a row of identical grey blanks.
+		style.bg_color = tint.darkened(0.55)
 	style.corner_radius_top_left = 10
 	style.corner_radius_top_right = 10
 	style.corner_radius_bottom_left = 10

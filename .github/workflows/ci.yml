@@ -175,6 +175,12 @@ jobs:
 
           run_harness "line test" res://linetest.tscn
 
+          # The city has to play as a run: difficulty climbing across it with
+          # ups and downs rather than flat or as a staircase, and levels spread
+          # across districts rather than piled into one. A generator change can
+          # quietly wreck either.
+          run_harness "order test" res://ordertest.tscn
+
           # partest supersedes the old single-level playtest: it runs the same
           # search over all three difficulties and additionally checks each
           # level's par against what a solution really costs.

@@ -84,7 +84,9 @@ var _bar: ProgressBar
 var _pending: ProgressBar
 var _results: Results
 ## Which of the three the player picked.
-var _level_id: String = Levels.MEDIUM
+## Where the player is. The first level of the city until they pick another —
+## there is no "medium" any more, because there are no named difficulties.
+var _level_id: String = ""
 ## The best rating already offered, so the same one is not offered twice.
 var _buttons: Array[Button] = []
 var _art: Array[Control] = []
@@ -125,12 +127,17 @@ func _start() -> void:
 	# game with no level at all if the reload never came.
 	if UI.update_ready():
 		UI.apply_update()
+	if _level_id == "":
+		_level_id = String(Levels.all_ids()[0])
 	var spec := Levels.by_id(_level_id)
 	_level.build(spec)
 	# The place the level stands in comes with the level, and the city has to
 	# be rebuilt for it — it is baked once from a fixed seed so the skyline
 	# does not reshuffle on every rebuild.
-	_backdrop.setting = String(spec.get("setting", "downtown"))
+	# The sky belongs to the part of town, not to the seed. A warehouse on the
+	# waterfront is seen against the waterfront whichever seed made it.
+	_backdrop.setting = Districts.SKY.get(
+		Levels.district_of(_level_id), spec.get("setting", "downtown"))
 	_backdrop.rebuild()
 	_power_full = float(spec["power"])
 	_power = _power_full
@@ -544,6 +551,10 @@ func _spent() -> float:
 func _show_results(won: bool, earned: int) -> void:
 	if _results != null:
 		return
+	# Banked before the panel is even built, so a player who closes the tab on
+	# the results screen still keeps what they earned.
+	if won:
+		Progress.record(_level_id, earned)
 	_holding = false
 	_effects.stop_aim()
 	_results = Results.new()

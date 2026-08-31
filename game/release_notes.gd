@@ -11,6 +11,21 @@ extends RefCounted
 
 const NOTES: Array = [
 	{
+		"version": "0.14.0",
+		"date": "2026-08-31",
+		"lines": [
+			"The levels are a city now, in districts — a waterfront, a "
+			+ "downtown, the works, an interchange, a retail park, an old "
+			+ "town — and each building is where that kind really gets built.",
+			"Bring one down and the next opens. Every level keeps the stars "
+			+ "you earned on it.",
+			"The run gets harder as it goes, with steps back in it.",
+			"Easy, Medium and Hard are gone. There is a city instead.",
+			"Experimental mode opens every level at once, if you would rather "
+			+ "look around.",
+		],
+	},
+	{
 		"version": "0.13.0",
 		"date": "2026-08-31",
 		"lines": [
