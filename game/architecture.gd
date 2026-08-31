@@ -92,33 +92,24 @@ const TYPES: Array[String] = [
 ## stacks high. The fix is in the architecture — more, smaller panels, or more
 ## storeys to raise the building against its own rubble — not in the scoring,
 ## and not in a constant. It comes back when its pile is in proportion.
-## The grandstand is held back with the panel block. It is the hardest thing
-## here to make stand: a raked mass, two tall columns and a cantilevered roof,
-## and the roof is the problem. Balanced with a back span it stops tipping and
-## starts crushing its own column pads instead — three seeds, three failures,
-## across three different attempts at the base. The shape is right and the
-## foundations are not, and a level that falls over before the player arrives
-## is not one to ship.
-## Load-bearing masonry is held back, with the panel block and the grandstand.
+## The grandstand came back in with the frame rebuild: its roof is carried on
+## posts standing on the terrace now rather than cantilevered off a tie that
+## could only have worked in tension, and twelve seeds in twelve stand.
 ##
-## It shipped for a while and it should not have. It fails more than anything
-## else here: three of its four seeds are dropped by the bake for carrying on
-## damaging themselves after they have settled, and the survivor is failed by
-## gentest on its own run. Always the same piece, a brick pier, and always
-## while standing still.
+## Load-bearing masonry is back too, and the paragraph above says why. It was
+## benched for carrying on damaging itself after settling — always the same
+## brick pier, always standing still — and that was chased through widened
+## piers and a raised rest tolerance before anyone rendered it. The cause was
+## the interpenetration, and it is fixed and now gated by fittest.
 ##
-## Widening the piers was tried — they read 1.8 times what brick tolerates —
-## and it changed nothing, so it has been taken back out rather than left in
-## looking like a fix. Brick's rest tolerance was already raised once for this
-## exact piece, from 2.0 to 3.5, and raising it again would be tuning the
-## material to excuse the building.
-##
-## What is actually wrong is that a masonry wall is being modelled as a stack
-## of separate piers and courses when the real thing is monolithic — the
-## spandrel was made continuous for that reason and it was not enough. That is
-## a rebuild of the system, not an adjustment to it.
+## Measured before re-enabling it, sixteen seeds: fifteen hold outright and
+## one takes a single point, which is the same shape as every shipped system.
+## The old note here concluded it needed rebuilding as a monolithic wall. That
+## was written against the broken geometry and is no longer what the numbers
+## say, so it has gone rather than been left sitting under a system that
+## stands up.
 const GENERATED: Array[String] = [
-	CURTAIN_WALL, FLAT_SLAB, STACK, SHED,
+	CURTAIN_WALL, MASONRY, FLAT_SLAB, STACK, SHED,
 	HOUSE, RETAIL, OVERPASS, STAND,
 ]
 

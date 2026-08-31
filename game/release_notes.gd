@@ -17,6 +17,8 @@ const NOTES: Array = [
 			"The waterfront gets its chimneys back. The older ones were "
 			+ "being built on timber and falling over before you touched "
 			+ "them.",
+			"Brick warehouses are back with them — no frame, the walls are "
+			+ "the building.",
 		],
 	},
 	{

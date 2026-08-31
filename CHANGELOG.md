@@ -11,6 +11,13 @@ Nothing since 0.14.5.
 
 ## [0.14.5] - 2026-08-31
 
+### Added
+
+- **Brick warehouses are back.** Load-bearing masonry — no frame, the walls
+  are the building — returns to the waterfront alongside the chimneys. It was
+  benched for damaging itself while standing still; the cause turned out to be
+  pieces built inside each other, which is fixed and now checked for.
+
 ### Fixed
 
 - **The waterfront gets its chimneys back.** Every Victorian chimney fell over
