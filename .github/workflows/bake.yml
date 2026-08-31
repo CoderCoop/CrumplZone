@@ -41,8 +41,21 @@ jobs:
           fi
           # A pack with nothing in it would sail through review as a diff that
           # merely looks small, and would put every level back on the estimate.
-          if ! grep -qE '^\t[0-9]+: [0-9]' game/pack.gd; then
-            echo "::error::the bake produced an empty pack"
+          #
+          # This guard was wrong in two ways at once and so had never passed,
+          # which is why no bake had opened a pull request and the pack went
+          # stale for weeks. grep -E does not read \t as a tab — it reads it
+          # as a literal "t" — so the pattern could not match any line; and
+          # even with a real tab, the old `[0-9]+: [0-9]` predates the pack
+          # storing a dictionary per seed rather than a bare number.
+          #
+          # It counts and prints now, rather than answering yes or no. A check
+          # whose output is a silent success is a check nobody can tell has
+          # stopped working, which is exactly what happened here.
+          measured=$(grep -cP '^\t[0-9]+: \{"pile"' game/pack.gd || true)
+          echo "pack.gd carries $measured measured levels"
+          if [ "${measured:-0}" -lt 8 ]; then
+            echo "::error::the bake produced a pack of only ${measured:-0} levels"
             exit 1
           fi
           # Keep the report for the pull request body.
