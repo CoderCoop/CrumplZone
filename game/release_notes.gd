@@ -14,8 +14,10 @@ const NOTES: Array = [
 		"version": "0.14.1",
 		"date": "2026-08-31",
 		"lines": [
-			"The city is a map now — water, roads, and a pin on each district. "
-			+ "Tap a part of town to see what is standing in it.",
+			"The city is a model now, seen from above — towers downtown, "
+			+ "brick in the Old Town, sheds at the works, water and a quay "
+			+ "along one edge. Tap a part of town to see what is standing "
+			+ "in it.",
 		],
 	},
 	{

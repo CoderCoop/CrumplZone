@@ -13,11 +13,21 @@ Nothing since 0.14.1.
 
 ### Changed
 
-- **The city screen is a drawn map.** Water along one edge, a road grid, the
-  interchange cutting across it, and a pin on each district coloured by what
-  stands there. Tap a district to see the levels in it. It was a list of
-  headed sections, which told you which part of town a building was in and
-  showed you nothing of where that is.
+- **The city screen is a model of the city, seen from above.** Every block is
+  built rather than shaded in: towers downtown, two-storey brick in the Old
+  Town, long low sheds out at the works, a raised interchange on piers, water
+  and a quay along one edge — all on a baseboard with a visible cut edge and a
+  shadow under it. Each district is labelled by a pin standing on the model,
+  and the one you have chosen is ringed on the board. Tap a district to see
+  the levels in it.
+
+  It was a list of headed sections, which told you which part of town a
+  building was in and showed you nothing of where that is — or of what is
+  built there, which is the part that makes choosing one feel like choosing a
+  place.
+
+- **The waterfront moved down the shore**, so it sits against open water
+  rather than at the corner where the water pinches out.
 
 ## [0.14.0] - 2026-08-31
 
