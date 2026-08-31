@@ -119,7 +119,7 @@ const TYPES: Array[String] = [
 ## a rebuild of the system, not an adjustment to it.
 const GENERATED: Array[String] = [
 	CURTAIN_WALL, FLAT_SLAB, STACK, SHED,
-	HOUSE, RETAIL, OVERPASS,
+	HOUSE, RETAIL, OVERPASS, STAND,
 ]
 
 ## What each one is called on the level card, and the one-line reason it is
@@ -128,7 +128,7 @@ const ABOUT := {
 	HOUSE: ["Brick house", "two rooms up, two down. The walls are the frame."],
 	RETAIL: ["Strip mall", "one storey of shopfront. Almost all of it is glass."],
 	OVERPASS: ["Overpass", "spans dropped on piers. Nothing ties them together."],
-	STAND: ["Grandstand", "a raked terrace on legs, and a roof reaching over it."],
+	STAND: ["Grandstand", "a raked terrace, and a roof on posts over the seats."],
 	CURTAIN_WALL: ["Curtain wall", "a steel frame, glazed. The glass holds nothing up."],
 	MASONRY: ["Brick warehouse", "load-bearing walls. No frame — the piers are the building."],
 	PANEL: ["Panel block", "precast panels stacked dry. The joints are the weakness."],
@@ -529,6 +529,15 @@ static func _house(rng: RandomNumberGenerator) -> Array:
 	# wick water, and it gives the wall a base that will not crush.
 	blocks.append(_block(0.0, -7.0, width, 14.0, "plinth", Materials.STONE))
 	y = -14.0
+	# Where the floor a storey's windows sit on actually is. On the ground
+	# floor it is the plinth; above, it is the top of the joist spanning
+	# between the walls — which is 12 px higher than where the piers start,
+	# because the piers pass the joist rather than standing on it.
+	#
+	# The sills used to be placed at the piers' level, which built every
+	# first-floor sill 10 px inside the joist under it. fittest found it in
+	# every house seed; nothing had ever looked.
+	var deck := y
 
 	for storey in storeys:
 		for side in [-1.0, 1.0]:
@@ -552,17 +561,19 @@ static func _house(rng: RandomNumberGenerator) -> Array:
 		var glass_h := storey_h * 0.44
 		for i in 2:
 			var mid := (-1.0 if i == 0 else 1.0) * (open_w * 0.5 + wall * 0.35)
-			blocks.append(_block(mid, y - sill_h * 0.5, open_w * 0.62, sill_h,
-				"plinth", Materials.STONE))
-			blocks.append(_block(mid, y - sill_h - glass_h * 0.5, open_w * 0.62,
-				glass_h, "glazing", Materials.GLASS))
+			blocks.append(_block(mid, deck - sill_h * 0.5, open_w * 0.62,
+				sill_h, "plinth", Materials.STONE))
+			blocks.append(_block(mid, deck - sill_h - glass_h * 0.5,
+				open_w * 0.62, glass_h, "glazing", Materials.GLASS))
 		# A stone lintel course over the openings, then the floor.
 		y -= storey_h
 		blocks.append(_block(0.0, y - 9.0, width, 18.0, "spandrel", Materials.STONE))
 		y -= 18.0
+		deck = y
 		if storey < storeys - 1:
 			blocks.append(_block(0.0, y - floor_h * 0.5, width - wall * 2.0 - 8.0,
 				floor_h, "joist", Materials.TIMBER))
+			deck = y - floor_h
 
 	# A pitched roof, stepped rather than sloped, because every collider here
 	# is an axis-aligned rectangle and a stepped gable reads as a pitch at
@@ -571,7 +582,7 @@ static func _house(rng: RandomNumberGenerator) -> Array:
 	for i in steps:
 		var t := float(i) / float(steps)
 		blocks.append(_block(0.0, y - 9.0 - float(i) * 16.0,
-			width * (1.0 - t * 0.62), 16.0, "roof", Materials.TIMBER))
+			width * (1.0 - t * 0.62), 16.0, "gable", Materials.TIMBER))
 	# The chimney, off to one side as they always are, and brick where the
 	# roof is timber — the one heavy thing on top of the lightest.
 	var stack_x := (half - wall) * (1.0 if rng.randf() < 0.5 else -1.0) * 0.55
@@ -699,13 +710,6 @@ static func _stand(rng: RandomNumberGenerator) -> Array:
 	var first := -depth * 0.5
 	var back := first + depth - tread * 0.5
 	var head := -16.0 - rise * float(tiers) - 84.0
-	# The back span reaches behind the columns; the footing has to reach with
-	# it, or the tie holding the roof down stands on nothing. Measured the
-	# hard way: a tie placed beyond the footing simply fell over, taking the
-	# roof with it.
-	var reach := depth * 0.52
-	var back_span := reach * 0.34
-	var tie_x := back + back_span
 	# No continuous footing. One slab under the whole stand crushed itself on
 	# every seed — the same failure the shed's ground beam had, and for the
 	# same reason: a single member in contact with the street, every leg and
@@ -720,6 +724,7 @@ static func _stand(rng: RandomNumberGenerator) -> Array:
 	# which is what a table balanced on one leg does. A terrace is a mass with
 	# steps cut into it, not a row of tables, and built that way it is the
 	# most stable thing in the game.
+	var deck_top: Array[float] = []
 	for i in tiers:
 		var x := first + tread * 0.5 + float(i) * tread
 		var top := -16.0 - rise * float(i + 1)
@@ -729,27 +734,84 @@ static func _stand(rng: RandomNumberGenerator) -> Array:
 		# that reads as the seating deck rather than the mass under it.
 		blocks.append(_block(x, top - 8.0, tread + 1.0, 16.0, "deck",
 			Materials.CONCRETE))
+		deck_top.append(top - 16.0)
 
-	# Two columns at the back carrying the roof, and a tie behind them.
+	# The rear frame stands behind the terrace, on the street.
+	#
+	# It used to stand at `back`, which is the centre of the last riser — so
+	# both pads were built inside the terrace, overlapping it and each other.
+	# That is a geometry error wearing a physics failure's clothes: the whole
+	# stand sank thirty pixels while the pads squeezed up out of it, and no
+	# amount of retuning a material would have touched it. Same class of bug
+	# as the masonry piers, found the same way, by printing which piece moved.
+	#
+	# Everything below is derived from one clearance so it cannot come back:
+	# the pads clear the terrace, and they clear each other.
+	const CLEAR := 3.0
+	var pad_half := leg_w * 0.6
+	var spread := leg_w * 1.5
+	var frame_x: float = first + depth + CLEAR + spread + pad_half
+	var legs_top := head + 7.0
+	# Standing on the pad, not through it. The old formula put the stanchion's
+	# foot at -7 and the pad at -14 to 0, so seven pixels of every column were
+	# inside the thing it was standing on — in every seed, for as long as this
+	# system has existed.
+	var pad_top := -14.0
 	for side in [-1.0, 1.0]:
-		var cx: float = back + float(side) * tread * 0.26
-		blocks.append(_block(cx, -7.0, leg_w * 2.0, 14.0, "footing",
-			Materials.CONCRETE))
-		blocks.append(_block(cx, (head + 14.0) * 0.5 - 7.0,
-			leg_w, absf(head + 14.0), "stanchion", Materials.STEEL))
-	blocks.append(_block(tie_x, -7.0, leg_w * 1.8, 14.0, "footing",
-		Materials.CONCRETE))
-	blocks.append(_block(tie_x, (head + 14.0) * 0.5 - 7.0, leg_w * 0.8,
-		absf(head + 14.0), "web", Materials.STEEL))
-	blocks.append(_block((back + tie_x) * 0.5, head - 8.0,
-		tie_x - back + leg_w, 16.0, "chord", Materials.STEEL))
-	# The canopy: a cantilever forward over the seats with a back span behind
-	# the columns holding it down. Built with the forward reach alone it was a
-	# lever with all its weight in front of its support, and did what that has
-	# to do — one seed sagged 55 px untouched where 21 was allowed.
-	var roof_w := reach + back_span
-	blocks.append(_block(back + back_span * 0.5 - reach * 0.5, head - 23.0,
-		roof_w, 14.0, "roof", Materials.SHEET))
+		var cx: float = frame_x + float(side) * spread
+		blocks.append(_block(cx, pad_top * 0.5, pad_half * 2.0, absf(pad_top),
+			"footing", Materials.CONCRETE))
+		blocks.append(_block(cx, (legs_top + pad_top) * 0.5, leg_w,
+			absf(pad_top - legs_top), "stanchion", Materials.STEEL))
+
+	# Props standing on the terrace under the roof, and the whole reason this
+	# system was benched.
+	#
+	# It was a cantilever: the roof reached forward over the seats and a
+	# slender post behind the stanchions was supposed to hold its back span
+	# down. Measured over six seeds, that post fell flat on four of them and
+	# took the roof with it — and the reason is not that the post was too
+	# thin. The roof's centre of mass sat 51 px in front of everything holding
+	# it up, so the post was being asked to resist uplift, in a simulation
+	# with no joints, where nothing can pull on anything. A post can only
+	# push. Widening its footing was tried and did not help, because the
+	# footing was never the problem.
+	#
+	# So the roof is carried from underneath instead, on posts standing on the
+	# terrace — which is what most grounds built, obstructed views and all.
+	# Every member is in compression, and the demolition is better for it:
+	# take a post out and the roof comes down on the seats.
+	var roof_front := first + tread * 0.8
+	var roof_back := frame_x + spread + leg_w * 0.5
+	# Centred on the step it stands on, not wherever the share lands. Placed by
+	# the share alone, a prop overhung its deck by 6 px and that 6 px was
+	# inside the next riser, twelve pixels above the deck it was standing on —
+	# the same interpenetration as the pads, an order of magnitude smaller and
+	# just as much a geometry error. A prop is narrower than a tread, so
+	# centring it on one is enough to make that impossible rather than
+	# unlikely.
+	var used := -1
+	for share in [0.24, 0.60]:
+		var want: float = lerpf(roof_front, roof_back, share)
+		var tier: int = clampi(int(floor((want - first) / tread)), 0,
+			tiers - 1)
+		if tier <= used:
+			tier = mini(used + 1, tiers - 1)
+		used = tier
+		var prop_x: float = first + tread * (float(tier) + 0.5)
+		var prop_foot: float = deck_top[tier]
+		blocks.append(_block(prop_x, (legs_top + prop_foot) * 0.5,
+			leg_w * 0.9, absf(prop_foot - legs_top), "prop",
+			Materials.STEEL))
+
+	# The chord across every support, and the roof on top of it. The roof
+	# overhangs a little at each end, because a roof flush with its supports
+	# reads as a lid.
+	var chord_front: float = lerpf(roof_front, roof_back, 0.24) - leg_w
+	blocks.append(_block((chord_front + roof_back) * 0.5, legs_top - 8.0,
+		roof_back - chord_front, 16.0, "chord", Materials.STEEL))
+	blocks.append(_block((roof_front + roof_back) * 0.5, legs_top - 23.0,
+		roof_back - roof_front, 14.0, "canopy", Materials.SHEET))
 	return blocks
 
 

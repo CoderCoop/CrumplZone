@@ -7,7 +7,24 @@ sections are dated.
 
 ## [Unreleased]
 
-Nothing since 0.14.3.
+Nothing since 0.14.4.
+
+## [0.14.4] - 2026-08-31
+
+### Fixed
+
+- **Houses look like houses.** The upstairs windows sat *inside* the floor
+  they should have been standing on, and the roof was drawn with an office
+  block's parapet ends and plant room on it. The sills sit on the floor now
+  and the roof is slate courses and verge boards.
+
+### Changed
+
+- **The grandstand is rebuilt and is coming back.** Its roof used to reach out
+  over the seats held down by a slender post behind — which fell over on two
+  seeds in three, because a post can only push and it was being asked to pull.
+  It is a roof on posts standing on the terrace now, the way most grounds
+  built one. It joins the city with the next pack of levels.
 
 ## [0.14.3] - 2026-08-31
 

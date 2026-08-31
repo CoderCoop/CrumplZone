@@ -345,6 +345,35 @@ func _add_detail(face: Polygon2D, polygon: PackedVector2Array, role: String,
 					colour.darkened(0.18))
 				_bar(face, Rect2(30.0, -half.y - 20.0, 4.0, 20.0),
 					colour.darkened(0.34))
+		"canopy":
+			# Corrugated sheeting on purlins, with a fascia along the front
+			# edge. A stand's canopy is a sheet-metal lid on a steel frame: no
+			# parapet, and nothing stands on it. It was drawn with the "roof"
+			# role, so every grandstand had an office block's plant room and
+			# an aerial sitting on its canopy.
+			var purlin := -half.x + 12.0
+			while purlin < half.x - 1.0:
+				_bar(face, Rect2(purlin - 1.0, -half.y, 2.0, half.y * 2.0),
+					colour.darkened(0.22))
+				purlin += 15.0
+			_bar(face, Rect2(-half.x, -half.y, half.x * 2.0, 2.5),
+				colour.lightened(0.26))
+			_bar(face, Rect2(-half.x, -half.y, 5.0, half.y * 2.0 + 7.0),
+				colour.darkened(0.16))
+		"gable":
+			# Slate courses and a verge board. A stepped gable is what a pitch
+			# looks like when every collider is an axis-aligned rectangle, and
+			# it was being given parapet ends and a plant room because it
+			# shared a role with a flat roof.
+			var slate := -half.y + 4.0
+			while slate < half.y:
+				_bar(face, Rect2(-half.x, slate, half.x * 2.0, 1.6),
+					colour.darkened(0.30))
+				slate += 6.0
+			for side in [-1.0, 1.0]:
+				_bar(face, Rect2(side * half.x - (3.0 if side > 0.0 else 0.0),
+					-half.y - 2.0, 3.0, half.y * 2.0 + 2.0),
+					colour.lightened(0.18))
 		"post":
 			# A flat slab has no beams, so the column flares into the slab in a
 			# drop head — the detail that says where this frame carries its
