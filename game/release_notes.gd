@@ -11,6 +11,15 @@ extends RefCounted
 
 const NOTES: Array = [
 	{
+		"version": "0.14.2",
+		"date": "2026-08-31",
+		"lines": [
+			"The city is a model now, seen from above — towers downtown, "
+			+ "brick in the Old Town, sheds at the works, water and a quay "
+			+ "along one edge.",
+		],
+	},
+	{
 		"version": "0.14.1",
 		"date": "2026-08-31",
 		"lines": [

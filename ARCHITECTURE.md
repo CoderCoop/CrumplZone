@@ -26,6 +26,7 @@ graph TD
         tools["tools.gd<br/>the three verbs"]
         levels["levels.gd<br/>specs, lines, power<br/>difficulty and run order"]
         districts["districts.gd<br/>the city and its parts"]
+        citymap["citymap.gd<br/>the city as a model<br/>drawn, and tapped"]
         progress["progress.gd<br/>stars, unlocks, saved"]
         architecture["architecture.gd<br/>real structural systems"]
         standcheck["standcheck.gd<br/>does a building stand up<br/>one answer, both harnesses"]
@@ -34,7 +35,7 @@ graph TD
     end
 
     subgraph checks["Checked, not shipped"]
-        partest["partest.gd<br/>solvability and depth<br/>for all three difficulties"]
+        partest["partest.gd<br/>solvability and depth"]
         waketest["waketest.gd<br/>settled bodies get woken"]
         breaktest["breaktest.gd<br/>everything breakable breaks"]
         stresstest["stresstest.gd<br/>weight breaks the right things"]
@@ -78,6 +79,8 @@ graph TD
     generator -->|level spec| solver
     levels -->|lines, pile, power| generator
     districts -->|which part of town| levels
+    districts -->|what to draw, and where| citymap
+    citymap -->|the district picked| intro
     progress -->|what is open| intro
     districts -->|which sky| backdrop
     solver -->|drives headlessly| level
@@ -190,8 +193,15 @@ matters:
   `config/version`, and CI fails if it disagrees with the newest heading in
   `CHANGELOG.md`, so the game cannot tell a player one version while the
   repository says another.
-
-Scoring and generated levels are still absent.
+- **`citymap.gd`** draws the city as a model on a board: an oblique projection,
+  every footprint extruded into a box, lit from one side, and painted back to
+  front because a `Control`'s draw list has no depth buffer. Heights and
+  colours come from `districts.gd`, so the skyline says what is built where
+  before a label is read. District labels are `Button`s standing on the model
+  on stems, placed far corner first and moved toward the viewer when they
+  clash — the projection puts screen x on `u - v`, which piles the districts of
+  a city laid out like this one on top of each other. Everything is drawn
+  rather than loaded, for the same reason the tool icons are.
 
 **`spikes/`** holds measurement harnesses that answer a question and then stay
 as evidence. They are not imported by the game and are not exported. The one

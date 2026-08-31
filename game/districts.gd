@@ -20,13 +20,17 @@ const WATERFRONT := "waterfront"
 const WORKS := "works"
 const STADIUM := "stadium"
 
-## Where each district sits on the map, in a space running 0..1 both ways, and
-## what it is called. The layout reads like a city rather than a grid: the
+## Where each district sits on the model, in a space running 0..1 both ways,
+## and what it is called. The layout reads like a city rather than a grid: the
 ## waterfront along one edge, the highway cutting across, downtown at the
 ## centre with everything else around it.
+##
+## These are plan coordinates on the board, not screen fractions. citymap.gd
+## projects them obliquely, so (0, 0) is the far corner and (1, 1) the near
+## one; a district's screen position is not its "at" scaled up.
 const PLACES := {
 	WATERFRONT: {
-		"title": "Waterfront", "at": Vector2(0.16, 0.20),
+		"title": "Waterfront", "at": Vector2(0.20, 0.46),
 		"about": "warehouses and a chimney, on the water",
 	},
 	DOWNTOWN: {
