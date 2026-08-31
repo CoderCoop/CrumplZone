@@ -7,7 +7,24 @@ sections are dated.
 
 ## [Unreleased]
 
-Nothing since 0.14.1.
+Nothing since 0.14.2.
+
+## [0.14.2] - 2026-08-31
+
+### Changed
+
+- **The city is a model now, not a map of one.** The same city, built rather
+  than shaded in: towers downtown, two-storey brick in the Old Town, long low
+  sheds out at the works, an interchange raised on piers, water and a quay
+  along one edge — all seen from above on a baseboard with a visible cut edge
+  and a shadow under it. Each district is labelled by a pin standing on the
+  model, and the one you have chosen is ringed on the board.
+
+  A map says where a district is. It does not say what is built there, which
+  is the part that makes choosing one feel like choosing a place.
+
+- **The waterfront moved down the shore**, so it sits against open water
+  rather than at the corner where the water pinches out.
 
 ## [0.14.1] - 2026-08-31
 
