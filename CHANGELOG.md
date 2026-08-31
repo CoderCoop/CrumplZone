@@ -7,7 +7,23 @@ sections are dated.
 
 ## [Unreleased]
 
-Nothing since 0.14.2.
+Nothing since 0.14.3.
+
+## [0.14.3] - 2026-08-31
+
+### Added
+
+- **Every district has its own sky now**, and something on the horizon that
+  says where you are: gantry cranes over the waterfront, chimneys and gas
+  holders at the works, a flyover on piers behind the interchange, floodlight
+  masts and a stand at the ground, lit sign pylons at the retail park, rows of
+  pitched roofs in the old town, a tower crane downtown.
+
+### Changed
+
+- **Seven districts no longer share four skies.** The Retail Park and the Old
+  Town were seen against the same one, and the Interchange against downtown's.
+  A part of town you cannot tell apart from another is not a place.
 
 ## [0.14.2] - 2026-08-31
 

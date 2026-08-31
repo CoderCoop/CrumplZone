@@ -41,7 +41,9 @@ graph TD
         stresstest["stresstest.gd<br/>weight breaks the right things"]
         collapsetest["collapsetest.gd<br/>broken columns stop carrying"]
         gentest["gentest.gd<br/>generated levels stand up<br/>and stay winnable"]
+        skytest["skytest.gd<br/>every district has a sky<br/>and no two share one"]
         shots["shots.gd<br/>a picture of each system<br/>looked at, not asserted"]
+        skyshot["skyshot.gd<br/>a picture of each sky<br/>same building, different town"]
         verifylv["verify_levels.gd<br/>generate-and-verify measurement"]
     end
 
@@ -83,6 +85,8 @@ graph TD
     citymap -->|the district picked| intro
     progress -->|what is open| intro
     districts -->|which sky| backdrop
+    skytest -->|gates| ci
+    skyshot -->|drives| backdrop
     solver -->|drives headlessly| level
     partest -->|drives headlessly| level
     verifylv -->|drives| solver
@@ -183,7 +187,13 @@ matters:
   because the two symbols this project did try to type both rendered as tofu
   boxes on the builds that shipped them.
 - **`effects.gd`** draws what a tool just did, and **`backdrop.gd`** draws the
-  sky, the skyline and the street. Both are strictly cosmetic: they own no
+  sky, the skyline and the street. Each district has its own setting — a whole
+  palette plus the silhouettes that stand on its horizon: gantry cranes on the
+  waterfront, chimneys and gas holders at the works, a flyover on piers at the
+  interchange, floodlight masts and a stand at the ground, sign pylons at the
+  retail park, pitched roofs in the old town, a tower crane downtown. The
+  palette alone was not enough; two districts under different skies still read
+  as the same place when the skyline is plain boxes either way. Both are strictly cosmetic: they own no
   bodies and apply no forces, because the solver replays this game thousands of
   times headlessly and an animation that touched the simulation would make
   every one of those verdicts a lie about the game the player gets.

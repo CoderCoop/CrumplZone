@@ -33,6 +33,10 @@ const SETTINGS := {
 	Architecture.FLAT_SLAB: ["downtown", "estate"],
 	Architecture.STACK: ["works"],
 	Architecture.SHED: ["works", "estate"],
+	Architecture.HOUSE: ["estate"],
+	Architecture.RETAIL: ["strip"],
+	Architecture.OVERPASS: ["highway"],
+	Architecture.STAND: ["stadium"],
 }
 
 ## An era changes what a system is built from without changing how it stands.

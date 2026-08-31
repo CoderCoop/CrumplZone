@@ -181,6 +181,13 @@ jobs:
           # quietly wreck either.
           run_harness "order test" res://ordertest.tscn
 
+          # Every district has to have a sky of its own, and every sky has to
+          # exist. Backdrop falls back to downtown for a name it does not know,
+          # which is right at runtime and invisible everywhere else: a typo
+          # costs a level its whole horizon and nothing says so. Four of seven
+          # districts shared a setting for months for the same reason.
+          run_harness "sky test" res://skytest.tscn
+
           # partest supersedes the old single-level playtest: it runs the same
           # search over all three difficulties and additionally checks each
           # level's par against what a solution really costs.
