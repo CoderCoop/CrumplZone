@@ -1,0 +1,56 @@
+name: deploy-drift
+
+# Is what players actually have the same as what main says it should be?
+#
+# For three releases it was not, and nobody knew. The Pages deploy went red on
+# 0.12.1 and again on 0.13.0, and the only symptom was a person opening the app
+# days later and finding it old. CI going green on a pull request says the code
+# is sound; it says nothing about whether the thing ever shipped.
+#
+# So this asks the only question that matters from outside, on a schedule, and
+# fails when the answer is wrong. A failing scheduled job is the notification.
+on:
+  schedule:
+    # Every three hours. A deploy takes minutes, so anything still adrift at
+    # this spacing is a real failure rather than one in flight.
+    - cron: "40 */3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Compare what is deployed against what main says
+        run: |
+          set -euo pipefail
+          declared=$(sed -n 's/^config\/version="\(.*\)"$/\1/p' game/project.godot)
+          if [ -z "$declared" ]; then
+            echo "::error::could not read config/version from game/project.godot"
+            exit 1
+          fi
+
+          url="https://codercoop.github.io/CrumplZone/version.txt"
+          # Cache-busted, because asking a CDN what it has cached and being
+          # told what it cached is not an answer.
+          live=$(curl -fsS --max-time 30 "$url?t=$(date +%s)" | tr -d '[:space:]' || true)
+
+          echo "main says   : $declared"
+          echo "players have: ${live:-<nothing served>}"
+
+          if [ -z "$live" ]; then
+            echo "::error::no version.txt is being served — either the deploy has never"
+            echo "::error::run since this check was added, or the site is not up"
+            exit 1
+          fi
+          if [ "$live" != "$declared" ]; then
+            echo "::error::players are on $live and main is on $declared."
+            echo "::error::A deploy has failed or never ran. Check the pages workflow;"
+            echo "::error::a green pull request does not mean the build shipped."
+            exit 1
+          fi
+          echo "in step: players have $live"
