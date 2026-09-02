@@ -25,9 +25,9 @@ extends Node2D
 ## The seeds the pack actually ships, not a range of its own.
 ##
 ## It used to walk 4100 upward and judge whatever came out, which meant it
-## failed on levels the bake had already looked at and refused to ship — and
+## failed on levels the generate step had already looked at and refused to ship — and
 ## it would have passed a pack that had quietly shrunk to nothing. Testing
-## what ships is the point; the bake's own report is where a seed that was
+## what ships is the point; the generate step's own report is where a seed that was
 ## rejected gets explained.
 const LEAST_LEVELS := 8
 
@@ -86,16 +86,16 @@ func _physics_process(_delta: float) -> void:
 				_settled_damage = StandCheck.damage_total(_level)
 			if _ticks < StandCheck.SETTLE_TICKS + StandCheck.WATCH_TICKS:
 				return
-			# One check, shared with the bake. See standcheck.gd.
+			# One check, shared with the generate step. See standcheck.gd.
 			var bedded := StandCheck.culprits(_level)
 			if not bedded.is_empty():
 				_lines.append("        bedded in with: %s" % bedded)
-			# Reported, not failed on, below StandCheck.DEGRADING. The bake
+			# Reported, not failed on, below StandCheck.DEGRADING. The generate step
 			# is the gate for standing: it runs this same check five times a
 			# level and then again over the whole pack until nothing drops.
 			# A single further roll here cannot add information it does not
 			# have, and it demonstrably disagrees — which made CI red for
-			# levels the bake had validated.
+			# levels the generate step had validated.
 			var why := StandCheck.verdict(_level, _spec, _top_at_build,
 				_settled_damage)
 			var carried_on := StandCheck.damage_total(_level) - _settled_damage
@@ -153,15 +153,15 @@ func _judge() -> void:
 	# This used to be a failure, and it was the right one while the lines were
 	# derived from the pile: a pile that came in under reality dragged the
 	# third line down inside the rubble with it. The lines come from the
-	# building's height now, so a run that leaves more than the bake recorded
+	# building's height now, so a run that leaves more than the generate step recorded
 	# moves nothing — and failing on it would be asserting that three samples
-	# find the worst of a distribution with a tail, which the first bake
+	# find the worst of a distribution with a tail, which the first generate run
 	# proved false on five seeds out of eleven.
 	#
 	# What actually protects the player is the next check: the winning line
 	# must be above what the level really leaves. That one still fails.
 	if guessed < actual:
-		_lines.append("        left %.0f px, over the %.0f px the bake recorded"
+		_lines.append("        left %.0f px, over the %.0f px the generate step recorded"
 			% [actual, guessed])
 	if win < actual:
 		_failures.append("seed %d (%s) cannot be won: pile %.0f, winning line %.0f"

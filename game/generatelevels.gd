@@ -2,7 +2,7 @@ extends Node2D
 
 ## Measures how low every level can physically go, and writes pack.gd.
 ##
-##   godot --headless --fixed-fps 60 --path game res://bakelevels.tscn
+##   godot --headless --fixed-fps 60 --path game res://generatelevels.tscn
 ##
 ## This is the job that replaced a model with a measurement. It builds each
 ## level, checks it stands untouched, then flattens it completely several
@@ -10,7 +10,7 @@ extends Node2D
 ## their seed, so the pack is a table of seed to measured height and the
 ## geometry is rebuilt from the seed wherever it is needed.
 ##
-## It runs in CI rather than in the game: a bake is minutes of physics, and
+## It runs in CI rather than in the game: a generate run is minutes of physics, and
 ## nothing about it belongs on a path a player waits on. The result is
 ## committed, so a change to the generator shows up as a reviewable diff in
 ## the pile heights rather than as levels quietly shifting under players.
@@ -20,7 +20,7 @@ extends Node2D
 ## shipping it is how the gate stops meaning anything.
 
 const SEEDS_FROM := 4100
-## How many seeds a system may be offered before the bake gives up on filling
+## How many seeds a system may be offered before the generate step gives up on filling
 ## its quota. Seeds are laid out in blocks of this size, one block per system,
 ## so a system needing a fourth attempt cannot collide with the next system's
 ## range and every seed number stays stable as systems come and go.
@@ -47,7 +47,7 @@ const REPEATS := 5
 const MAX_ROUNDS := 4
 
 
-## Frames a single job may take before the bake calls itself stalled. The
+## Frames a single job may take before the generate step calls itself stalled. The
 ## longest honest job is REPEATS runs of a standing check plus a flatten that
 ## reaches its ceiling — around ten thousand frames on the biggest level — so
 ## this is roughly three times the worst legitimate case.
@@ -143,7 +143,7 @@ func _begin(job: Dictionary) -> void:
 	_run = 0
 	_worst = 0.0
 	# Printed as it goes. The measure phase used to say nothing at all until
-	# it had finished, so a bake that was working and a bake that had hung
+	# it had finished, so a generate run that was working and a generate run that had hung
 	# looked identical for minutes at a time — which is how a two-hour stall
 	# went unnoticed once already, and it was the validation phase that got
 	# the fix rather than this one.
@@ -181,7 +181,7 @@ func _physics_process(_delta: float) -> void:
 	# only while _jobs held every job there would ever be. Once seeds were
 	# issued on demand rather than listed up front, _jobs held the three
 	# authored levels alone — so the moment the first seed came round, this
-	# returned on every tick and the bake sat doing nothing.
+	# returned on every tick and the generate step sat doing nothing.
 	#
 	# That is the second time this exact loop has hung, and the comment
 	# describing the first was sitting directly above it. The phase is the
@@ -198,7 +198,7 @@ func _physics_process(_delta: float) -> void:
 		print("stalled: %d frames without finishing a job, in phase \"%s\", on %s"
 			% [_frames - _progress_frame, _phase,
 				_label() if not _current.is_empty() else "no job"])
-		print("that is a bug in the bake, not a slow level")
+		print("that is a bug in the generate step, not a slow level")
 		get_tree().quit(1)
 		return
 	_ticks += 1
@@ -214,7 +214,7 @@ func _physics_process(_delta: float) -> void:
 			# "If it stands once it stands" is not true here. Physics does not
 			# reproduce across runs, and a marginal building stands on one
 			# roll and crushes a piece on the next — measured, three levels
-			# the bake had passed and shipped were then failed by gentest on
+			# the generate step had passed and shipped were then failed by gentest on
 			# its own roll of the same level. The pack promises these stand,
 			# so it has to check that as often as it checks anything else.
 			var why := StandCheck.verdict(_level, _spec, _top_at_build,
@@ -278,10 +278,10 @@ func _physics_process(_delta: float) -> void:
 ## earlier level has been demolished in the same process. Physics carries
 ## state between builds, so a level near the edge can pass one and fail the
 ## other — and dropping the culprit only promotes the next borderline level,
-## which is exactly what happened when masonry was benched and a house and a
+## which is exactly what happened when masonry was disabled and a house and a
 ## stack took its place.
 ##
-## So the bake finishes by sitting gentest's exam. Every accepted level, once,
+## So the generate step finishes by sitting gentest's exam. Every accepted level, once,
 ## in order, and anything that fails is dropped. Then again, because dropping
 ## a level changes the sequence for the ones after it, until a pass drops
 ## nothing. What ships is what passed the check that gates it.
@@ -356,7 +356,7 @@ func _record() -> void:
 	# search that cannot clear half the levels is not one to gate on or rate
 	# against. See Levels.THREE_STAR_SHARE.
 	# The system goes in the pack with the measurement, because the pack is
-	# what the game rebuilds from. The bake asks for a system by name; if the
+	# what the game rebuilds from. The generate step asks for a system by name; if the
 	# game then regenerated from the seed alone it would draw whatever that
 	# seed happens to pick and build a different building than the one that
 	# was measured — same seed, different level, and every number in the pack

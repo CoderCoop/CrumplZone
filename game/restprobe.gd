@@ -1,7 +1,7 @@
 extends Node2D
 
 ## How long after a demolition does a level actually come to rest, against the
-## fixed budget the bake waits out? Measurement only.
+## fixed budget the generate step waits out? Measurement only.
 
 const CHARGE_EVERY := 14
 const BUDGET := 900

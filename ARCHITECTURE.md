@@ -45,7 +45,7 @@ graph TD
         fittest["fittest.gd<br/>nothing is built inside<br/>anything else"]
         shots["shots.gd<br/>a picture of each system<br/>looked at, not asserted"]
         skyshot["skyshot.gd<br/>a picture of each sky<br/>same building, different town"]
-        benchprobe["benchprobe.gd<br/>which piece moves, and which way<br/>measured, not gated"]
+        systemprobe["systemprobe.gd<br/>which piece moves, and which way<br/>measured, not gated"]
         verifylv["verify_levels.gd<br/>generate-and-verify measurement"]
     end
 
@@ -91,7 +91,7 @@ graph TD
     fittest -->|reads specs from| architecture
     fittest -->|gates| ci
     skyshot -->|drives| backdrop
-    benchprobe -->|drives| level
+    systemprobe -->|drives| level
     solver -->|drives headlessly| level
     partest -->|drives headlessly| level
     verifylv -->|drives| solver
@@ -218,6 +218,30 @@ matters:
   a city laid out like this one on top of each other. Everything is drawn
   rather than loaded, for the same reason the tool icons are.
 
+## What the suffixes mean
+
+Three kinds of script live in `game/` alongside the game, and the suffix says
+which. The rule held by accident before it was written down — every gated
+scene was a `*test` and every `*test` was gated, with one exception that had
+been quietly misfiling itself for months.
+
+| suffix | what it is | fails the build? |
+| --- | --- | --- |
+| `*test.gd` | a check CI runs on every pull request | **yes** |
+| `*probe.gd` | a diagnostic that measures and prints | never |
+| `*shot.gd` | renders a picture to be looked at | never |
+
+`loadprobe.gd` was `loadtest.gd`: it measures resting load against tolerance,
+it is not in `ci.yml`, and nothing it printed could ever turn a build red. A
+name that claims to be a gate and is not is worse than no name, because the
+next person reads the list of `*test` files as the list of things that are
+checked.
+
+The vocabulary follows the same idea. What used to be called *the bake* is
+**the generate step** — it generates a committed artifact, `pack.gd`, the way
+any code generator does. A structural system that is not in
+`Architecture.GENERATED` is **disabled**, not *benched*.
+
 **`spikes/`** holds measurement harnesses that answer a question and then stay
 as evidence. They are not imported by the game and are not exported. The one
 here established that Godot's 2D physics repeats reliably enough for the
@@ -241,10 +265,10 @@ A level is a shape; everything numeric about it is measured from that shape or
 from a solution, never chosen by hand:
 
 - **The pile** is how high the rubble really sits when the building is
-  pulverised completely — measured in CI by `bakelevels.gd`, which flattens
+  pulverised completely — measured in CI by `generatelevels.gd`, which flattens
   each level several times and keeps the worst.
 - **Par** is what the cheapest clearing the solver can find costs, measured by
-  the same bake. Both go in `pack.gd`.
+  the same generate run. Both go in `pack.gd`.
 - **The winning line** follows from the building's own height. It does not
   follow from the pile: the pile is a number that must never come in low, so
   every pixel of caution in it used to push the line up, toward a level won on
@@ -256,14 +280,14 @@ from a solution, never chosen by hand:
 
 The pile's job is not to place anything. It decides whether a level ships at
 all: a winning line inside the level's own rubble is a level nobody can
-finish, and the bake drops it.
+finish, and the generate step drops it.
 
 Rating against par rather than against a share of the bar is what makes "three
 stars is hard" true on every level instead of on the one that happened to be
 tuned. Par was tried before and abandoned as unmaintainable, because it had to
 be re-measured by hand every time the physics changed what a demolition costs
 — twice in one day, at one point. It is maintainable now for one reason: the
-bake re-measures it weekly without being asked and proposes the new numbers as
+the generate step re-measures it weekly without being asked and proposes the new numbers as
 a reviewable diff.
 
 There were three lines for a while, one per star, with the rating being how
@@ -271,13 +295,13 @@ many of them everything got under. That is gone, along with the choice to bank
 a win or go back for another line — under cost-based scoring, every extra
 charge only lowers the rating, so there is nothing to go back for.
 
-**Whether a building stands up is decided once, in `standcheck.gd`.** The bake
+**Whether a building stands up is decided once, in `standcheck.gd`.** The generate step
 runs it five times per level and then again over the whole accepted pack until
 a round drops nothing; `gentest` runs it too but only fails past a large
 margin. That split is measured, not a convenience: physics carries state
 between builds in a process, so two harnesses running the same check in
 different orders genuinely disagree about whichever level is nearest the edge.
-The bake is the gate because it samples far more; `gentest` still fails
+The generate step is the gate because it samples far more; `gentest` still fails
 outright on a level that cannot be won, one won before it is touched, a pack
 that has shrunk, or a building actually coming apart.
 
@@ -289,9 +313,9 @@ the hard level on its own.
 
 ```mermaid
 flowchart LR
-    shape[Building shape] --> bake[bakelevels in CI]
-    bake --> pile[Measured pile]
-    bake --> par[Measured par]
+    shape[Building shape] --> generate[generatelevels in CI]
+    generate --> pile[Measured pile]
+    generate --> par[Measured par]
     pile --> fit{Winning line<br/>above the pile?}
     fit -->|no| dropped[Dropped, never shipped]
     fit -->|yes| pack[pack.gd]
