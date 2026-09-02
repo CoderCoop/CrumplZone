@@ -20,6 +20,11 @@ extends Node2D
 ## shipping it is how the gate stops meaning anything.
 
 const SEEDS_FROM := 4100
+## How many seeds a system may be offered before the bake gives up on filling
+## its quota. Seeds are laid out in blocks of this size, one block per system,
+## so a system needing a fourth attempt cannot collide with the next system's
+## range and every seed number stays stable as systems come and go.
+const ATTEMPTS_PER_SYSTEM := 9
 ## How many levels of each structural system the pack carries.
 ##
 ## Deliberate coverage, not a random draw. Twenty-four random seeds produced
@@ -41,6 +46,12 @@ const REPEATS := 5
 ## How many validation passes to try before giving up and saying so.
 const MAX_ROUNDS := 4
 
+
+## Frames a single job may take before the bake calls itself stalled. The
+## longest honest job is REPEATS runs of a standing check plus a flatten that
+## reaches its ceiling — around ten thousand frames on the biggest level — so
+## this is roughly three times the worst legitimate case.
+const STALL_FRAMES := 30000
 
 const CHARGE_EVERY := 14
 const SETTLE := 900
@@ -64,7 +75,18 @@ var _dropped_this_round := 0
 var _order: Array = []
 var _measured := {}
 var _authored := {}
+var _current := {}
+var _frames := 0
+var _progress_frame := 0
+var _system_at := 0
+var _attempt := 0
+var _accepted := {}
+## Systems that ran out of seeds before filling their quota.
+var _short: Array[String] = []
 var _dropped: Array[String] = []
+## Runs that hit the ceiling still moving, so the pile came off a collapse
+## that had not finished.
+var _restless: Array[String] = []
 var _report_lines: Array[String] = []
 
 
@@ -73,29 +95,70 @@ func _ready() -> void:
 	add_child(_level)
 	for d in Levels.ORDER:
 		_jobs.append({"kind": "authored", "id": d})
-	var at := SEEDS_FROM
-	for system in Architecture.GENERATED:
-		for i in PER_SYSTEM:
-			_jobs.append({"kind": "seed", "id": at, "system": system})
-			at += 1
 	_next_job()
 
 
+## The next level to measure, backfilling a system that has lost one.
+##
+## It used to offer each system exactly PER_SYSTEM seeds and ship whatever
+## survived. That is a quota in name only: a system whose seeds happen to fail
+## ends up under-represented in the city, and the districts built on it go
+## thin. Measured on the pack this replaces — masonry shipped one level of
+## three, flat slabs and houses two of three, while chimneys and grandstands
+## got all three. The player sees that as one part of town with nothing in it.
+##
+## So a dropped seed is replaced rather than mourned: the system is offered
+## the next seed in its block until it has PER_SYSTEM accepted or the block
+## runs out, and a system that cannot fill its quota says so.
 func _next_job() -> void:
 	_job += 1
-	if _job >= _jobs.size():
-		_begin_validation()
+	if _job < _jobs.size():
+		_begin(_jobs[_job])
 		return
+	_offer_seed()
+
+
+## Offer the current system its next seed, moving on once its quota is full or
+## its block of seeds is spent.
+func _offer_seed() -> void:
+	while _system_at < Architecture.GENERATED.size():
+		var system: String = String(Architecture.GENERATED[_system_at])
+		var taken: int = int(_accepted.get(system, 0))
+		if taken < PER_SYSTEM and _attempt < ATTEMPTS_PER_SYSTEM:
+			var id: int = SEEDS_FROM + _system_at * ATTEMPTS_PER_SYSTEM \
+				+ _attempt
+			_attempt += 1
+			_begin({"kind": "seed", "id": id, "system": system})
+			return
+		if taken < PER_SYSTEM:
+			_short.append("%s filled %d of %d in %d attempts"
+				% [system, taken, PER_SYSTEM, _attempt])
+		_system_at += 1
+		_attempt = 0
+	_begin_validation()
+
+
+func _begin(job: Dictionary) -> void:
+	_current = job
 	_run = 0
 	_worst = 0.0
+	# Printed as it goes. The measure phase used to say nothing at all until
+	# it had finished, so a bake that was working and a bake that had hung
+	# looked identical for minutes at a time — which is how a two-hour stall
+	# went unnoticed once already, and it was the validation phase that got
+	# the fix rather than this one.
+	_progress_frame = _frames
+	print("measuring %s%s" % [_label(),
+		"" if job["kind"] == "authored" else " (%s, attempt %d)"
+			% [job["system"], _attempt]])
 	_start()
 
 
 func _spec_for_job() -> Dictionary:
-	var job: Dictionary = _jobs[_job]
-	if job["kind"] == "authored":
-		return Levels.level(String(job["id"]))
-	return Generator.generate(int(job["id"]), String(job.get("system", "")))
+	if _current["kind"] == "authored":
+		return Levels.level(String(_current["id"]))
+	return Generator.generate(int(_current["id"]),
+		String(_current.get("system", "")))
 
 
 func _start() -> void:
@@ -111,14 +174,35 @@ func _start() -> void:
 
 
 func _physics_process(_delta: float) -> void:
-	# Validation runs after the job list is exhausted, so this guard has to
-	# know about it. It did not, and the validating phase never received a
-	# tick: the bake sat in a loop doing nothing for two hours and printed
-	# not one line, because it only reports at the end.
-	if _job >= _jobs.size() and not _validating:
+	_frames += 1
+	# Guarded on the phase, not on the job index.
+	#
+	# This read `_job >= _jobs.size() and not _validating`, which was correct
+	# only while _jobs held every job there would ever be. Once seeds were
+	# issued on demand rather than listed up front, _jobs held the three
+	# authored levels alone — so the moment the first seed came round, this
+	# returned on every tick and the bake sat doing nothing.
+	#
+	# That is the second time this exact loop has hung, and the comment
+	# describing the first was sitting directly above it. The phase is the
+	# honest condition: it is empty only before the first job starts, and the
+	# run quits from _write.
+	if _phase == "":
+		return
+	# ...and a watchdog, because "did nothing, silently, for hours" is now a
+	# thing this file has done twice. The first cost two hours locally; the
+	# second cost six on a runner before the job timeout noticed. A stall is
+	# a bug either way, and a bug should fail in minutes and say so.
+	if _frames - _progress_frame > STALL_FRAMES:
+		print("")
+		print("stalled: %d frames without finishing a job, in phase \"%s\", on %s"
+			% [_frames - _progress_frame, _phase,
+				_label() if not _current.is_empty() else "no job"])
+		print("that is a bug in the bake, not a slow level")
+		get_tree().quit(1)
 		return
 	_ticks += 1
-	_level.tick_settle()
+	var at_rest: bool = _level.tick_settle()
 	match _phase:
 		"standing":
 			if _ticks == StandCheck.SETTLE_TICKS:
@@ -159,8 +243,25 @@ func _physics_process(_delta: float) -> void:
 			if _ticks % CHARGE_EVERY == 0 and _charge_at < _spots.size():
 				Tools.apply(Tools.Kind.EXPLOSIVE, _level, _spots[_charge_at], 1.0)
 				_charge_at += 1
-			if _ticks < SETTLE + _spots.size() * CHARGE_EVERY:
+			# Stop when the rubble has stopped, not when a counter runs out.
+			#
+			# Level.tick_settle() has always returned whether everything has
+			# come to rest, and this loop has always thrown that away and
+			# counted to SETTLE instead. Measured across the pack, 49% of the
+			# budget was spent watching a pile that had already stopped
+			# moving — 14,528 ticks of 29,408, and up to 78% on a chimney.
+			#
+			# SETTLE stays, as a ceiling rather than a target. A level that
+			# reaches it still moving has not been measured at rest, and the
+			# pile taken from it is a snapshot of something mid-collapse, so
+			# it is worth saying so.
+			var ceiling: int = SETTLE + _spots.size() * CHARGE_EVERY
+			var flattened: bool = _charge_at >= _spots.size() and at_rest
+			if not flattened and _ticks < ceiling:
 				return
+			if not flattened:
+				_restless.append("%s (%s) on run %d"
+					% [_label(), _spec.get("kind", "?"), _run + 1])
 			_worst = maxf(_worst, StandCheck.top_of(_level, _spec))
 			_run += 1
 			if _run < REPEATS:
@@ -215,6 +316,7 @@ func _next_check() -> void:
 			_report_lines.append("validation round %d: every level held" % _round)
 		_write()
 		return
+	_progress_frame = _frames
 	print("  checking %d of %d" % [_check_at + 1, _order.size()])
 	# The system comes from what was just measured, not from Pack.system_for.
 	#
@@ -238,12 +340,10 @@ func _next_check() -> void:
 
 
 func _label() -> String:
-	var job: Dictionary = _jobs[_job]
-	return "%s %s" % [job["kind"], job["id"]]
+	return "%s %s" % [_current["kind"], _current["id"]]
 
 
 func _record() -> void:
-	var job: Dictionary = _jobs[_job]
 	var fy: float = float(_spec["floor_y"])
 	var third: float = fy - float(_spec["height_line"])
 	if third < _worst:
@@ -262,10 +362,12 @@ func _record() -> void:
 	# was measured — same seed, different level, and every number in the pack
 	# describing something else.
 	var entry := {"pile": _worst, "system": String(_spec.get("kind", ""))}
-	if job["kind"] == "authored":
-		_authored[String(job["id"])] = entry
+	if _current["kind"] == "authored":
+		_authored[String(_current["id"])] = entry
 	else:
-		_measured[int(job["id"])] = entry
+		_measured[int(_current["id"])] = entry
+		var system := String(_current["system"])
+		_accepted[system] = int(_accepted.get(system, 0)) + 1
 	var headroom := 99.0 if _worst <= 0.0 else third / _worst
 	var note := "" if headroom >= Levels.MEASURED_MARGIN else "   TIGHT"
 	_report_lines.append("%-16s %-13s pile %3.0f  line %3.0f  headroom %.2fx%s"
@@ -320,6 +422,16 @@ func _write() -> void:
 		print("dropped, and not in the pack:")
 		for d in _dropped:
 			print("  " + d)
+	if not _short.is_empty():
+		print("")
+		print("systems that could not fill their quota:")
+		for line in _short:
+			print("  " + line)
+	if not _restless.is_empty():
+		print("")
+		print("still moving when the budget ran out, so measured mid-collapse:")
+		for r in _restless:
+			print("  " + r)
 	print("")
 	print("%d levels measured over %d runs each, worst kept" % [_report_lines.size(), REPEATS])
 	print("pack.gd written")
