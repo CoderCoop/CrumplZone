@@ -92,7 +92,7 @@ static func summary() -> Dictionary:
 ## Everything open at once, for looking around rather than playing through.
 ##
 ## Off by default and deliberately not framed as a cheat: a game whose levels
-## are generated and re-baked wants a way to look at all of them without
+## are generated and re-generated wants a way to look at all of them without
 ## playing seventeen demolitions first, and so does anyone reviewing a change
 ## to the generator.
 static func experimental() -> bool:

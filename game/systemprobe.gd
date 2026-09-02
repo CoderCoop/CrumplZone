@@ -1,12 +1,12 @@
 extends Node2D
 
-## Why does a benched structural system not stand up?
+## Why does a disabled structural system not stand up?
 ##
-##   godot --headless --fixed-fps 60 --path game res://benchprobe.tscn -- <system> [count]
+##   godot --headless --fixed-fps 60 --path game res://systemprobe.tscn -- <system> [count]
 ##
 ## Three systems are held back from Architecture.GENERATED because they damage
 ## themselves standing still. Which piece, and by how much, is the whole
-## question — and the bake only ever printed that a seed was dropped.
+## question — and the generate step only ever printed that a seed was dropped.
 ##
 ## Not a gate. It measures and prints, so a rebuild can be aimed rather than
 ## guessed at, and so the same seeds can be re-measured after a change.

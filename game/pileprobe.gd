@@ -2,7 +2,7 @@ extends Node2D
 
 ## How much does the same level's pile vary between runs?
 ##
-##   godot --headless --fixed-fps 60 --path game res://pilespread.tscn
+##   godot --headless --fixed-fps 60 --path game res://pileprobe.tscn
 ##
 ## gentest guesses each level's pile at build time and fails if the guess
 ## comes in under what the level really leaves, with a safety factor to cover
@@ -34,7 +34,7 @@ extends Node2D
 ##
 ## None of this breaks the winning line, which comes from the building's
 ## height and not from the pile. What it breaks is the assumption behind
-## bakelevels' REPEATS: the worst of a handful of samples is not a limit when
+## generatelevels' REPEATS: the worst of a handful of samples is not a limit when
 ## the underlying spread is this wide, so the pile recorded in the pack is a
 ## number to treat as indicative rather than as a bound.
 
@@ -43,8 +43,8 @@ extends Node2D
 ## and every seed is built as that, which is how a system held back from
 ## generation can still be measured:
 ##
-##   godot ... res://pilespread.tscn -- 4106 4119
-##   godot ... res://pilespread.tscn -- panel 4100 4101 4102
+##   godot ... res://pileprobe.tscn -- 4106 4119
+##   godot ... res://pileprobe.tscn -- panel 4100 4101 4102
 const SEEDS: Array[int] = [4106, 4102, 4110]
 const REPEATS := 6
 const STAND_TICKS := 240

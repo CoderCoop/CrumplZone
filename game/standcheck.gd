@@ -3,17 +3,17 @@ extends RefCounted
 
 ## Does a building stand up on its own? One answer, one place.
 ##
-## There were two. The bake built a level five times in isolation and decided
+## There were two. The generate step built a level five times in isolation and decided
 ## what shipped; gentest built every shipped level once, in sequence, and
 ## gated CI on the result. Two exams, and they disagreed about whichever
-## building sat nearest the edge — the bake would pass a level and CI would
+## building sat nearest the edge — the generate step would pass a level and CI would
 ## then reject it, and dropping the culprit only promoted the next borderline
-## one. Masonry was benched for it and the failures moved to a house and a
+## one. Masonry was disabled for it and the failures moved to a house and a
 ## stack.
 ##
 ## The conditions differ because physics carries state between builds in a
 ## process, and neither harness can reproduce the other's history. So they no
-## longer try: the check lives here, both call it, and the bake finishes by
+## longer try: the check lives here, both call it, and the generate step finishes by
 ## running it over the whole accepted pack in pack order, which is the shape
 ## gentest uses. What ships is what passed the check that gates it.
 
@@ -25,13 +25,13 @@ const WATCH_TICKS := 90
 ## Damage past which a level is degrading rather than disagreeing.
 ##
 ## The two harnesses cannot be made to agree, and that is measured rather than
-## assumed: the bake now runs this exact check, over the whole accepted pack,
+## assumed: the generate step now runs this exact check, over the whole accepted pack,
 ## in pack order, until a round drops nothing — and gentest still fails three
-## levels the bake passed, and different ones from those it dropped. Physics
+## levels the generate step passed, and different ones from those it dropped. Physics
 ## carries state between builds in a process, so the two histories differ and
 ## no amount of shared code closes that.
 ##
-## So the bake is the gate for standing — five rolls plus a converged
+## So the generate step is the gate for standing — five rolls plus a converged
 ## validation pass — and gentest reports rather than fails, except past this.
 ## Measured across a pack: a healthy level accrues exactly nothing after
 ## settling, the history-dependent ones accrue one to nine points, and a

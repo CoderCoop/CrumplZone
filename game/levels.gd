@@ -77,7 +77,7 @@ const LINE_MIN := 90.0
 ## Headroom over a measured pile.
 ##
 ## Measuring did not remove the need for this, and finding that out is what
-## the first bake was worth. The bake flattens each level several times and
+## the first generate run was worth. The generate step flattens each level several times and
 ## keeps the worst, and five of eleven seeds still went on to leave more than
 ## that in the very next run — seed 4109 by 35%, 54 px recorded against 73 px
 ## produced. The distribution has a tail that a handful of samples does not
@@ -86,12 +86,12 @@ const LINE_MIN := 90.0
 ## So the margin stays, but it is now a measured one rather than a modelled
 ## one, and that is the whole difference. It pads an accurate number by a
 ## factor taken from the observed spread (1.21x to 1.46x between the best and
-## worst run of a seed, and up to 1.35x beyond the bake's worst), instead of
+## worst run of a seed, and up to 1.35x beyond the generate step's worst), instead of
 ## padding a per-system guess whose own error nobody had ever quantified.
 ## How much clearance over the measured pile a level ought to have before it
 ## is comfortable rather than merely possible. A warning threshold, not a
 ## multiplier: it is reported, never applied to a line. Sized from the
-## overshoot the first bake missed — five of eleven seeds left more than the
+## overshoot the first generate run missed — five of eleven seeds left more than the
 ## worst of three runs, the largest by 35%.
 const MEASURED_MARGIN := 1.35
 
@@ -144,7 +144,7 @@ const TITLES := {
 
 
 ## Every level the game can offer, in the order it offers them: the three
-## authored ones, then the generated ones the bake measured and kept.
+## authored ones, then the generated ones the generate step measured and kept.
 ##
 ## Generated levels were built, verified and gated for a while without being
 ## reachable from anywhere in the game — the pack existed and no player could
@@ -246,7 +246,7 @@ static var _ordered: Array = []
 static func by_id(id: String) -> Dictionary:
 	if id.is_valid_int():
 		# The system comes from the pack, not from the seed, so the game
-		# builds the building the bake measured.
+		# builds the building the generate step measured.
 		return Generator.generate(id.to_int(), Pack.system_for(id.to_int()))
 	return level(id)
 
@@ -307,7 +307,7 @@ const POWER_MIN := 140.0
 ##
 ## Par — what the cheapest clearing the solver can find costs — is the right
 ## thing to rate against in principle, because it means the same on every
-## level. The bake measured it, and the numbers said not to trust it: the
+## level. The generate step measured it, and the numbers said not to trust it: the
 ## medium authored level priced at 238 while the harder one priced at 104,
 ## which is not a thing that can be true, and the search found no clearing at
 ## all for six of twelve generated levels at depth five — levels gentest has
@@ -355,7 +355,7 @@ static func finish(spec: Dictionary) -> Dictionary:
 	for b in blocks:
 		tall = maxf(tall, float(spec["floor_y"]) - (float(b["y"]) - float(b["h"]) * 0.5))
 
-	# A measured pile if one was baked for this level, and the estimate only
+	# A measured pile if one was generated for this level, and the estimate only
 	# when there is not. The two are not equivalent and the difference is the
 	# point: a measurement is what the level really leaves, and needs no
 	# safety factor, so nothing pads the winning line. See pack.gd.
@@ -397,10 +397,10 @@ static func finish(spec: Dictionary) -> Dictionary:
 	var floor_y: float = float(spec["floor_y"])
 	spec["height_line"] = floor_y - win
 	# Fit to ship, judged against what the level really leaves. A winning line
-	# below the achievable pile is a level nobody can finish, and the bake
+	# below the achievable pile is a level nobody can finish, and the generate step
 	# drops such a level rather than shipping it. Only a measured level can be
 	# judged — an estimated one is marked fit because there is nothing
-	# trustworthy to judge it against, which is itself a reason to bake every
+	# trustworthy to judge it against, which is itself a reason to generate every
 	# level.
 	spec["reachable"] = true
 	spec["headroom"] = 0.0

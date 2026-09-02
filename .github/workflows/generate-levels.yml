@@ -1,9 +1,9 @@
-name: bake-levels
+name: generate-levels
 
 # Measuring how low every level can go is minutes of physics, so it does not
 # belong on the pull-request gate and it certainly does not belong in the game.
 # It runs here: on demand, and weekly so that a generator change nobody
-# re-baked shows up on its own rather than waiting to be noticed.
+# re-generated shows up on its own rather than waiting to be noticed.
 on:
   workflow_dispatch:
     inputs:
@@ -23,9 +23,9 @@ env:
   GODOT_VERSION: 4.6-stable
 
 jobs:
-  bake:
+  generate:
     runs-on: ubuntu-latest
-    # A bake is minutes. A run that passes half an hour is stuck, and without
+    # A generate run is minutes. A run that passes half an hour is stuck, and without
     # this the default six-hour limit is what eventually notices — which is
     # exactly what happened when a dispatch loop hung on its first seed.
     timeout-minutes: 30
@@ -43,16 +43,16 @@ jobs:
 
           log="$(mktemp)"
           set -o pipefail
-          "$godot" --headless --fixed-fps 60 --path game res://bakelevels.tscn 2>&1 | tee "$log"
+          "$godot" --headless --fixed-fps 60 --path game res://generatelevels.tscn 2>&1 | tee "$log"
           if grep -q "SCRIPT ERROR" "$log"; then
-            echo "::error::the bake errored at runtime — the pack it wrote cannot be trusted"
+            echo "::error::the generate step errored at runtime — the pack it wrote cannot be trusted"
             exit 1
           fi
           # A pack with nothing in it would sail through review as a diff that
           # merely looks small, and would put every level back on the estimate.
           #
           # This guard was wrong in two ways at once and so had never passed,
-          # which is why no bake had opened a pull request and the pack went
+          # which is why no generate run had opened a pull request and the pack went
           # stale for weeks. grep -E does not read \t as a tab — it reads it
           # as a literal "t" — so the pattern could not match any line; and
           # even with a real tab, the old `[0-9]+: [0-9]` predates the pack
@@ -64,11 +64,11 @@ jobs:
           measured=$(grep -cP '^\t[0-9]+: \{"pile"' game/pack.gd || true)
           echo "pack.gd carries $measured measured levels"
           if [ "${measured:-0}" -lt 8 ]; then
-            echo "::error::the bake produced a pack of only ${measured:-0} levels"
+            echo "::error::the generate step produced a pack of only ${measured:-0} levels"
             exit 1
           fi
           # Keep the report for the pull request body.
-          cp "$log" bake-report.txt
+          cp "$log" generate-report.txt
 
       - name: Show what the measurements would be
         if: inputs.dry_run
@@ -83,10 +83,10 @@ jobs:
           name: measured-pack
           path: |
             game/pack.gd
-            bake-report.txt
+            generate-report.txt
 
       # main is protected and a bot walking around that gate would make the
-      # gate decorative. The bake proposes; review disposes, and the diff in
+      # gate decorative. The generate step proposes; review disposes, and the diff in
       # the pile heights is the thing worth looking at.
       # GitHub does not trigger workflows for anything created with
       # GITHUB_TOKEN. That is deliberate — it stops a workflow triggering
@@ -97,7 +97,7 @@ jobs:
       #
       # This has already cost two rounds of re-opening the same pull request
       # by hand off a second branch, which is most of the point of automating
-      # the bake gone. The documented fix is to act as a GitHub App: its token
+      # the generate step gone. The documented fix is to act as a GitHub App: its token
       # is a real actor, so its pull requests trigger CI like anyone else's,
       # and unlike a personal access token it is short-lived and scoped to
       # this repository alone.
@@ -108,24 +108,24 @@ jobs:
       #      Repository permissions: Contents read & write, Pull requests
       #      read & write. No account permissions, no webhook.
       #   2. Install it on CoderCoop/CrumplZone only.
-      #   3. Repository variable  BAKE_APP_ID          = the App's ID
-      #      Repository secret    BAKE_APP_PRIVATE_KEY = the App's .pem
+      #   3. Repository variable  GENERATE_APP_ID          = the App's ID
+      #      Repository secret    GENERATE_APP_PRIVATE_KEY = the App's .pem
       #
-      # Until that exists this step is skipped and the bake still runs and
+      # Until that exists this step is skipped and the generate step still runs and
       # still opens a pull request — it just cannot gate it, and says so
       # loudly rather than leaving someone to work out why nothing ran.
       - name: Act as the app, so the pull request can gate itself
         id: app
-        if: ${{ !inputs.dry_run && vars.BAKE_APP_ID != '' }}
+        if: ${{ !inputs.dry_run && vars.GENERATE_APP_ID != '' }}
         uses: actions/create-github-app-token@v2
         with:
-          app-id: ${{ vars.BAKE_APP_ID }}
-          private-key: ${{ secrets.BAKE_APP_PRIVATE_KEY }}
+          app-id: ${{ vars.GENERATE_APP_ID }}
+          private-key: ${{ secrets.GENERATE_APP_PRIVATE_KEY }}
 
       - name: Say plainly that the pull request will not be checked
-        if: ${{ !inputs.dry_run && vars.BAKE_APP_ID == '' }}
+        if: ${{ !inputs.dry_run && vars.GENERATE_APP_ID == '' }}
         run: |
-          echo "::warning title=This pull request cannot merge on its own::BAKE_APP_ID is not set, so the pull request is opened with GITHUB_TOKEN. GitHub does not trigger workflows for those: it will have no check runs and the required 'ci' check will never report, so someone has to push the same commit to an ordinary branch and open a second pull request from it. The setup notes in .github/workflows/bake.yml stop that being necessary."
+          echo "::warning title=This pull request cannot merge on its own::GENERATE_APP_ID is not set, so the pull request is opened with GITHUB_TOKEN. GitHub does not trigger workflows for those: it will have no check runs and the required 'ci' check will never report, so someone has to push the same commit to an ordinary branch and open a second pull request from it. The setup notes in .github/workflows/generate-levels.yml stop that being necessary."
 
       - name: Open a pull request if the measurements moved
         if: ${{ !inputs.dry_run }}
@@ -134,14 +134,14 @@ jobs:
           # Falls back to the default token, which still opens the pull
           # request; it just cannot trigger the checks on it.
           token: ${{ steps.app.outputs.token || github.token }}
-          branch: bake/level-pack
-          title: "chore: re-bake the level pack"
+          branch: generated/level-pack
+          title: "chore: re-generate the level pack"
           commit-message: |
-            chore: re-bake the level pack
+            chore: re-generate the level pack
 
-            Measured by .github/workflows/bake.yml. Each level is flattened
+            Measured by .github/workflows/generate-levels.yml. Each level is flattened
             several times and the worst pile kept, because the same level does
             not leave the same rubble twice.
-          body-path: bake-report.txt
+          body-path: generate-report.txt
           add-paths: game/pack.gd
           delete-branch: true

@@ -337,7 +337,7 @@ func _level_list() -> VBoxContainer:
 
 	box.add_child(_spacer(10))
 	# Everything open at once. A toggle rather than a hidden code, because it
-	# is not a cheat: the levels are generated and re-baked, and looking at all
+	# is not a cheat: the levels are generated and re-generated, and looking at all
 	# of them without playing seventeen demolitions first is a reasonable thing
 	# to want — for a player and for anyone reviewing the generator.
 	# A toggle button rather than a checkbox. Godot's checkbox draws its mark

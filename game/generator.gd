@@ -90,8 +90,8 @@ static func generate(level_seed: int, force_kind := "") -> Dictionary:
 		b["y"] = float(b["y"]) + FLOOR_Y
 
 	var about: Array = Architecture.ABOUT.get(kind, ["Building", ""])
-	# The measured pile if this seed has been baked, and nothing if it has
-	# not — finish() falls back to the estimate, which is what an unbaked seed
+	# The measured pile if this seed has been generated, and nothing if it has
+	# not — finish() falls back to the estimate, which is what an ungenerated seed
 	# deserves and no more.
 	var measured := Pack.for_seed(level_seed)
 	var spec := {

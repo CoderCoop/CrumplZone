@@ -132,7 +132,7 @@ func _start() -> void:
 	var spec := Levels.by_id(_level_id)
 	_level.build(spec)
 	# The place the level stands in comes with the level, and the city has to
-	# be rebuilt for it — it is baked once from a fixed seed so the skyline
+	# be rebuilt for it — it is generated once from a fixed seed so the skyline
 	# does not reshuffle on every rebuild.
 	# The sky belongs to the part of town, not to the seed. A warehouse on the
 	# waterfront is seen against the waterfront whichever seed made it.

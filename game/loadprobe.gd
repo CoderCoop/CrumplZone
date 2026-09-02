@@ -2,7 +2,7 @@ extends Node2D
 
 ## What load do pieces really carry standing still, against what they tolerate?
 ##
-##   godot --headless --fixed-fps 60 --path game res://loadtest.tscn
+##   godot --headless --fixed-fps 60 --path game res://loadprobe.tscn
 ##
 ## gentest fails a different level every run, always one piece taking one
 ## point of damage untouched. Before deciding whether that threshold is right,

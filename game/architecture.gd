@@ -86,7 +86,7 @@ const TYPES: Array[String] = [
 ## winning line landed at 324 px on a 242 px building: a level won before it
 ## is touched.
 ##
-## Re-measured with pilespread, worst of six runs on three seeds, as a share
+## Re-measured with pileprobe, worst of six runs on three seeds, as a share
 ## of the building's own height:
 ##
 ##     house           9%
@@ -109,7 +109,7 @@ const TYPES: Array[String] = [
 ## could only have worked in tension, and twelve seeds in twelve stand.
 ##
 ## Load-bearing masonry is back too, and the paragraph above says why. It was
-## benched for carrying on damaging itself after settling — always the same
+## disabled for carrying on damaging itself after settling — always the same
 ## brick pier, always standing still — and that was chased through widened
 ## piers and a raised rest tolerance before anyone rendered it. The cause was
 ## the interpenetration, and it is fixed and now gated by fittest.
@@ -770,7 +770,7 @@ static func _stand(rng: RandomNumberGenerator) -> Array:
 			absf(pad_top - legs_top), "stanchion", Materials.STEEL))
 
 	# Props standing on the terrace under the roof, and the whole reason this
-	# system was benched.
+	# system was disabled.
 	#
 	# It was a cantilever: the roof reached forward over the seats and a
 	# slender post behind the stanchions was supposed to hold its back span
@@ -830,7 +830,7 @@ static func _stand(rng: RandomNumberGenerator) -> Array:
 ## for timber, so it replaced the whole base of a 700 to 950 px stack with
 ## the softest material in the game. Every victorian chimney fell over
 ## untouched, five seeds out of five, and all three that reached the pack
-## were dropped by the bake for it. The era is supposed to change what a
+## were dropped by the generate step for it. The era is supposed to change what a
 ## building is made of without changing whether it stands up.
 static func _block(x: float, y: float, w: float, h: float, role: String,
 		material: String, fixed := false) -> Dictionary:

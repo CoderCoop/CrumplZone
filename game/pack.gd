@@ -1,9 +1,9 @@
 class_name Pack
 extends RefCounted
 
-## Measured rubble heights, baked in CI.
+## Measured rubble heights, generated in CI.
 ##
-## GENERATED FILE — regenerate with bakelevels.tscn, do not hand-edit.
+## GENERATED FILE — regenerate with generatelevels.tscn, do not hand-edit.
 ##
 ## How low a building can physically go decides whether it is fit to ship, and
 ## it used to be modelled: a per-system guess at how far debris spreads, times
@@ -26,7 +26,7 @@ extends RefCounted
 ## seed -> {"pile": the worst rubble it left, "system": which kind of building
 ## it is}. Measured, not modelled.
 ##
-## The system is recorded rather than re-drawn from the seed. The bake asks
+## The system is recorded rather than re-drawn from the seed. The generate step asks
 ## for each system by name so that every one of them is covered, so the seed
 ## alone no longer decides what gets built — and rebuilding from the seed
 ## alone would give the game a different building than the one measured.
@@ -62,7 +62,7 @@ const AUTHORED := {
 	"hard": {"pile": 87},
 }
 
-## The measured pile, or -1 for a level the bake has never covered.
+## The measured pile, or -1 for a level the generate step has never covered.
 ##
 ## Absent has to be distinguishable from zero, and zero is a real result: a
 ## chimney can be left with nothing at all above the street, and seed 4103 was
@@ -77,7 +77,7 @@ static func for_level(difficulty: String) -> float:
 	return float(AUTHORED.get(difficulty, {}).get("pile", -1.0))
 
 
-## Which kind of building a baked seed is, or "" if it is not in the pack.
+## Which kind of building a generated seed is, or "" if it is not in the pack.
 static func system_for(level_seed: int) -> String:
 	return String(MEASURED.get(level_seed, {}).get("system", ""))
 
