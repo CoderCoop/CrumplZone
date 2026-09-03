@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Runnable on demand against a branch, which is how the generated level
+  # pack gets checked. GitHub creates no pull_request event for a pull
+  # request opened with GITHUB_TOKEN, so nothing would otherwise ever run
+  # against that branch — see generate-levels.yml.
+  workflow_dispatch:
 
 permissions:
   contents: read
