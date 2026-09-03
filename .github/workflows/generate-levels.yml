@@ -18,6 +18,9 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # SPIKE: does granting this make a token dispatch work, or does the
+  # anti-recursion rule still swallow it silently?
+  actions: write
 
 env:
   GODOT_VERSION: 4.6-stable
