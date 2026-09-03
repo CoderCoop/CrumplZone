@@ -18,6 +18,9 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # Lets this workflow ask ci.yml to run on the branch it just pushed. That
+  # is the whole mechanism below, and it needs no secret.
+  actions: write
 
 env:
   GODOT_VERSION: 4.6-stable
@@ -88,52 +91,11 @@ jobs:
       # main is protected and a bot walking around that gate would make the
       # gate decorative. The generate step proposes; review disposes, and the diff in
       # the pile heights is the thing worth looking at.
-      # GitHub does not trigger workflows for anything created with
-      # GITHUB_TOKEN. That is deliberate — it stops a workflow triggering
-      # itself forever — and it means a pull request opened with the default
-      # token gets no check runs at all, so the required `ci` check never
-      # reports and branch protection will never let it merge. It is not a
-      # permissions problem and no permissions block fixes it.
-      #
-      # This has already cost two rounds of re-opening the same pull request
-      # by hand off a second branch, which is most of the point of automating
-      # the generate step gone. The documented fix is to act as a GitHub App: its token
-      # is a real actor, so its pull requests trigger CI like anyone else's,
-      # and unlike a personal access token it is short-lived and scoped to
-      # this repository alone.
-      #
-      # ONE-TIME SETUP, which needs a human:
-      #
-      #   1. Create a GitHub App on the account that owns this repository.
-      #      Repository permissions: Contents read & write, Pull requests
-      #      read & write. No account permissions, no webhook.
-      #   2. Install it on CoderCoop/CrumplZone only.
-      #   3. Repository variable  GENERATE_APP_ID          = the App's ID
-      #      Repository secret    GENERATE_APP_PRIVATE_KEY = the App's .pem
-      #
-      # Until that exists this step is skipped and the generate step still runs and
-      # still opens a pull request — it just cannot gate it, and says so
-      # loudly rather than leaving someone to work out why nothing ran.
-      - name: Act as the app, so the pull request can gate itself
-        id: app
-        if: ${{ !inputs.dry_run && vars.GENERATE_APP_ID != '' }}
-        uses: actions/create-github-app-token@v2
-        with:
-          app-id: ${{ vars.GENERATE_APP_ID }}
-          private-key: ${{ secrets.GENERATE_APP_PRIVATE_KEY }}
-
-      - name: Say plainly that the pull request will not be checked
-        if: ${{ !inputs.dry_run && vars.GENERATE_APP_ID == '' }}
-        run: |
-          echo "::warning title=This pull request cannot merge on its own::GENERATE_APP_ID is not set, so the pull request is opened with GITHUB_TOKEN. GitHub does not trigger workflows for those: it will have no check runs and the required 'ci' check will never report, so someone has to push the same commit to an ordinary branch and open a second pull request from it. The setup notes in .github/workflows/generate-levels.yml stop that being necessary."
-
       - name: Open a pull request if the measurements moved
+        id: pr
         if: ${{ !inputs.dry_run }}
         uses: peter-evans/create-pull-request@v7
         with:
-          # Falls back to the default token, which still opens the pull
-          # request; it just cannot trigger the checks on it.
-          token: ${{ steps.app.outputs.token || github.token }}
           branch: generated/level-pack
           title: "chore: re-generate the level pack"
           commit-message: |
@@ -145,3 +107,41 @@ jobs:
           body-path: generate-report.txt
           add-paths: game/pack.gd
           delete-branch: true
+
+      # And ask CI to check it.
+      #
+      # GitHub does not trigger workflows for events created with
+      # GITHUB_TOKEN — deliberately, so a workflow cannot trigger itself
+      # forever. A pull request opened above therefore gets no check runs at
+      # all, the required `ci` check never reports, and branch protection can
+      # never let it merge. That cost three rounds of pushing the same commit
+      # to an ordinary branch and opening a second pull request by hand.
+      #
+      # The rule covers events. It does not cover an explicit dispatch: the
+      # REST API will start a workflow run for this token, given
+      # `actions: write`. Measured before relying on it — without the
+      # permission the call is a 403, with it the run appears and completes,
+      # attributed to github-actions[bot].
+      #
+      # So the real ci.yml runs, against the real branch, and publishes the
+      # real check on the commit the pull request is for. Nothing here marks
+      # its own homework and no App, deploy key or personal access token is
+      # involved.
+      - name: Ask CI to check the branch
+        if: ${{ !inputs.dry_run && steps.pr.outputs.pull-request-number }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          code=$(curl -s -o /tmp/dispatch -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/ci.yml/dispatches" \
+            -d '{"ref":"generated/level-pack"}')
+          if [ "$code" != "204" ]; then
+            echo "::error::could not ask ci.yml to run (HTTP $code)"
+            cat /tmp/dispatch
+            exit 1
+          fi
+          echo "::notice::ci.yml dispatched against generated/level-pack; \
+          pull request #${{ steps.pr.outputs.pull-request-number }} will \
+          gate on it"
