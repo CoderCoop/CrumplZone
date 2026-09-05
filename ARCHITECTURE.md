@@ -43,6 +43,7 @@ graph TD
         gentest["gentest.gd<br/>generated levels stand up<br/>and stay winnable"]
         skytest["skytest.gd<br/>every district has a sky<br/>and no two share one"]
         fittest["fittest.gd<br/>nothing is built inside<br/>anything else"]
+        scrolltest["scrolltest.gd<br/>a touch drag reaches the scroll<br/>from anywhere on the screen"]
         shots["shots.gd<br/>a picture of each system<br/>looked at, not asserted"]
         skyshot["skyshot.gd<br/>a picture of each sky<br/>same building, different town"]
         systemprobe["systemprobe.gd<br/>which piece moves, and which way<br/>measured, not gated"]
@@ -90,6 +91,8 @@ graph TD
     skytest -->|gates| ci
     fittest -->|reads specs from| architecture
     fittest -->|gates| ci
+    scrolltest -->|drives| intro
+    scrolltest -->|gates| ci
     skyshot -->|drives| backdrop
     systemprobe -->|drives| level
     solver -->|drives headlessly| level
@@ -236,6 +239,14 @@ it is not in `ci.yml`, and nothing it printed could ever turn a build red. A
 name that claims to be a gate and is not is worse than no name, because the
 next person reads the list of `*test` files as the list of things that are
 checked.
+
+Every gate but one runs `--headless`. `scrolltest.gd` needs a window, because
+the intro screen sizes itself from the screen it is on: with no screen at all
+`UI.units_per_css` returns 12.5 and the overlay lays itself out for a 64x64
+phone, so anything measured from it is meaningless. CI runs that one under
+`xvfb-run` at `--resolution 390x844`. Any future check on a screen that sizes
+itself needs the same treatment, and a headless one will look green while
+measuring a layout no device ever gets.
 
 The vocabulary follows the same idea. What used to be called *the bake* is
 **the generate step** — it generates a committed artifact, `pack.gd`, the way

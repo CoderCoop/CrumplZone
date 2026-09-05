@@ -96,6 +96,10 @@ var _feet: Array[Vector2] = []
 
 func _ready() -> void:
 	custom_minimum_size = Vector2(0.0, 330.0)
+	# The map is the largest thing in a scrolling column, so a Control that
+	# swallows drags makes most of the screen unscrollable on a phone. It only
+	# draws — it has no input of its own to take.
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_build_pins()
 	resized.connect(func() -> void:
 		_place_pins()
@@ -221,6 +225,9 @@ func _build_pins() -> void:
 		var pin := Button.new()
 		pin.text = Districts.title(district)
 		pin.focus_mode = Control.FOCUS_NONE
+		# Takes its own taps and lets a drag past it to the scroll behind —
+		# see UI.let_drags_through.
+		pin.mouse_filter = Control.MOUSE_FILTER_PASS
 		pin.clip_text = true
 		pin.add_theme_font_size_override("font_size", 13)
 		# Over the 44 px touch floor, and wide enough for the longest district

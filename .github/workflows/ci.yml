@@ -206,4 +206,38 @@ jobs:
           # level's par against what a solution really costs.
           run_harness "par test" res://partest.tscn
 
-          echo "::notice::ci passed — secret scan, GDScript checks, wake test, break test, stress test, collapse test, crack test, hull test, replay test, stand test, one shot test, generation test, line test, par test"
+          # The one harness that needs a window rather than --headless.
+          #
+          # The intro screen sizes itself from the screen it is on, and with
+          # no screen at all UI.units_per_css returns 12.5 — so headless lays
+          # the whole overlay out for a 64x64 phone and every measurement
+          # taken from it is meaningless. Under a real window at a real phone
+          # size it lays out the way a phone gets it.
+          run_windowed_harness() {
+            local name="$1" scene="$2" log
+            log="$(mktemp)"
+            echo "--- $name ---"
+            set -o pipefail
+            if ! xvfb-run -a --server-args="-screen 0 500x1000x24" \
+                "$godot" --fixed-fps 60 --resolution 390x844 \
+                --rendering-driver opengl3 --path game "$scene" 2>&1 \
+                | tee "$log"; then
+              echo "::error::$name failed"
+              return 1
+            fi
+            if grep -q "SCRIPT ERROR" "$log"; then
+              echo "::error::$name printed SCRIPT ERROR"
+              grep -m5 -A3 "SCRIPT ERROR" "$log"
+              return 1
+            fi
+          }
+
+          # A touch drag has to reach the thing that scrolls, from anywhere on
+          # the screen. It did not: every Button and every bare Control is
+          # MOUSE_FILTER_STOP by default, so a drag beginning on the city map,
+          # a district pin, a level tile or a spacer died where the finger
+          # landed and the help screen scrolled from some places and not
+          # others. Invisible to every other check here, and to a diff.
+          run_windowed_harness "scroll test" res://scrolltest.tscn
+
+          echo "::notice::ci passed — secret scan, GDScript checks, wake test, break test, stress test, collapse test, crack test, hull test, replay test, stand test, one shot test, generation test, line test, par test, scroll test"

@@ -109,3 +109,31 @@ static func device_pixel_ratio() -> float:
 		if typeof(value) == TYPE_FLOAT or typeof(value) == TYPE_INT:
 			_ratio = clampf(float(value), 1.0, 4.0)
 	return _ratio
+
+
+## Lets a touch drag through a control tree to whatever is scrolling behind it.
+##
+## A ScrollContainer only drag-scrolls from events that actually reach it, and
+## a Control with MOUSE_FILTER_STOP ends that chain. Every Button is STOP by
+## default and so is every bare Control, which on a phone means the drag dies
+## wherever the finger happened to land.
+##
+## Measured on the intro screen before this existed, counting events arriving
+## at the ScrollContainer for one identical 12-step drag:
+##
+##      5% down the column, over a Label      24
+##     15% down, over a spacer Control         0
+##     30% down, over a Label                 24
+##     50% down, over a district pin Button    0
+##     70% down, over the city map             0
+##     90% down, over a level tile Button      0
+##
+## STOP becomes PASS rather than IGNORE, so a button still takes its own taps
+## and the scroll behind it hears the drag as well. A control that is already
+## IGNORE or PASS is left alone.
+static func let_drags_through(root: Control) -> void:
+	if root.mouse_filter == Control.MOUSE_FILTER_STOP:
+		root.mouse_filter = Control.MOUSE_FILTER_PASS
+	for child in root.get_children():
+		if child is Control:
+			let_drags_through(child as Control)

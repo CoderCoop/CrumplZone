@@ -94,6 +94,11 @@ func _ready() -> void:
 	_column.add_child(_how)
 	_column.add_child(_news)
 	_column.add_child(_levels)
+	# Nothing in the scrolling column may swallow a touch drag. Applied as a
+	# sweep rather than at each of the eight places a control is built here,
+	# because the next one added would silently miss it — and the symptom is
+	# not a crash, it is a screen that scrolls from some places and not others.
+	UI.let_drags_through(_column)
 
 	# Offered rather than advertised: the button only exists when the browser
 	# has an install prompt in hand for it.
@@ -383,6 +388,7 @@ func _rebuild_levels() -> void:
 	_column.add_child(_levels)
 	_column.move_child(_levels, at)
 	_levels.visible = was_visible
+	UI.let_drags_through(_column)
 	relayout()
 
 
