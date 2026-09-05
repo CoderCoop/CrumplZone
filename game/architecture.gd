@@ -174,36 +174,136 @@ static func build(kind: String, rng: RandomNumberGenerator) -> Dictionary:
 static func _curtain_wall(rng: RandomNumberGenerator) -> Array:
 	var storeys := rng.randi_range(3, 5)
 	var columns := rng.randi_range(4, 6)
-	var spacing := rng.randf_range(78.0, 92.0)
 	var column := Vector2(rng.randf_range(20.0, 26.0), rng.randf_range(70.0, 82.0))
 	var slab_h := 22.0
+	# How far the glass keeps off the columns either side of it. It holds
+	# nothing up and must not start: glazing fitted tight between the columns
+	# braces the frame against shear, which took this building from solvable
+	# in three moves to unsolvable in seven the one time it was tried.
+	var clear := 22.0
 	var blocks: Array = []
-	var first_x := -float(columns - 1) * spacing * 0.5
-	var slab_w := float(columns - 1) * spacing + column.x * 2.0
-	var bay := spacing - column.x - 22.0
-	var y := 0.0
+
+	# Bays of different widths rather than a repeating grid. The widest bay is
+	# the longest span in the building, so the slab over it is the one worth
+	# dropping — and which bay that is has to be found rather than assumed,
+	# which is the whole difference from a frame where every bay is alike.
+	#
+	# The span is derived from the bay rather than drawn beside it, so there
+	# is always room left over to vary. Drawn independently, a wide column and
+	# a narrow spacing left nothing spare and _split fell back to an even
+	# split — measured, two seeds in twenty-four came out as the regular grid
+	# this is meant to replace, and they came out that way silently.
+	var least: float = column.x + clear + 24.0
+	var span: float = float(columns - 1) * (least + rng.randf_range(18.0, 44.0))
+	var bays := _split(span, columns - 1, rng, 0.55, least)
+	var nodes := _nodes(bays, -span * 0.5)
+
+	# A tall ground floor and shallower ones above, the way a real office is
+	# built. See _storey_heights: it is also the storey a demolition looks at
+	# first, and a stack of identical ones has no such storey.
+	var heights := _storey_heights(storeys, column.y,
+		rng.randf_range(1.0, 1.32), rng, 0.09)
+
+	# A setback: above some storey the frame steps in by one bay, on one side.
+	# It is the largest change to the silhouette available here, it is what
+	# every tower of this age actually did, and it makes the top of the
+	# building a different shape from the bottom — so the rubble does not
+	# arrive in a single square heap.
+	#
+	# One bay from one side rather than a bay from each. Stepping in from both
+	# would put the storey above's columns inboard of the ones below on both
+	# sides, which is a tower balanced on its own middle; stepping in from one
+	# leaves a continuous line of columns down the other.
+	var step_at := -1
+	if storeys >= 4 and columns >= 5 and rng.randf() < 0.7:
+		step_at = rng.randi_range(2, storeys - 1)
+	var step_right: bool = rng.randf() < 0.5
+
 	# One reinforced column at the ground floor on the taller ones: something
 	# no tool goes through, so the building has to come down around it.
 	var core := -1
 	if storeys >= 4:
 		core = int(columns / 2)
 
+	var y := 0.0
 	for storey in storeys:
-		for i in columns:
-			blocks.append(_block(first_x + i * spacing, y - column.y * 0.5,
-				column.x, column.y, "column",
-				Materials.REINFORCED if (storey == 0 and i == core) else Materials.STEEL))
-		for i in columns - 1:
-			blocks.append(_block(first_x + i * spacing + spacing * 0.5,
-				y - column.y * 0.5, bay, column.y - 20.0, "glazing", Materials.GLASS))
-		y -= column.y
-		blocks.append(_block(0.0, y - slab_h * 0.5, slab_w, slab_h,
-			"roof" if storey == storeys - 1 else "slab", Materials.CONCRETE))
+		var high: float = heights[storey]
+		var lo := 0
+		var hi := columns - 1
+		if step_at >= 0 and storey >= step_at:
+			if step_right:
+				hi -= 1
+			else:
+				lo += 1
+		for i in range(lo, hi + 1):
+			blocks.append(_block(nodes[i], y - high * 0.5,
+				column.x, high, "column",
+				Materials.REINFORCED if (storey == 0 and i == core)
+					else Materials.STEEL))
+		for i in range(lo, hi):
+			# Between two columns, clear of both. Derived from the bay it
+			# fills rather than from a nominal spacing, so an uneven bay
+			# cannot put the glass inside the column beside it.
+			var pane: float = bays[i] - column.x - clear
+			blocks.append(_block((nodes[i] + nodes[i + 1]) * 0.5,
+				y - high * 0.5, pane, high - 20.0, "glazing", Materials.GLASS))
+		y -= high
+		# The slab reaches the columns it is carrying and no further, so a
+		# storey that has stepped in sits on a slab of its own width.
+		var slab_w: float = nodes[hi] - nodes[lo] + column.x * 2.0
+		blocks.append(_block((nodes[lo] + nodes[hi]) * 0.5, y - slab_h * 0.5,
+			slab_w, slab_h, "roof" if storey == storeys - 1 else "slab",
+			Materials.CONCRETE))
 		y -= slab_h
+		if storey == storeys - 1:
+			# The plant room: lift overrun, tanks and air handling, in a box
+			# on the roof and never in the middle of it. Every building of
+			# this kind has one, and it is the heaviest thing at the top of
+			# the lightest part of the frame — so which way the tower wants to
+			# go over is a question with an answer.
+			#
+			# It is also what makes this system asymmetric by construction.
+			# Uneven bays and a setback left it a mirror image whenever the
+			# bays came out palindromic and no setback was drawn, and a gate
+			# that passes on a coin toss is not a gate.
+			var plant_w: float = (nodes[hi] - nodes[lo]) * rng.randf_range(0.22, 0.34)
+			var side: float = 1.0 if rng.randf() < 0.5 else -1.0
+			var plant_x: float = (nodes[lo] + nodes[hi]) * 0.5 \
+				+ side * (slab_w * 0.5 - plant_w * 0.5 - 14.0)
+			blocks.append(_block(plant_x, y - 17.0, plant_w, 34.0,
+				"plant", Materials.CONCRETE))
 	return blocks
 
 
 # --- load-bearing brick, arched openings ------------------------------------
+
+## Uneven openings were built here and taken out again, and the measurements
+## are kept because the next attempt should not start from nothing.
+##
+## A warehouse with a cart entrance is the most characterful thing this
+## generator could have, and it cost five seeds in sixteen: 15 of 16 hold with
+## the wall as it is here, 10 of 16 with openings of different widths. The loss
+## was isolated to this function — the original body inside the otherwise
+## changed file holds 15 of 16 — and then four explanations were tested and
+## every one of them was wrong:
+##
+##   pier sized to its tributary opening   no change (10 of 16)
+##   fatter piers throughout               worse (11, 8, 8 of 16 at rising ratios)
+##   less mass on top (parapet 28>22>18)   no change (10, 10, 11 of 16)
+##   milder unevenness (spread .5>.35>.2)  no change (10, 10, 11 of 16)
+##
+## Forward from the original, uneven bays alone cost two seeds (15 to 13) and
+## the rest of the drop came from the other changes compounding, none of which
+## cost anything measurable on its own. That is the shape of a system with no
+## margin left, and the honest reading is that load-bearing brick here is at
+## its limit before any variety is added — not that some constant is wrong.
+##
+## So it keeps its even bays for now. It is exempt in varietytest.gd, with this
+## as the reason, and it comes back when there is an explanation rather than
+## another guess. The place to look first is what a warehouse carries: three
+## storeys of brick on piers is most of the mass in the game, and giving it
+## something to spare is a different change from making it uneven.
+
 
 static func _masonry(rng: RandomNumberGenerator) -> Array:
 	# Three storeys at most. Load-bearing brick past that needs walls thicker
@@ -337,14 +437,39 @@ static func _panel(rng: RandomNumberGenerator) -> Array:
 static func _flat_slab(rng: RandomNumberGenerator) -> Array:
 	var decks := rng.randi_range(3, 5)
 	var columns := rng.randi_range(5, 7)
-	var spacing := rng.randf_range(64.0, 78.0)
 	var column_w := rng.randf_range(14.0, 18.0)
 	var storey_h := rng.randf_range(52.0, 62.0)
 	var slab_h := 20.0
 	var blocks: Array = []
-	var first := -float(columns - 1) * spacing * 0.5
-	var span := float(columns - 1) * spacing + column_w * 3.0 \
+
+	# Bays of different widths. A car park is poured to a structural grid and
+	# a real one is not square: the bays over the ramp and the lift core are
+	# wider than the parking bays, because that is what has to fit under them.
+	# The wide bay is the long span, which is the one that drops a whole floor
+	# when its column goes.
+	#
+	# The average pitch is the one this deck has always had, 71 px. Sized from
+	# the column instead and drawn freely it came out at a mean of 97, and a
+	# car park 37% wider on the same posts is not a change anyone asked for —
+	# so it is held to its own size. It did not, however, explain anything:
+	# uneven bays cost two seeds in sixteen at either width.
+	#
+	# What those two seeds do is take one point of damage on one piece, with
+	# 2.5 px of sag — the marginal reading loadprobe.gd was written about, not
+	# a structure coming apart. Masonry's were three and four points across
+	# several piers, which is why that system kept its even bays and this one
+	# did not. Neither loss is explained; the difference in kind is the whole
+	# of the reason they were decided differently, and it is recorded here so
+	# that decision can be argued with rather than guessed at.
+	#
+	# The floor keeps the core clear of the post beside it and nothing more.
+	var least: float = column_w * 2.4 + 14.0
+	var pitch: float = least + rng.randf_range(10.0, 26.0)
+	var bays := _split(float(columns - 1) * pitch, columns - 1, rng, 0.5, least)
+	var nodes := _nodes(bays, -float(columns - 1) * pitch * 0.5)
+	var span: float = nodes[columns - 1] - nodes[0] + column_w * 3.0 \
 		+ column_w * 0.14 * float(decks - 1)
+	var core_at: int = 0 if rng.randf() < 0.5 else columns - 1
 	var y := 0.0
 
 	for deck in decks:
@@ -355,8 +480,24 @@ static func _flat_slab(rng: RandomNumberGenerator) -> Array:
 		# gentest caught the ground storey crushing itself untouched.
 		var thickness: float = column_w * (1.0 + 0.14 * float(decks - 1 - deck))
 		for i in columns:
-			blocks.append(_block(first + float(i) * spacing, y - storey_h * 0.5,
-				thickness, storey_h, "post", Materials.CONCRETE))
+			# The stair and lift core stands on one of the end column lines,
+			# in place of a column rather than beside one. It is the one stiff
+			# thing in a building that is otherwise slabs balanced on sticks,
+			# real car parks are braced by exactly this, and it is reinforced
+			# — so the decks have to be brought down around it.
+			#
+			# It is also what makes this system asymmetric by construction.
+			# Uneven bays alone left it a mirror image whenever they came out
+			# palindromic, and a gate that passes on a coin toss is not a gate.
+			#
+			# In the column's slot, not through it: a full-height shaft would
+			# have every deck built inside it, which is the failure this file
+			# has shipped four times.
+			var is_core: bool = i == core_at
+			blocks.append(_block(nodes[i], y - storey_h * 0.5,
+				column_w * 2.4 if is_core else thickness, storey_h,
+				"core" if is_core else "post",
+				Materials.REINFORCED if is_core else Materials.CONCRETE))
 		y -= storey_h
 		blocks.append(_block(0.0, y - slab_h * 0.5, span, slab_h, "deck",
 			Materials.CONCRETE))
@@ -406,33 +547,34 @@ static func _stack(rng: RandomNumberGenerator) -> Array:
 
 static func _shed(rng: RandomNumberGenerator) -> Array:
 	var bays := rng.randi_range(4, 6)
-	var spacing := rng.randf_range(92.0, 118.0)
 	var height := rng.randf_range(108.0, 140.0)
 	var column_w := rng.randf_range(19.0, 24.0)
 	var blocks: Array = []
-	var first := -float(bays) * spacing * 0.5
-	var span := float(bays) * spacing + column_w
+
+	# Bays of different widths. A shed is built to whatever it has to house,
+	# and the bay over the crane run or the machine is wider than the rest —
+	# which is also the bay whose truss carries furthest with least under it.
+	#
+	# Derived from the pad, so a bay can never be narrower than the two pads
+	# either side of it plus the sill between them.
+	var least: float = column_w * 2.2 + 42.0
+	var total: float = float(bays) * (least + rng.randf_range(8.0, 36.0))
+	var widths := _split(total, bays, rng, 0.44, least)
+	var nodes := _nodes(widths, -total * 0.5)
+	var first: float = nodes[0]
+	var span: float = total + column_w
 	var y := 0.0
 
 	# One bay is left open as the doorway, which is what a shed is for. Chosen
 	# before anything is placed, because the ground work skips it too.
 	var door := rng.randi_range(0, bays - 1)
 
-	# The clear width between two pads, less a little. Everything at ground
-	# level in a bay is derived from this one number rather than measured
-	# from the bay: the sill is this wide and the wall standing on it is
-	# narrower still, so neither can be built inside a pad. Sizing the wall
-	# from the bay instead put it 1.4 to 4.4 px into the pads at the ends of
-	# the generator's ranges — small enough that the stability gate passed
-	# anyway, which is what makes it worth writing down rather than leaving.
-	var sill_w := spacing - column_w * 2.2 - 6.0
-
 	# Stanchions on pad footings. Measured before they had any: two shed seeds
 	# in twelve fell over untouched — a row of slender columns carrying a wide
 	# truss is an inverted pendulum, and a real one is bolted to a pad footing
 	# for exactly that reason.
 	for i in bays + 1:
-		var x := first + float(i) * spacing
+		var x: float = nodes[i]
 		blocks.append(_block(x, -BASE_H * 0.5, column_w * 2.2, BASE_H,
 			"footing", Materials.CONCRETE))
 		blocks.append(_block(x, -BASE_H - (height - BASE_H) * 0.5,
@@ -454,24 +596,32 @@ static func _shed(rng: RandomNumberGenerator) -> Array:
 	for i in bays:
 		if i == door:
 			continue
-		blocks.append(_block(first + spacing * 0.5 + float(i) * spacing,
-			-BASE_H * 0.5, sill_w, BASE_H, "footing", Materials.CONCRETE))
+		blocks.append(_block((nodes[i] + nodes[i + 1]) * 0.5,
+			-BASE_H * 0.5, _sill_of(widths[i], column_w), BASE_H,
+			"footing", Materials.CONCRETE))
 	y = -height
 	# Truss: a bottom chord across the whole span, a top chord, and posts
 	# between them. Light, deep, and it carries a long way on very little.
 	blocks.append(_block(0.0, y - 6.0, span, 12.0, "chord", Materials.STEEL))
 	blocks.append(_block(0.0, y - 40.0, span, 10.0, "chord", Materials.STEEL))
-	for i in bays * 2 + 1:
-		blocks.append(_block(first + float(i) * spacing * 0.5, y - 23.0, 7.0, 22.0,
-			"web", Materials.STEEL))
+	# Web posts on every stanchion line and on every bay's middle, which with
+	# uneven bays is no longer an even sequence — the truss is panelled to the
+	# frame under it, the way a real one is.
+	for i in bays + 1:
+		blocks.append(_block(nodes[i], y - 23.0, 7.0, 22.0, "web",
+			Materials.STEEL))
+	for i in bays:
+		blocks.append(_block((nodes[i] + nodes[i + 1]) * 0.5, y - 23.0, 7.0,
+			22.0, "web", Materials.STEEL))
 	# Sawtooth roof: a glazed face and a solid face per bay, north-light,
 	# which is what these were built with.
 	for i in bays:
-		var centre := first + spacing * 0.5 + float(i) * spacing
-		blocks.append(_block(centre - spacing * 0.22, y - 62.0,
-			spacing * 0.42, 34.0, "rooflight", Materials.GLASS))
-		blocks.append(_block(centre + spacing * 0.24, y - 55.0,
-			spacing * 0.46, 18.0, "sheeting", Materials.TIMBER))
+		var centre: float = (nodes[i] + nodes[i + 1]) * 0.5
+		var wide: float = widths[i]
+		blocks.append(_block(centre - wide * 0.22, y - 62.0,
+			wide * 0.42, 34.0, "rooflight", Materials.GLASS))
+		blocks.append(_block(centre + wide * 0.24, y - 55.0,
+			wide * 0.46, 18.0, "sheeting", Materials.TIMBER))
 
 	# Cladding on the walls. Without it this was a row of columns holding a
 	# truss up in the air — structurally a shed, and to look at, a viaduct.
@@ -488,7 +638,6 @@ static func _shed(rng: RandomNumberGenerator) -> Array:
 	# between its columns braced the frame against shear and took the same
 	# building from solvable in three moves to unsolvable in seven. Cladding
 	# holds nothing up, and has to be built so that it cannot start.
-	var clad_w := sill_w - 4.0
 	# Up to just under the eaves. At 30 px of clearance the wall stopped a
 	# quarter of the way down the elevation and read as a hoarding rather
 	# than a building; 14 leaves the chord free without the gap showing.
@@ -500,11 +649,26 @@ static func _shed(rng: RandomNumberGenerator) -> Array:
 	for i in bays:
 		if i == door:
 			continue
-		var cx := first + spacing * 0.5 + float(i) * spacing
+		var cx: float = (nodes[i] + nodes[i + 1]) * 0.5
+		var clad_w: float = _sill_of(widths[i], column_w) - 4.0
 		for c in rows:
 			blocks.append(_block(cx, -BASE_H - course_h * (float(c) + 0.5),
 				clad_w, course_h - 1.0, "sheeting", Materials.TIMBER))
 	return blocks
+
+
+## The clear width between two pads, less a little. Everything at ground level
+## in a bay is derived from this one number rather than measured from the bay:
+## the sill is this wide and the wall standing on it is narrower still, so
+## neither can be built inside a pad. Sizing the wall from the bay instead put
+## it 1.4 to 4.4 px into the pads at the ends of the generator's ranges — small
+## enough that the stability gate passed anyway, which is what makes it worth
+## writing down rather than leaving.
+##
+## A function rather than a value, because with bays of different widths there
+## is now a different answer per bay.
+static func _sill_of(bay: float, column_w: float) -> float:
+	return bay - column_w * 2.2 - 6.0
 
 
 # --- a small brick house -----------------------------------------------------
@@ -606,21 +770,30 @@ static func _house(rng: RandomNumberGenerator) -> Array:
 ## brought over as well.
 static func _retail(rng: RandomNumberGenerator) -> Array:
 	var units := rng.randi_range(3, 5)
-	var unit_w := rng.randf_range(96.0, 128.0)
 	var height := rng.randf_range(96.0, 116.0)
 	var column_w := rng.randf_range(16.0, 22.0)
 	var blocks: Array = []
-	var span := float(units) * unit_w
-	var first := -span * 0.5 + unit_w * 0.5
 	var deck_h := 18.0
+
+	# Shops of different widths, because a parade of identical ones is a
+	# drawing convention rather than a street. The widest unit has the longest
+	# span of deck over it and the most glass under it, so which shopfront is
+	# worth taking out is a question rather than a formality.
+	#
+	# Derived so there is always room to vary: a unit narrower than a column
+	# plus its clearances is a pane of negative width — see _split.
+	var least: float = column_w + 46.0
+	var span: float = float(units) * (least + rng.randf_range(30.0, 66.0))
+	var widths := _split(span, units, rng, 0.5, least)
+	var nodes := _nodes(widths, -span * 0.5)
 
 	blocks.append(_block(0.0, -7.0, span, 14.0, "footing", Materials.CONCRETE))
 	for i in units + 1:
-		var x := -span * 0.5 + float(i) * unit_w
-		blocks.append(_block(x, -14.0 - (height - 14.0) * 0.5, column_w,
+		blocks.append(_block(nodes[i], -14.0 - (height - 14.0) * 0.5, column_w,
 			height - 14.0, "column", Materials.STEEL))
 	for i in units:
-		var mid := first + float(i) * unit_w
+		var mid: float = (nodes[i] + nodes[i + 1]) * 0.5
+		var unit_w: float = widths[i]
 		# Glazing standing on the footing and stopping short of the deck:
 		# clear of the columns either side so it braces nothing, and bearing
 		# on something so it is not suspended.
@@ -649,7 +822,21 @@ static func _retail(rng: RandomNumberGenerator) -> Array:
 		Materials.CONCRETE))
 	y -= deck_h
 	# The sign band. Tall, light, and the thing that has to come over.
-	blocks.append(_block(0.0, y - 17.0, span, 34.0, "parapet", Materials.SHEET)) 
+	blocks.append(_block(0.0, y - 17.0, span, 34.0, "parapet", Materials.SHEET))
+	# One unit is the anchor, and its fascia stands proud of the rest — which
+	# is what every parade of shops has and none of these did.
+	#
+	# It is also the reason this system is not a mirror image of itself by
+	# construction rather than by luck. Uneven units alone left it symmetric
+	# whenever the widths happened to come out palindromic: measured, one seed
+	# in twenty-four, which is a gate that passes on a coin toss.
+	# At one end of the parade, which is where the big store is, and never in
+	# the middle — a raised fascia centred on the middle unit of an odd number
+	# of them is symmetric again, which is how the first version of this still
+	# left one seed in twenty-four a mirror image.
+	var anchor: int = 0 if rng.randf() < 0.5 else units - 1
+	blocks.append(_block((nodes[anchor] + nodes[anchor + 1]) * 0.5, y - 46.0,
+		widths[anchor] - 12.0, 24.0, "parapet", Materials.SHEET))
 	return blocks
 
 
@@ -661,15 +848,25 @@ static func _retail(rng: RandomNumberGenerator) -> Array:
 ## much cares.
 static func _overpass(rng: RandomNumberGenerator) -> Array:
 	var spans := rng.randi_range(3, 5)
-	var span_w := rng.randf_range(126.0, 168.0)
 	var height := rng.randf_range(118.0, 158.0)
 	var pier_w := rng.randf_range(26.0, 34.0)
 	var blocks: Array = []
-	var total := float(spans) * span_w
 	var deck_h := 20.0
 
+	# Spans of different lengths, which is what an overpass actually has: the
+	# one over the road it crosses is longer than the ones over the verge.
+	# The long span is the heaviest beam on the thinnest support, so which
+	# pier matters most is a question about this bridge rather than a rule
+	# about bridges.
+	#
+	# Derived so the footings can never meet: a span shorter than two pier
+	# pads is two pads built into each other.
+	var least: float = pier_w * 2.4
+	var total: float = float(spans) * (least + rng.randf_range(48.0, 96.0))
+	var lengths := _split(total, spans, rng, 0.42, least)
+	var nodes := _nodes(lengths, -total * 0.5)
 	for i in spans + 1:
-		var x := -total * 0.5 + float(i) * span_w
+		var x: float = nodes[i]
 		blocks.append(_block(x, -9.0, pier_w * 2.1, 18.0, "footing",
 			Materials.CONCRETE))
 		blocks.append(_block(x, -18.0 - (height - 18.0) * 0.5, pier_w,
@@ -680,7 +877,8 @@ static func _overpass(rng: RandomNumberGenerator) -> Array:
 			Materials.CONCRETE))
 	var y := -height - 16.0
 	for i in spans:
-		var mid := -total * 0.5 + span_w * 0.5 + float(i) * span_w
+		var mid: float = (nodes[i] + nodes[i + 1]) * 0.5
+		var span_w: float = lengths[i]
 		# Each span is its own beam, sitting on two caps and touching nothing
 		# else. Separate pieces, because separate is the point.
 		# Pier centre to pier centre, less a joint. Each span bears half on
@@ -691,9 +889,21 @@ static func _overpass(rng: RandomNumberGenerator) -> Array:
 			deck_h, "deck", Materials.CONCRETE))
 	y -= deck_h
 	for i in spans:
-		var mid := -total * 0.5 + span_w * 0.5 + float(i) * span_w
-		blocks.append(_block(mid, y - 8.0, span_w - 9.0, 16.0,
+		var mid: float = (nodes[i] + nodes[i + 1]) * 0.5
+		blocks.append(_block(mid, y - 8.0, lengths[i] - 9.0, 16.0,
 			"parapet", Materials.CONCRETE))
+	# A sign gantry over one span, on a leg standing on the deck beside the
+	# parapet. It is the one thing up here that is not part of the road, it is
+	# off to one side, and it is what makes this structure something other
+	# than its own mirror image — uneven spans alone left it symmetric
+	# whenever the lengths came out palindromic.
+	var gantry_at: int = 0 if rng.randf() < 0.5 else spans - 1
+	var gantry_x: float = (nodes[gantry_at] + nodes[gantry_at + 1]) * 0.5
+	var leg_h := 38.0
+	blocks.append(_block(gantry_x - lengths[gantry_at] * 0.28,
+		y - 16.0 - leg_h * 0.5, 12.0, leg_h, "post", Materials.STEEL))
+	blocks.append(_block(gantry_x, y - 16.0 - leg_h - 9.0,
+		lengths[gantry_at] * 0.62, 18.0, "sign", Materials.SHEET))
 	return blocks
 
 
@@ -818,6 +1028,91 @@ static func _stand(rng: RandomNumberGenerator) -> Array:
 	blocks.append(_block((roof_front + roof_back) * 0.5, legs_top - 23.0,
 		roof_back - roof_front, 14.0, "canopy", Materials.SHEET))
 	return blocks
+
+
+## Splits `total` into `count` pieces that differ in width, sum to exactly
+## `total`, and are never narrower than `least`.
+##
+## This is where variety within a building comes from, and the shape of it is
+## a safety property rather than a style. Jittering each member's position by
+## a few pixels is the obvious way to break up a regular grid, and it is how
+## four systems in this file ended up with blocks built inside each other,
+## each chased for rounds as a physics failure. Pieces that tile a span cannot
+## overlap: each one begins exactly where the last one ended, whatever the
+## random numbers do.
+##
+## `least` is guaranteed rather than hoped for — every piece is given it
+## before any of the remainder is shared out. A caller derives its own members
+## from the bay it is filling (a column each side, a pane between), so a bay
+## narrower than those add up to is a pane with negative width, and "unlikely
+## at the middle of the range" is how the last four of these got shipped.
+##
+## `spread` applies to the remainder, not to the whole, so it says how uneven
+## the spare room is rather than how uneven the bays are. 0.0 is the regular
+## grid this replaced.
+static func _split(total: float, count: int, rng: RandomNumberGenerator,
+		spread: float, least: float) -> Array[float]:
+	var parts: Array[float] = []
+	if count <= 0:
+		return parts
+	var spare: float = total - least * float(count)
+	if spare <= 0.0:
+		# The caller has asked for more pieces than the span holds. An even
+		# split is the honest answer; a negative one is not.
+		for i in count:
+			parts.append(total / float(count))
+		return parts
+	var weights: Array[float] = []
+	var sum := 0.0
+	for i in count:
+		var weight: float = 1.0 + rng.randf_range(-spread, spread)
+		weights.append(weight)
+		sum += weight
+	for i in count:
+		parts.append(least + spare * weights[i] / sum)
+	return parts
+
+
+## The boundaries between pieces that tile a span, both ends included. A
+## frame's columns stand on these and its bays fill the gaps between them, so
+## a column can never land inside the glass beside it.
+static func _nodes(widths: Array[float], left: float) -> Array[float]:
+	var out: Array[float] = [left]
+	var x := left
+	for w in widths:
+		x += w
+		out.append(x)
+	return out
+
+
+## Storey heights, with a taller one at the bottom.
+##
+## Real buildings have a tall ground floor — a lobby, a shopfront, a loading
+## bay — and it is also the first place a demolition looks: the storey with
+## the most slender columns carrying the most weight above them. Soft-storey
+## collapse is a real failure mode, and a frame of identical storeys has
+## nowhere for it to happen.
+static func _storey_heights(count: int, base: float, ground: float,
+		rng: RandomNumberGenerator, spread: float) -> Array[float]:
+	var out: Array[float] = []
+	var total := 0.0
+	for i in count:
+		out.append(base * (1.0 + rng.randf_range(-spread, spread)))
+	if count > 0:
+		out[0] = base * ground
+	for h in out:
+		total += h
+	# Rescaled so the building ends up the height it would have been anyway. A
+	# taller ground storey comes out of the storeys above it rather than being
+	# added on top, which is what a real building does under a height limit —
+	# and it keeps `base` meaning what it says, so a caller's storey range
+	# still describes the building it gets rather than a number the ground
+	# floor then multiplies.
+	var want: float = base * float(count)
+	if total > 0.0:
+		for i in count:
+			out[i] = out[i] / total * want
+	return out
 
 
 ## `fixed` marks a material that was chosen because a measurement said so,
