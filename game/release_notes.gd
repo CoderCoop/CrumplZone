@@ -11,6 +11,17 @@ extends RefCounted
 
 const NOTES: Array = [
 	{
+		"version": "0.14.7",
+		"date": "2026-09-05",
+		"lines": [
+			"Buildings are not repeating grids any more. The bays are "
+			+ "different widths, offices step in as they rise, and every "
+			+ "one of them has something off to one side.",
+			"So which bay to cut is a question now — the widest one is the "
+			+ "longest span, and it is somewhere different every time.",
+		],
+	},
+	{
 		"version": "0.14.6",
 		"date": "2026-09-05",
 		"lines": [

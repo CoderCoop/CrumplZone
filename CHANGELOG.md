@@ -7,6 +7,22 @@ sections are dated.
 
 ## [Unreleased]
 
+## [0.14.7] - 2026-09-05
+
+### Changed
+
+- **Buildings are no longer repeating grids.** Every generated building used
+  to be one unit copied across and one storey copied up, symmetric about its
+  own middle — so ten office blocks were ten copies of the same frame at
+  different sizes. Now the bays are different widths, offices have a tall
+  ground floor and step in as they rise, and each kind of building has
+  something of its own that is never in the middle: a plant room on the roof
+  of a tower, an anchor store at one end of a parade, a stair core up one side
+  of a car park, a sign gantry over one span of an overpass.
+- **Which bay to cut is now a question.** In a grid every bay was worth the
+  same. The widest bay is the longest span, and it is somewhere different in
+  every building.
+
 ## [0.14.6] - 2026-09-05
 
 ### Fixed

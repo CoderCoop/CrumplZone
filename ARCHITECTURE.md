@@ -44,6 +44,7 @@ graph TD
         skytest["skytest.gd<br/>every district has a sky<br/>and no two share one"]
         fittest["fittest.gd<br/>nothing is built inside<br/>anything else"]
         scrolltest["scrolltest.gd<br/>a touch drag reaches the scroll<br/>from anywhere on the screen"]
+        varietytest["varietytest.gd<br/>a building is not a repeating<br/>grid of itself"]
         shots["shots.gd<br/>a picture of each system<br/>looked at, not asserted"]
         skyshot["skyshot.gd<br/>a picture of each sky<br/>same building, different town"]
         systemprobe["systemprobe.gd<br/>which piece moves, and which way<br/>measured, not gated"]
@@ -93,6 +94,8 @@ graph TD
     fittest -->|gates| ci
     scrolltest -->|drives| intro
     scrolltest -->|gates| ci
+    varietytest -->|reads specs from| architecture
+    varietytest -->|gates| ci
     skyshot -->|drives| backdrop
     systemprobe -->|drives| level
     solver -->|drives headlessly| level

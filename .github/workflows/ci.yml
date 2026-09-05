@@ -201,6 +201,14 @@ jobs:
           # apart, which looks like a structure that is too weak.
           run_harness "fit test" res://fittest.tscn
 
+          # A building has to vary within itself, not only between seeds.
+          # Every generated one used to be a repeating unit across and a
+          # repeating storey up, mirror-symmetric about its own middle: 24 of
+          # 24 seeds of every system, measured. That reads as a placeholder,
+          # and it is flat as a puzzle too, because every bay of a regular
+          # frame is worth exactly the same to cut.
+          run_harness "variety test" res://varietytest.tscn
+
           # partest supersedes the old single-level playtest: it runs the same
           # search over all three difficulties and additionally checks each
           # level's par against what a solution really costs.
@@ -240,4 +248,4 @@ jobs:
           # others. Invisible to every other check here, and to a diff.
           run_windowed_harness "scroll test" res://scrolltest.tscn
 
-          echo "::notice::ci passed — secret scan, GDScript checks, wake test, break test, stress test, collapse test, crack test, hull test, replay test, stand test, one shot test, generation test, line test, par test, scroll test"
+          echo "::notice::ci passed — secret scan, GDScript checks, wake test, break test, stress test, collapse test, crack test, hull test, replay test, stand test, one shot test, generation test, line test, par test, scroll test, variety test"
