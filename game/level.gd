@@ -91,6 +91,14 @@ const REST_SPEED := 8.0
 ## itself settled, so the win never fires and the game sits on "settling…"
 ## until it is reloaded. Measured: thirty seconds after a demolition, nine
 ## pieces were still falling at 9,100 px/s and climbing.
+## How long a fragment below the line may go on moving before it is retired
+## anyway, in sweep ticks. _sweep_pass only ever retired a piece that had come
+## to rest, so the one piece that would not settle was the one piece it could
+## never take away — and a level with a handful of those never reports itself
+## settled at all. Ten seconds is far longer than any real piece of debris
+## takes to stop, so this catches only the ones that were never going to.
+const LOST_PATIENCE := 600
+
 const LOST_BELOW := 420.0
 const LOST_BESIDE := 1500.0
 
@@ -230,7 +238,23 @@ func _make_piece(pos: Vector2, polygon: PackedVector2Array, made_of: String,
 	body.contact_monitor = true
 	body.max_contacts_reported = 6
 
-	# Dust falls to the ground and stops mattering to anything else.
+	# Damping small debris was tried here and taken out again.
+	#
+	# It looked like the obvious fix — a fragment at the fracture floor has
+	# almost no rotational inertia and meets the ground on two points, so it
+	# skitters and turns long after everything holding it up has stopped, and
+	# something with that much surface for its mass really does stop quickly.
+	# Measured against the patience limit in _sweep_pass alone:
+	#
+	#     damped and patient    26 of 26 levels rest, 31 pieces still awake
+	#     patient only          26 of 26 levels rest,  0 pieces still awake
+	#
+	# The damping was not what fixed it and it was not free: debris that is
+	# damped settles where it lands instead of sliding out, so piles come out
+	# taller, and the grandstand's rubble stopped fitting under its own
+	# winning line — the generate step could fill only 2 of its 3 seeds and
+	# gentest failed two more. So it is gone rather than kept at a lower
+	# value, because a knob that buys nothing is a knob someone will tune.
 	var dust := made_of == Materials.GLASS \
 		and Fracture.area(polygon) < Materials.MIN_AREA * 2.0
 	body.set_collision_layer_value(LAYER_STRUCTURE, not dust)
@@ -1229,8 +1253,17 @@ func _sweep_pass() -> void:
 			continue          # still a piece worth simulating
 		if _top_of(body) < line:
 			continue          # above the line: it still counts
+		# How long this fragment has been eligible to go, moving or not. The
+		# damping above means almost everything stops on its own and is
+		# retired by the resting path below; this is for the one that does
+		# not, which used to keep a whole level from ever settling.
+		var waited: int = int(body.get_meta("waited", 0)) + STRESS_TICKS
+		body.set_meta("waited", waited)
 		if body.linear_velocity.length() > REST_SPEED:
 			body.set_meta("resting", 0)
+			if waited < LOST_PATIENCE:
+				continue
+			_retire(body)
 			continue
 		var resting: int = int(body.get_meta("resting", 0)) + STRESS_TICKS
 		if resting < REST_TICKS:
