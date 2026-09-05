@@ -11,6 +11,17 @@ extends RefCounted
 
 const NOTES: Array = [
 	{
+		"version": "0.14.8",
+		"date": "2026-09-05",
+		"lines": [
+			"The explosive throws things now. It breaks what is in reach "
+			+ "loose first and then sends it outward, tumbling — and how "
+			+ "far a piece goes says what it is made of.",
+			"It does not reach as far as it did. A charge that throws "
+			+ "properly was clearing whole buildings on its own.",
+		],
+	},
+	{
 		"version": "0.14.7",
 		"date": "2026-09-05",
 		"lines": [

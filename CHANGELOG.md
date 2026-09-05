@@ -7,6 +7,26 @@ sections are dated.
 
 ## [Unreleased]
 
+## [0.14.8] - 2026-09-05
+
+### Changed
+
+- **The explosive throws things now.** It always applied an outward force, but
+  it multiplied that force by each piece's own weight — which cancels the
+  weight straight back out, so a pane of glass and a reinforced core left the
+  blast at exactly the same speed. It now throws by area, so how far something
+  goes says what it is made of: sheeting flies, concrete shifts, a reinforced
+  core barely moves. Pieces tumble as they go, and the ones right next to the
+  charge are thrown too — they used to be the only ones the blast never moved.
+- **The charge breaks first and throws second.** A blast landing on a building
+  that is still standing is absorbed almost entirely by the pieces bracing
+  each other; making it stronger did close to nothing. Everything in reach is
+  now broken loose first and thrown afterwards, debris included, which is what
+  turns a charge into a detonation rather than a crack.
+- **The blast reaches less far**, 155 px down to 110. Straight swap, a charge
+  that throws properly cleared whole levels on its own — so the tool trades
+  reach for the force it now actually delivers.
+
 ## [0.14.7] - 2026-09-05
 
 ### Changed
