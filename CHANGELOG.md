@@ -7,7 +7,16 @@ sections are dated.
 
 ## [Unreleased]
 
-Nothing since 0.14.5.
+## [0.14.6] - 2026-09-05
+
+### Fixed
+
+- **The help screen scrolls from anywhere now.** Dragging to scroll only
+  worked if your finger started on a piece of text. Starting it on the city
+  map, a district pin, a level tile or the gap between sections did nothing at
+  all — which on a phone is most of the screen, and it made the Levels tab
+  feel broken rather than stuck. Tapping still picks a district or a level,
+  and a drag that starts on one no longer picks it by accident.
 
 ## [0.14.5] - 2026-08-31
 

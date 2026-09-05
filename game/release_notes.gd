@@ -11,6 +11,15 @@ extends RefCounted
 
 const NOTES: Array = [
 	{
+		"version": "0.14.6",
+		"date": "2026-09-05",
+		"lines": [
+			"This screen scrolls from anywhere now. Dragging only worked if "
+			+ "your finger started on a piece of text — starting it on the "
+			+ "map or on a level did nothing.",
+		],
+	},
+	{
 		"version": "0.14.5",
 		"date": "2026-08-31",
 		"lines": [
