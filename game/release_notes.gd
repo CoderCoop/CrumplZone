@@ -19,6 +19,8 @@ const NOTES: Array = [
 			+ "far a piece goes says what it is made of.",
 			"It does not reach as far as it did. A charge that throws "
 			+ "properly was clearing whole buildings on its own.",
+			"Small debris stops now. On a few levels the last few chips "
+			+ "never settled at all.",
 		],
 	},
 	{

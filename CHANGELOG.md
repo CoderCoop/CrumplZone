@@ -27,6 +27,16 @@ sections are dated.
   that throws properly cleared whole levels on its own — so the tool trades
   reach for the force it now actually delivers.
 
+### Fixed
+
+- **Small debris stops instead of twitching forever.** Fragments the size of
+  a brick chip could skitter and spin indefinitely, and on some levels they
+  never stopped at all — which is also why those levels never quite felt
+  finished. The clean-up that clears settled debris only ever removed a piece
+  that had come to rest, so the one piece that would not settle was the one
+  piece it could never take away. It gives up on those now. Every level in
+  the pack comes fully to rest; one of them never did before.
+
 ## [0.14.7] - 2026-09-05
 
 ### Changed
