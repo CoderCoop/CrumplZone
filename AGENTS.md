@@ -698,6 +698,15 @@ applies. Check, do not assume.**
   receipt. `GET /repos/{owner}/{repo}` returns the merge and feature flags, so
   reading the field back settles it in one call. Do that before concluding a
   setting needs Terraform or a human with a mouse.
+- **The `labels` section prunes.** Measured here on 2026-09-13: nine labels
+  declared, and a minute after the file reached `main` the repository had
+  exactly those nine — GitHub's stock `bug`, `enhancement`, `question`,
+  `wontfix` and the rest were gone. Undocumented, and the reason every label
+  meant to survive has to be in the file rather than only the new ones. Eight
+  of the nine came out with the declared colour and description; `levels`
+  kept the grey default it had been auto-created with when an issue was
+  labelled through the API before the file landed — the other five created
+  the same way were corrected. Open as #69; no explanation yet.
 - What genuinely has no key, and still needs Terraform: Pages configuration,
   secret scanning, and secret scanning push protection.
 
