@@ -7,9 +7,9 @@ and Specification were deliberately left out.
 
 Edit these defaults in `defaults/` in the dotfiles-ai fork, not here.
 
-Three further modules — **Diagnose before fixing**, **Mobile first**, and
-**Issues track the work** — are local to this project and are not from
-dotfiles-ai. They live at the bottom of this file, along with **Repo config:
+Four further modules — **Diagnose before fixing**, **Mobile first**, **Issues
+track the work** and **Every branch ships a preview** — are local to this
+project and are not from dotfiles-ai. They live at the bottom of this file, along with **Repo config:
 what the Settings app really applies**, which corrects a vendored module rather
 than adding one — where the two disagree, the correction wins, because it is
 the one with a measurement behind it.
@@ -609,6 +609,67 @@ issue — not a line in a reply, and not a private task list.
   was written in a chat log and not anywhere durable.
 - **Not everything is an issue.** A typo, a comment, a revert, a rename — do
   it. The test is whether anyone would want to find it again.
+
+---
+
+# Every branch ships a preview
+
+*Project-local, not from dotfiles-ai.*
+
+**Every pull request comes with a playable build and screenshots, and a
+question with more than one answer gets one branch per answer.**
+
+A description of a change to a physics game is not the change. Two decisions
+sat on one pull request for a week that would have taken thirty seconds each
+with the build in hand — how far a charge should reach, and whether twice the
+debris is acceptable on a phone. Prose cannot answer "how does it feel";
+playing it can.
+
+## What every pull request gets, automatically
+
+- **A playable build** at `https://codercoop.github.io/CrumplZone/pr/<n>/`,
+  rebuilt on every push and taken down when the pull request closes. It is
+  the same export, patched and verified the same way, as the live site.
+- **Screenshots** beside it under `/pr/<n>/shots/`: the help screen and the
+  level list at a phone's proportions, one of every building, and the build
+  as a real browser renders it before and after a tap.
+- **A comment on the pull request** with the link and the pictures inline,
+  refreshed on every push. Reviewing starts by playing, not by reading.
+
+`preview.yml` does this. The design and its one known unknown are in
+`ARCHITECTURE.md`.
+
+## What the author still has to do
+
+- **Make the preview show the change.** The stock screenshots cover the intro,
+  the map and one building of each kind. A change to anything else — a tool,
+  a collapse, the results screen — is invisible in them, and a preview that
+  does not show the change proves nothing. Extend or add a `*shot.gd` harness
+  *on the same branch* so the pull request's own screenshots include what it
+  did. That harness is part of the change, the way a test is.
+- **Look at it on a phone.** The screenshots are at phone proportions; the
+  playable build is meant to be opened on one. A change to layout or touch is
+  not done until it has been.
+- **Do not commit screenshots or builds to the branch.** They live in the
+  preview deployment, not in git. A web export is around 37 MB and a feature
+  branch merges into `main`; the previews branch is a deploy artifact that is
+  rewritten as one commit each time precisely so nothing accumulates.
+
+## When there is more than one way to do it
+
+- **One branch and one draft pull request per option**, each with its own
+  preview. Name the branch for the option, not the issue —
+  `spike/blast-radius-110`, `spike/blast-radius-155-weaker-throw` — and open
+  them as drafts so nobody mistakes an option for a proposal.
+- **Each pull request says what it demonstrates and what it costs**, in a
+  paragraph, and links the issue it is an answer to. The issue is where the
+  comparison lives; the pull requests are the exhibits.
+- **Decide by playing them**, then close the losers with a sentence about why,
+  and take the draft off the winner. A closed option is not wasted: its
+  preview is gone, but its measurements stay on the issue.
+- **This is how "propose before building" is satisfied here** rather than
+  contradicted. A branch that can be played is the proposal; the cost of
+  throwing it away is a click.
 
 ---
 

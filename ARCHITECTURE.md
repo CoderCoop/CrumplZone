@@ -55,6 +55,8 @@ graph TD
     subgraph build["Build and deploy"]
         pages["pages.yml<br/>export → verify → deploy"]
         verify["tools/verify-web-export<br/>runs the build in a browser"]
+        preview["preview.yml<br/>every pull request: build,<br/>screenshot, publish under /pr/"]
+        previews[("previews branch<br/>built previews, rewritten<br/>as one commit each time")]
         ci["ci.yml<br/>secrets, GDScript, harnesses<br/>required on main"]
     end
 
@@ -121,6 +123,10 @@ graph TD
     main -->|exported as WASM| pages
     pages --> verify
     verify -->|blocks deploy on failure| pages
+    preview -->|same export, same verify| verify
+    preview -->|pushes pr-N/| previews
+    previews -->|folded in under /pr/| pages
+    preview -->|workflow_dispatch, see #57| pages
     spike -.->|constrains the design of| charter
     charter -.->|governs| main
 ```
@@ -375,9 +381,16 @@ sequenceDiagram
     participant ci as ci workflow
     participant main
     participant pagesjob as pages workflow
+    participant preview as preview workflow
+    participant previews as previews branch
     participant site as GitHub Pages
 
     dev->>ci: pull request
+    dev->>preview: pull request
+    preview->>preview: export, verify in Chromium, screenshot at phone size
+    preview->>previews: push pr-N/ as a single orphan commit
+    preview->>pagesjob: workflow_dispatch (a bot push triggers nothing)
+    pagesjob->>site: publish, with every pr-N/ under /pr/
     ci-->>dev: secret scan, build/test report
     Note over ci,main: ci is a required check —<br/>main cannot be pushed directly
     dev->>main: squash merge once green
@@ -399,6 +412,29 @@ flip back by accident, and the failure would appear in a player's browser
 rather than in CI — so the pipeline serves the real artifact from a plain
 static server, loads it in a real browser, and refuses to deploy unless it
 renders and responds to input.
+
+**Pull request previews ride inside that same deployment.** GitHub Pages
+serves one deployment per repository, so a preview cannot be its own site.
+`preview.yml` exports each pull request's branch with the same script and the
+same browser check as the live site, takes screenshots at a phone's
+proportions with the engine's own `*shot` harnesses, pushes the result to the
+`previews` branch as `pr-<n>/`, and asks `pages.yml` to run. `pages.yml` folds
+every folder on that branch in under `/pr/` *after* every check has passed on
+the real build, so the root of the site — `version.txt` included, which
+`deploy-drift.yml` reads — is untouched. The branch is rewritten as one orphan
+commit on every change, so it never grows and a closed pull request leaves
+nothing behind. It is the pattern `rossjrw/pr-preview-action` implements for
+branch-deployed sites, done by hand because this site deploys through Actions
+and the two modes must not be mixed. No secret and no App: the same explicit
+`workflow_dispatch` that `generate-levels.yml` uses, for the same reason.
+
+One thing is unverified until the first real preview: the live site
+registers a service worker scoped to `/CrumplZone/`, and a preview at
+`/CrumplZone/pr/<n>/` registers its own, more specific one. A browser that
+already has the root worker installed will route the preview's first
+navigation through it. Online, the generated worker passes fetches through and
+the nested scope should take over; if a preview ever shows the *live* game
+instead of itself, that is where to look.
 
 ## The game's own structure
 

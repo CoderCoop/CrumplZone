@@ -1,0 +1,38 @@
+name: Set up Godot
+description: >
+  Downloads the pinned Godot editor and, when asked, its export templates.
+  One copy of this, because two workflows installing Godot by hand is how
+  they end up on two versions.
+inputs:
+  version:
+    description: Godot version, as the release tag spells it (4.6-stable)
+    required: true
+  templates:
+    description: Also install the export templates — needed to export, not to run
+    required: false
+    default: "false"
+outputs:
+  godot:
+    description: Absolute path of the Godot binary
+    value: ${{ steps.install.outputs.godot }}
+runs:
+  using: composite
+  steps:
+    - id: install
+      shell: bash
+      run: |
+        set -euo pipefail
+        v="${{ inputs.version }}"
+        base="https://github.com/godotengine/godot/releases/download/${v}"
+        curl -sSL -o godot.zip "$base/Godot_v${v}_linux.x86_64.zip"
+        unzip -q -o godot.zip
+        chmod +x "Godot_v${v}_linux.x86_64"
+        echo "godot=$PWD/Godot_v${v}_linux.x86_64" >> "$GITHUB_OUTPUT"
+        if [ "${{ inputs.templates }}" = "true" ]; then
+          curl -sSL -o templates.tpz "$base/Godot_v${v}_export_templates.tpz"
+          unzip -q -o templates.tpz
+          # Godot looks for templates under a dotted version directory.
+          dir=~/.local/share/godot/export_templates/"${v/-/.}"
+          rm -rf "$dir"; mkdir -p "$(dirname "$dir")"
+          mv templates "$dir"
+        fi
