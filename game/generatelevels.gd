@@ -350,6 +350,17 @@ func _record() -> void:
 		_dropped.append("%s (%s): the winning line sits at %.0f px inside a %.0f px pile"
 			% [_label(), _spec.get("kind", "?"), third, _worst])
 		return
+	# Clearing the worst of five rolls is not a promise. Physics does not
+	# reproduce across rolls — 1.21x to 1.46x between the best and worst run
+	# of one seed, and up to 1.35x beyond the worst the generate step saw —
+	# so a level whose line clears its pile by 1% is unwinnable on some sixth
+	# roll, and the corrected gate caught two shipped ones (#86). The margin
+	# was reported as TIGHT and shipped anyway; now it is the bar.
+	if _worst > 0.0 and third / _worst < Levels.MEASURED_MARGIN:
+		_dropped.append("%s (%s): the winning line clears a %.0f px pile by only %.2fx, under the %.2fx margin"
+			% [_label(), _spec.get("kind", "?"), _worst, third / _worst,
+				Levels.MEASURED_MARGIN])
+		return
 	# The solver used to run here too, to price the level. It was taken out:
 	# it rejected six of twelve levels that gentest shows are winnable, and
 	# priced the medium authored level at more than twice the hard one. A
