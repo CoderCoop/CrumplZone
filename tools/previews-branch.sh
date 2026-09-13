@@ -23,15 +23,17 @@ if ! git clone --quiet --depth 1 --branch previews "$repo" "$work" 2>/dev/null; 
   git -C "$work" remote add origin "$repo"
 fi
 cd "$work"
-rm -rf "pr-$n"
-[ "$cmd" = put ] && cp -a "$src" "pr-$n"
+# Both spellings: previews were briefly stored as pr-<n>/, which leaked into
+# the URL as /pr/pr-<n>/ (#72). Removing both migrates a stale one.
+rm -rf "pr-$n" "$n"
+[ "$cmd" = put ] && cp -a "$src" "$n"
 
 # An index, so the folder is browsable rather than a 404 at its root.
 {
   echo '<!doctype html><meta charset="utf-8"><title>CrumplZone pull request previews</title>'
   echo '<h1>Pull request previews</h1><ul>'
-  for d in pr-*/; do d="${d%/}"; [ -d "$d" ] || continue
-    echo "<li><a href=\"$d/\">pull request #${d#pr-}</a> — <a href=\"$d/shots/\">screenshots</a></li>"
+  for d in [0-9]*/; do d="${d%/}"; [ -d "$d" ] || continue
+    echo "<li><a href=\"$d/\">pull request #$d</a> — <a href=\"$d/shots/\">screenshots</a></li>"
   done
   echo '</ul>'
 } > index.html
@@ -40,6 +42,6 @@ git checkout --quiet --orphan rebuilt
 git add -A
 git -c user.name='github-actions[bot]' \
     -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-    commit --quiet --allow-empty -m "previews: $cmd pr-$n"
+    commit --quiet --allow-empty -m "previews: $cmd $n"
 git push --quiet --force origin rebuilt:previews
-echo "previews branch now holds: $(ls -d pr-*/ 2>/dev/null | tr -d / | tr '\n' ' ')"
+echo "previews branch now holds: $(ls -d [0-9]*/ 2>/dev/null | tr -d / | tr '\n' ' ')"

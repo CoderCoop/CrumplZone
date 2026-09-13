@@ -124,7 +124,7 @@ graph TD
     pages --> verify
     verify -->|blocks deploy on failure| pages
     preview -->|same export, same verify| verify
-    preview -->|pushes pr-N/| previews
+    preview -->|pushes N/| previews
     previews -->|folded in under /pr/| pages
     preview -->|workflow_dispatch, see #57| pages
     spike -.->|constrains the design of| charter
@@ -388,9 +388,9 @@ sequenceDiagram
     dev->>ci: pull request
     dev->>preview: pull request
     preview->>preview: export, verify in Chromium, screenshot at phone size
-    preview->>previews: push pr-N/ as a single orphan commit
+    preview->>previews: push N/ as a single orphan commit
     preview->>pagesjob: workflow_dispatch (a bot push triggers nothing)
-    pagesjob->>site: publish, with every pr-N/ under /pr/
+    pagesjob->>site: publish, with every N/ under /pr/
     ci-->>dev: secret scan, build/test report
     Note over ci,main: ci is a required check —<br/>main cannot be pushed directly
     dev->>main: squash merge once green
@@ -418,10 +418,11 @@ serves one deployment per repository, so a preview cannot be its own site.
 `preview.yml` exports each pull request's branch with the same script and the
 same browser check as the live site, takes screenshots at a phone's
 proportions with the engine's own `*shot` harnesses, pushes the result to the
-`previews` branch as `pr-<n>/`, and asks `pages.yml` to run. `pages.yml` folds
-every folder on that branch in under `/pr/` *after* every check has passed on
-the real build, so the root of the site — `version.txt` included, which
-`deploy-drift.yml` reads — is untouched. The branch is rewritten as one orphan
+`previews` branch as `<n>/` — the same name it is served under, because the
+fold-in copies the branch verbatim (#72) — and asks `pages.yml` to run.
+`pages.yml` folds every folder on that branch in under `/pr/` *after* every
+check has passed on the real build, so the root of the site — `version.txt`
+included, which `deploy-drift.yml` reads — is untouched. The branch is rewritten as one orphan
 commit on every change, so it never grows and a closed pull request leaves
 nothing behind. It is the pattern `rossjrw/pr-preview-action` implements for
 branch-deployed sites, done by hand because this site deploys through Actions
