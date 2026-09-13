@@ -48,6 +48,7 @@ graph TD
         shots["shots.gd<br/>a picture of each system<br/>looked at, not asserted"]
         skyshot["skyshot.gd<br/>a picture of each sky<br/>same building, different town"]
         systemprobe["systemprobe.gd<br/>which piece moves, and which way<br/>measured, not gated"]
+        throwprobe["throwprobe.gd<br/>what one charge throws,<br/>and how fast by material"]
         verifylv["verify_levels.gd<br/>generate-and-verify measurement"]
     end
 
@@ -98,6 +99,7 @@ graph TD
     varietytest -->|gates| ci
     skyshot -->|drives| backdrop
     systemprobe -->|drives| level
+    throwprobe -->|drives| level
     solver -->|drives headlessly| level
     partest -->|drives headlessly| level
     verifylv -->|drives| solver

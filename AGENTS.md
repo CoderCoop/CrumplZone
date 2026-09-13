@@ -7,11 +7,12 @@ and Specification were deliberately left out.
 
 Edit these defaults in `defaults/` in the dotfiles-ai fork, not here.
 
-Two further modules, **Diagnose before fixing** and **Mobile first**, are local
-to this project and are not from dotfiles-ai. They live at the bottom of this
-file, along with **Repo config: what the Settings app really applies**, which
-corrects a vendored module rather than adding one — where the two disagree, the
-correction wins, because it is the one with a measurement behind it.
+Three further modules — **Diagnose before fixing**, **Mobile first**, and
+**Issues track the work** — are local to this project and are not from
+dotfiles-ai. They live at the bottom of this file, along with **Repo config:
+what the Settings app really applies**, which corrects a vendored module rather
+than adding one — where the two disagree, the correction wins, because it is
+the one with a measurement behind it.
 
 ---
 
@@ -555,6 +556,59 @@ often one-thumbed. Design for that first and let the desktop inherit it.
 - **Check it at real aspect ratios**, portrait included, before calling a UI
   change done — a screenshot at desktop proportions proves nothing about a
   phone.
+
+---
+
+# Issues track the work
+
+*Project-local, not from dotfiles-ai.*
+
+**Every feature request and every bug gets a GitHub issue before it gets code,
+and the pull request closes it.**
+
+A conversation is not a tracker. Work discussed and not done evaporates when
+the session ends; work in an issue is still there next week, with its evidence
+attached. If something is worth doing and is not being done right now, it is an
+issue — not a line in a reply, and not a private task list.
+
+## The mechanism, which is GitHub's own
+
+- **Issue forms** in `.github/ISSUE_TEMPLATE/` — `bug_report.yml` and
+  `feature_request.yml`, the YAML form format rather than the older markdown
+  templates, so the fields that save time are asked for rather than hoped for.
+  Blank issues stay enabled: most issues here are filed from a conversation,
+  and a form that has to be side-stepped is friction.
+- **The kind of an issue is its type**, not a label. This organization defines
+  `Bug`, `Feature` and `Task` as GitHub issue types, and each form sets its own
+  via the form's `type:` key. Labels carry *area* — `physics`, `generator`,
+  `levels`, `ui`, `ci`, `docs` — and *state* — `needs-decision`,
+  `blocked-by-environment`, `debt`. Declared in `.github/settings.yml`, like
+  every other setting here.
+- **`Closes #N` in the pull request description**, which is what makes GitHub
+  close the issue on merge. Three details that are easy to get wrong:
+  a bare `#N` cross-references and closes nothing; the keyword only auto-closes
+  when the pull request targets the default branch; and it must be in the
+  description rather than in a branch commit, because this repository
+  squash-merges and the squash message is composed at merge time.
+  `.github/pull_request_template.md` puts the line there so it is filled in
+  rather than remembered.
+
+## Where the line falls
+
+- **File the issue first**, then do the work, then link it. An issue opened
+  after the fact to decorate a finished branch is bookkeeping.
+- **One issue per thing.** If a fix turns out to need two changes that are
+  independently revertable, that is two issues, or one issue and a follow-up
+  filed from what was learned.
+- **A decision parked on an open pull request stays on that pull request.**
+  Mirroring it as an issue splits the discussion across two places and neither
+  ends up holding the whole of it.
+- **Close with what was measured.** The issue is where the evidence should end
+  up — what reproduced it, which explanations were tested and rejected. Three
+  bugs in this project have been chased twice because the first investigation
+  was written in a chat log and not anywhere durable.
+- **Not everything is an issue.** A typo, a comment, a revert, a rename — do
+  it. The test is whether anyone would want to find it again.
 
 ---
 

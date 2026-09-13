@@ -44,3 +44,47 @@ branches:
       # escalation it mitigates needs a push-only collaborator to exist.
       required_pull_request_reviews: null
       restrictions: null
+
+# Labels carry the *area* and the *state* of an issue, never its kind. Kind
+# lives in GitHub's typed field — Bug, Feature, Task, defined at the org level
+# and set by the issue forms in .github/ISSUE_TEMPLATE. Two mechanisms for one
+# fact is how a tracker ends up with `bug` on a Feature.
+#
+# GitHub's stock labels (bug, enhancement, question, wontfix...) are
+# deliberately not declared here. Whether this app prunes labels it does not
+# list is not documented and has not been measured — if it prunes, the stock
+# type-labels go, which is the outcome wanted anyway; if it does not, they sit
+# unused. Either way this list is the set meant to be used. Read the labels
+# back after this applies rather than assuming, the way the settings-app
+# correction at the bottom of AGENTS.md says to.
+labels:
+  # Where the work is.
+  - name: physics
+    color: 1d76db
+    description: Rigid bodies, fracture, the stress model, the tools
+  - name: generator
+    color: 0e8a16
+    description: architecture.gd and how a building is built from a seed
+  - name: levels
+    color: 5319e7
+    description: The pack, seeds, winning lines, difficulty and ordering
+  - name: ui
+    color: fbca04
+    description: Screens, controls, touch, layout
+  - name: ci
+    color: 555555
+    description: Workflows, gates, release and deploy
+  - name: docs
+    color: c2e0c6
+    description: ARCHITECTURE, CHANGELOG, AGENTS and the site
+
+  # What it is waiting on.
+  - name: needs-decision
+    color: d93f0b
+    description: Blocked on a human call, not on work or information
+  - name: blocked-by-environment
+    color: e99695
+    description: Needs something this container cannot do, such as deleting a remote branch
+  - name: debt
+    color: b60205
+    description: Known, measured, and not explained — the cause is still open

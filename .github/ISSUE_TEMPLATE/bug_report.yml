@@ -1,0 +1,67 @@
+name: Bug report
+description: Something in the game does not work, or does not work everywhere.
+title: "Bug: "
+# GitHub's typed field rather than a `bug` label. The kind of an issue lives in
+# exactly one place; see the issue-tracking module in AGENTS.md.
+type: Bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The two fields that actually save time here are **where it happens**
+        and **which level**. A demolition level is generated from a seed, so a
+        seed reproduces the building exactly — without it a report about one
+        building is a report about thirty.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens
+      description: And what you expected instead.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      options:
+        - Playing a level
+        - The help / intro screen
+        - The city map or level list
+        - The end-of-level results
+        - Somewhere else (say below)
+    validations:
+      required: true
+
+  - type: input
+    id: level
+    attributes:
+      label: Which level
+      description: >
+        Its name, or the seed if you have it. Leave blank if it happens on all
+        of them — that is useful to know too.
+
+  - type: input
+    id: device
+    attributes:
+      label: Device and browser
+      description: >
+        This is a phone game first, and several bugs here have existed only on
+        touch. "iPhone 14, Safari" is enough.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The number at the top of the help screen, e.g. 0.14.8.
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to make it happen again
+      description: >
+        Optional, and worth more than anything else in this form if you have
+        it. A bug nobody can reproduce gets fixed by guesswork.
