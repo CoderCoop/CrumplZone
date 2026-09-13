@@ -7,6 +7,12 @@ sections are dated.
 
 ## [Unreleased]
 
+### Fixed
+
+- Tall brick houses and chimneys no longer creep sideways and fall over on
+  their own. The contact solver was leaving enough error per tick on the
+  game's deepest stacks to slide them; it now runs twice as many iterations.
+
 ## [0.14.8] - 2026-09-05
 
 ### Changed
