@@ -27,8 +27,17 @@ extends Control
 ## Everything is drawn rather than loaded, for the same reason the tool icons
 ## are: a font or an asset the build does not ship renders as nothing, and this
 ## project has been caught by that twice.
+##
+## The same board also shows one district close up (#63). `window` is the
+## part of the plan the board covers — the whole city by default, a square
+## around one district for the close-up — and everything projects through it,
+## so the two views cannot disagree about where north is. In a close-up the
+## pins are the district's levels, each standing on a real plot of the model,
+## because a level is a building somewhere in town and a tile in a grid had
+## stopped saying so.
 
 signal district_picked(district: String)
+signal level_picked(id: String)
 
 const WATER := Color(0.17, 0.30, 0.42)
 const QUAY := Color(0.42, 0.43, 0.44)
@@ -89,9 +98,50 @@ const PARCELS := 7
 
 var selected := ""
 
+## The part of the plan this board shows, in plan coordinates.
+var window := Rect2(0.0, 0.0, 1.0, 1.0)
+## When set, the board is that district close up and the pins are its levels.
+var district_view := ""
+var selected_level := ""
+
 var _pins: Array[Button] = []
 var _anchors: Array[Vector2] = []
 var _feet: Array[Vector2] = []
+## In a close-up: which levels are on the board, and which plot each stands on
+## ({"plot": index into _plots(), "kind": what the building is made of}).
+var _level_ids: Array[String] = []
+var _level_plots := {}
+
+
+## The plan window for a district close-up: a square around its spot, kept on
+## the board. Zooming by about two and a half, which is enough to give every
+## level its own building without the district losing its neighbours.
+static func window_for(district: String) -> Rect2:
+	var half := 0.21
+	var at := Districts.at(district)
+	var origin := Vector2(
+		clampf(at.x - half, 0.0, 1.0 - half * 2.0),
+		clampf(at.y - half, 0.0, 1.0 - half * 2.0))
+	return Rect2(origin, Vector2(half * 2.0, half * 2.0))
+
+
+## What a level's building is coloured, by what it is made of. Shared with the
+## intro's Play button so the two agree.
+static func kind_tint(kind: String) -> Color:
+	return {
+		Architecture.CURTAIN_WALL: Color(0.62, 0.78, 0.92),
+		Architecture.MASONRY: Color(0.86, 0.55, 0.44),
+		Architecture.FLAT_SLAB: Color(0.78, 0.80, 0.83),
+		Architecture.STACK: Color(0.84, 0.62, 0.46),
+		Architecture.SHED: Color(0.70, 0.76, 0.72),
+	}.get(kind, Color(0.95, 0.78, 0.34)) as Color
+
+
+## How much taller than the city view things stand: a close-up of a quarter of
+## the board is two and a half times closer, so a building rises two and a
+## half times as far or the district comes out flattened.
+func _zoom() -> float:
+	return 1.0 / maxf(window.size.x, 0.05)
 
 
 func _ready() -> void:
@@ -118,7 +168,9 @@ func _ground(u: float, v: float) -> Vector2:
 	# expands sideways and not downward turns the board into a flat ribbon on a
 	# wide window, and a model that has been rolled out is not a model.
 	var hx: float = minf(maxf(size.x * 0.5 - MARGIN, 1.0), hy * 2.4)
-	return Vector2(size.x * 0.5 + (u - v) * hx, top + (u + v) * hy)
+	var nu: float = (u - window.position.x) / window.size.x
+	var nv: float = (v - window.position.y) / window.size.y
+	return Vector2(size.x * 0.5 + (nu - nv) * hx, top + (nu + nv) * hy)
 
 
 func _box(u0: float, v0: float, u1: float, v1: float, rise: float,
@@ -138,10 +190,23 @@ func _box(u0: float, v0: float, u1: float, v1: float, rise: float,
 
 
 ## A flat patch of ground — water, grass, tarmac — projected as it lies.
+##
+## Clipped to the window by clamping each corner into it. Exact for the
+## rectangles that streets, parcels and the park are; a fair approximation for
+## the shoreline strips and the pitch, whose clipped edge is at worst a little
+## straighter than it should be. A patch clamped flat — entirely outside the
+## window — is dropped rather than handed to the triangulator as a line.
 func _patch(points: PackedVector2Array, tint: Color) -> void:
 	var out := PackedVector2Array()
+	var lo := Vector2(INF, INF)
+	var hi := Vector2(-INF, -INF)
 	for p in points:
-		out.append(_ground(p.x, p.y))
+		var c := p.clamp(window.position, window.end)
+		lo = lo.min(c)
+		hi = hi.max(c)
+		out.append(_ground(c.x, c.y))
+	if hi.x - lo.x < 0.0005 or hi.y - lo.y < 0.0005:
+		return
 	draw_colored_polygon(out, tint)
 
 
@@ -220,6 +285,9 @@ func _build_pins() -> void:
 	for pin in _pins:
 		pin.queue_free()
 	_pins.clear()
+	if district_view != "":
+		_build_level_pins()
+		return
 	for entry in Districts.inhabited():
 		var district: String = String(entry)
 		var pin := Button.new()
@@ -246,10 +314,53 @@ func _build_pins() -> void:
 	_place_pins()
 
 
+## One pin per level of the district, standing on the building it is. A locked
+## level is still on the map — dimmed and unpressable — so the district reads
+## as a place with that many buildings in it, not as a place with gaps.
+func _build_level_pins() -> void:
+	_level_ids.clear()
+	_level_plots.clear()
+	for entry in Levels.all_ids():
+		var id := String(entry)
+		if Levels.district_of(id) != district_view:
+			continue
+		_level_ids.append(id)
+		var open := Progress.unlocked(id)
+		var earned := Progress.stars(id)
+		var rating := "· · ·"
+		if open:
+			rating = ""
+			for i in 3:
+				rating += ("*" if i < earned else "·") + (" " if i < 2 else "")
+		var pin := Button.new()
+		pin.text = "Level %s\n%s" % [Levels.title_for(id), rating]
+		pin.disabled = not open
+		pin.focus_mode = Control.FOCUS_NONE
+		pin.mouse_filter = Control.MOUSE_FILTER_PASS
+		pin.clip_text = true
+		pin.add_theme_font_size_override("font_size", 13)
+		# Over the 44 px floor both ways, and there are at most a handful per
+		# district, so they can afford to be larger than the tiles were.
+		pin.custom_minimum_size = Vector2(88.0, 48.0)
+		if open:
+			pin.pressed.connect(func() -> void:
+				selected_level = id
+				_restyle()
+				queue_redraw()
+				level_picked.emit(id))
+		add_child(pin)
+		_pins.append(pin)
+	_restyle()
+	_place_pins()
+
+
 ## A pin carries the colour of what stands in its district, so the model reads
 ## as somewhere with different buildings in different places even before
 ## anything is played.
 func _restyle() -> void:
+	if district_view != "":
+		_restyle_level_pins()
+		return
 	for i in _pins.size():
 		var district: String = String(Districts.inhabited()[i])
 		var tint := _tint_of(district)
@@ -274,6 +385,40 @@ func _restyle() -> void:
 		var ink := INK if chosen else LABEL
 		_pins[i].add_theme_color_override("font_color", ink)
 		_pins[i].add_theme_color_override("font_pressed_color", ink)
+
+
+## A level pin is coloured by what its building is made of, the way the tiles
+## were, so a district of brick houses reads as brick before it is played.
+func _restyle_level_pins() -> void:
+	for i in _pins.size():
+		var id: String = _level_ids[i]
+		var kind := String(_level_plots.get(id, {}).get("kind", ""))
+		var tint := kind_tint(kind)
+		var open := not _pins[i].disabled
+		var chosen: bool = id == selected_level
+		for state in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
+			var box := StyleBoxFlat.new()
+			box.bg_color = tint if open else tint.darkened(0.55)
+			if chosen:
+				box.bg_color = tint.lightened(0.15)
+			box.corner_radius_top_left = 8
+			box.corner_radius_top_right = 8
+			box.corner_radius_bottom_left = 8
+			box.corner_radius_bottom_right = 8
+			box.shadow_size = 3
+			box.shadow_color = Color(0.0, 0.0, 0.0, 0.35)
+			box.shadow_offset = Vector2(0.0, 2.0)
+			if chosen:
+				box.border_width_top = 2
+				box.border_width_bottom = 2
+				box.border_width_left = 2
+				box.border_width_right = 2
+				box.border_color = LABEL
+			_pins[i].add_theme_stylebox_override(state, box)
+		var ink := INK if open else Color(0.55, 0.57, 0.62)
+		_pins[i].add_theme_color_override("font_color", ink)
+		_pins[i].add_theme_color_override("font_pressed_color", ink)
+		_pins[i].add_theme_color_override("font_disabled_color", ink)
 
 
 ## Pins stand on the model rather than lying on it: each one is anchored to its
@@ -301,12 +446,21 @@ func _place_pins() -> void:
 	var order: Array[int] = []
 	var ideal: Array[Vector2] = []
 	var anchors: Array[Vector2] = []
+	var stands: Array[Vector2] = []
+	if district_view != "":
+		stands = _level_stands()
 	for i in _pins.size():
-		var district := String(all[i])
-		var at := Districts.at(district)
-		var anchor := _ground(at.x, at.y)
+		var anchor: Vector2
+		var lift: float
+		if district_view != "":
+			anchor = stands[i]
+			lift = 14.0
+		else:
+			var district := String(all[i])
+			var at := Districts.at(district)
+			anchor = _ground(at.x, at.y)
+			lift = float(RISE.get(district, 14.0)) + 18.0
 		var want := _pins[i].custom_minimum_size
-		var lift: float = float(RISE.get(district, 14.0)) + 18.0
 		anchors.append(anchor)
 		ideal.append(Vector2(
 			clampf(anchor.x - want.x * 0.5, 2.0,
@@ -355,6 +509,54 @@ func _free_spot(want_at: Vector2, want: Vector2,
 		clampf(want_at.y, 2.0, maxf(size.y - want.y - 2.0, 2.0)))
 
 
+## Where each level pin stands in a close-up: on the roof of a plot of its own.
+##
+## The levels are spread round the district's spot on a ring, far side first,
+## and each takes the nearest plot nobody has yet. A ring rather than a row,
+## because a district is a place and its buildings are around it, not along
+## it; and real plots rather than free-floating spots, so the pin points at a
+## building rather than at a patch of street.
+func _level_stands() -> Array[Vector2]:
+	_level_plots.clear()
+	var out: Array[Vector2] = []
+	var plots := _plots()
+	var centre := Districts.at(district_view)
+	var inside := window.grow(-0.03)
+	var claimed := {}
+	var n: int = _level_ids.size()
+	for i in n:
+		var id: String = _level_ids[i]
+		var angle: float = -PI * 0.5 + TAU * float(i) / maxf(float(n), 1.0)
+		var want: Vector2 = centre + Vector2(cos(angle), sin(angle)) \
+			* window.size.x * 0.26
+		var best := -1
+		var nearest := INF
+		for plot in plots:
+			var index: int = int(plot["index"])
+			if claimed.has(index):
+				continue
+			var mid := Vector2(float(plot["u"]) + float(plot["w"]) * 0.5,
+				float(plot["v"]) + float(plot["h"]) * 0.5)
+			if not inside.has_point(mid):
+				continue
+			var d := mid.distance_to(want)
+			if d < nearest:
+				nearest = d
+				best = index
+		var kind := String(Levels.by_id(id).get("kind", ""))
+		if best < 0:
+			_level_plots[id] = {"plot": -1, "kind": kind}
+			out.append(_ground(want.x, want.y))
+			continue
+		claimed[best] = true
+		_level_plots[id] = {"plot": best, "kind": kind}
+		var plot: Dictionary = plots[best]
+		var roof := _ground(float(plot["u"]) + float(plot["w"]) * 0.5,
+			float(plot["v"]) + float(plot["h"]) * 0.5)
+		out.append(roof + Vector2(0.0, -float(plot["rise"]) * _zoom()))
+	return out
+
+
 # --- the board -------------------------------------------------------------
 
 func _draw() -> void:
@@ -383,18 +585,20 @@ func _draw() -> void:
 func _board() -> void:
 	# The board throws a shadow, which is most of what says this is an object
 	# on a table rather than a picture of a plan.
+	# The board is the window, not the city: in a close-up the slab is cut
+	# where the view is, or its edges land two boards away.
+	var w0 := window.position
+	var w1 := window.end
 	var shadow := PackedVector2Array()
-	for corner in [Vector2(0.0, 0.0), Vector2(1.0, 0.0), Vector2(1.0, 1.0),
-			Vector2(0.0, 1.0)]:
+	for corner in [w0, Vector2(w1.x, w0.y), w1, Vector2(w0.x, w1.y)]:
 		shadow.append(_ground(corner.x, corner.y) + Vector2(5.0, SLAB + 6.0))
 	draw_colored_polygon(shadow, Color(0.0, 0.0, 0.0, 0.30))
 	_patch(PackedVector2Array([
-		Vector2(0.0, 0.0), Vector2(1.0, 0.0),
-		Vector2(1.0, 1.0), Vector2(0.0, 1.0)]), BOARD)
+		w0, Vector2(w1.x, w0.y), w1, Vector2(w0.x, w1.y)]), BOARD)
 	var down := Vector2(0.0, SLAB)
-	var right := _ground(1.0, 0.0)
-	var near := _ground(1.0, 1.0)
-	var left := _ground(0.0, 1.0)
+	var right := _ground(w1.x, w0.y)
+	var near := _ground(w1.x, w1.y)
+	var left := _ground(w0.x, w1.y)
 	draw_colored_polygon(PackedVector2Array([
 		right, near, near + down, right + down]), BOARD_NEAR)
 	draw_colored_polygon(PackedVector2Array([
@@ -443,10 +647,14 @@ func _streets() -> void:
 			Vector2(at + 0.012, 1.0), Vector2(at + 0.012, 0.0)]), ROAD)
 
 
-## Buildings, parcel by parcel. Each parcel between the streets is split into
-## one or two plots each way and built on, which is why the model reads as
-## blocks with streets between rather than as a scatter of dots.
-func _gather_blocks(into: Array) -> void:
+## Every plot on the board, the same every time it is asked for: where it is,
+## how tall, what colour. Parcel by parcel — each parcel between the streets
+## is split into one or two plots each way and built on, which is why the
+## model reads as blocks with streets between rather than as a scatter of
+## dots. A list rather than a draw loop because in a close-up the level pins
+## stand on these.
+func _plots() -> Array:
+	var out: Array = []
 	var rng := RandomNumberGenerator.new()
 	# Fixed, so it is the same city every time it is drawn.
 	rng.seed = 20260831
@@ -472,11 +680,33 @@ func _gather_blocks(into: Array) -> void:
 						* rng.randf_range(0.55, 1.25)
 					var tint: Color = _tint_of(district).darkened(
 						rng.randf_range(0.30, 0.58))
-					into.append({
-						"depth": pu + pw + pv + ph,
-						"draw": func() -> void:
-							_box(pu, pv, pu + pw, pv + ph, rise, tint),
-					})
+					out.append({"index": out.size(), "u": pu, "v": pv,
+						"w": pw, "h": ph, "rise": rise, "tint": tint})
+	return out
+
+
+## The plots as boxes, clipped to the window. A plot a level stands on is
+## drawn in its level's own colour, lit rather than shaded, so the buildings
+## that can be played are the ones that stand out.
+func _gather_blocks(into: Array) -> void:
+	var level_of := {}
+	for id in _level_plots:
+		level_of[int(_level_plots[id]["plot"])] = id
+	for plot in _plots():
+		var rect := Rect2(float(plot["u"]), float(plot["v"]),
+			float(plot["w"]), float(plot["h"])).intersection(window)
+		if rect.size.x <= 0.0 or rect.size.y <= 0.0:
+			continue
+		var rise: float = float(plot["rise"]) * _zoom()
+		var tint: Color = plot["tint"]
+		if level_of.has(int(plot["index"])):
+			tint = kind_tint(String(_level_plots[level_of[int(plot["index"])]]["kind"]))
+		into.append({
+			"depth": rect.end.x + rect.end.y,
+			"draw": func() -> void:
+				_box(rect.position.x, rect.position.y, rect.end.x, rect.end.y,
+					rise, tint),
+		})
 
 
 ## The interchange, raised on piers and cut into spans. One entry per span, so
@@ -488,18 +718,22 @@ func _gather_interchange(into: Array) -> void:
 		var t1: float = float(i + 1) / float(SPANS)
 		var a := ROAD_FROM.lerp(ROAD_TO, t0)
 		var b := ROAD_FROM.lerp(ROAD_TO, t1)
+		# A span is drawn whole or not at all: a span cut by the window's edge
+		# would have to bend to stay on the board.
+		if not (window.grow(0.02).has_point(a) and window.grow(0.02).has_point(b)):
+			continue
 		var mid := a.lerp(b, 0.5)
 		into.append({
 			"depth": a.x + a.y + 0.03,
 			"draw": func() -> void:
 				_box(mid.x - 0.012, mid.y - 0.012, mid.x + 0.012,
-					mid.y + 0.012, DECK - 3.0, CONCRETE.darkened(0.42))
+					mid.y + 0.012, (DECK - 3.0) * _zoom(), CONCRETE.darkened(0.42))
 				_deck(a, b),
 		})
 
 
 func _deck(a: Vector2, b: Vector2) -> void:
-	var lift := Vector2(0.0, -DECK)
+	var lift := Vector2(0.0, -DECK * _zoom())
 	var wide := 0.030
 	var p0 := _ground(a.x, a.y - wide) + lift
 	var p1 := _ground(b.x, b.y - wide) + lift
@@ -521,7 +755,12 @@ func _deck(a: Vector2, b: Vector2) -> void:
 func _stems() -> void:
 	var all := Districts.inhabited()
 	for i in _feet.size():
-		if i < all.size() and String(all[i]) == selected:
+		var lit: bool
+		if district_view != "":
+			lit = i < _level_ids.size() and _level_ids[i] == selected_level
+		else:
+			lit = i < all.size() and String(all[i]) == selected
+		if lit:
 			var glow := PackedVector2Array()
 			for step in 20:
 				var a: float = TAU * float(step) / 20.0

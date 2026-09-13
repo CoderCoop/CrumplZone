@@ -85,6 +85,8 @@ jobs:
           }
           shot res://introshot.tscn -- "$out"
           shot res://introshot.tscn -- "$out" levels
+          shot res://introshot.tscn -- "$out" levels 430x880 downtown
+          shot res://introshot.tscn -- "$out" levels 430x880 residential
           shot res://shots.tscn -- "$out"
           echo "screenshots:"; ls -1 "$out"
 
@@ -123,6 +125,10 @@ jobs:
           | help screen | level list | a level, in the browser | after one tap |
           | --- | --- | --- | --- |
           | ![help]($base/shots/intro-how-430x880.png) | ![levels]($base/shots/intro-levels-430x880.png) | ![before]($base/shots/canvas-before.png) | ![after]($base/shots/canvas-after.png) |
+
+          | Downtown, close up | Old Town, close up |
+          | --- | --- |
+          | ![downtown]($base/shots/intro-levels-downtown-430x880.png) | ![old town]($base/shots/intro-levels-residential-430x880.png) |
 
           One of every building, at a phone's proportions: [$base/shots/]($base/shots/)
 
