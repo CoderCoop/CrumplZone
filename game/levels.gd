@@ -71,7 +71,7 @@ const SPREAD_DEFAULT := 0.95
 ## losing game, and being wrong the other way only makes a level easier.
 const ESTIMATE_SAFETY := 1.35
 const PACKING := 0.62
-const LINE_MIN := 90.0
+const LINE_MIN := 110.0
 
 
 ## Headroom over a measured pile.
@@ -101,7 +101,7 @@ const MEASURED_MARGIN := 1.35
 ## pile is small and a line set purely as a multiple of it lands near the roof
 ## — measured, a shed 202 px tall had its winning line at 202, which is a level
 ## already won before it is touched.
-const LINE_OVER_HEIGHT := 0.52
+const LINE_OVER_HEIGHT := 0.60
 
 
 static func estimate_pile(blocks: Array, kind := "") -> float:

@@ -62,7 +62,12 @@ func _next() -> void:
 	if _at >= Pack.seeds().size():
 		_report()
 		return
-	_spec = Generator.generate(int(Pack.seeds()[_at]))
+	# The building the game builds for this seed, not the one the seed alone
+	# would pick: the system comes from the pack, as it does in Levels.by_id.
+	# Built by seed alone, this flattened buildings the game never shows and
+	# held their piles against another building's recorded pile (#84).
+	var level_seed := int(Pack.seeds()[_at])
+	_spec = Generator.generate(level_seed, Pack.system_for(level_seed))
 	_level.build(_spec)
 	_seen[_spec["kind"]] = int(_seen.get(_spec["kind"], 0)) + 1
 	_standing_before = _level.standing()
