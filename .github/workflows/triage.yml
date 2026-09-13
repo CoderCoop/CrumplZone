@@ -1,0 +1,37 @@
+# Which new issues go into the work queue — the rule is "Who can put work in
+# the queue" in AGENTS.md.
+#
+# Anyone can open an issue; only an authorized user can put one in the queue.
+# GitHub's own author_association says which is which, and it is in the event
+# payload, so this is one comparison and at most one API call. An issue from
+# anyone else is labelled needs-triage as it is opened: "seen but not queued"
+# as visible state, cleared by a person removing the label or adding `ready`.
+#
+# Labels can only be applied by the Triage role and above, which is what makes
+# `ready` an authorization rather than a request.
+name: triage
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Label an issue from outside the repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ASSOCIATION: ${{ github.event.issue.author_association }}
+          NUMBER: ${{ github.event.issue.number }}
+        run: |
+          case "$ASSOCIATION" in
+            OWNER|MEMBER|COLLABORATOR)
+              echo "#$NUMBER: author is $ASSOCIATION — queued as filed, no label" ;;
+            *)
+              gh issue edit "$NUMBER" --repo "$GITHUB_REPOSITORY" --add-label needs-triage
+              echo "#$NUMBER: author is $ASSOCIATION — labelled needs-triage, waits for a person" ;;
+          esac

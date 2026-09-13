@@ -88,3 +88,12 @@ labels:
   - name: debt
     color: b60205
     description: Known, measured, and not explained — the cause is still open
+
+  # Who put it in the queue. Applying a label needs the Triage role and
+  # opening an issue does not, so these two are authorization made visible.
+  - name: needs-triage
+    color: e4e669
+    description: Opened from outside the repository; a person looks before it is worked on
+  - name: ready
+    color: 2ea44f
+    description: Put in the work queue by an authorized user
