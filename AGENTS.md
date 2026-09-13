@@ -607,6 +607,12 @@ issue — not a line in a reply, and not a private task list.
   The decision is made by review there, on the issue or on a pull request,
   never in a chat message that scrolls away — and a session that needs the
   decision waits for that review rather than asking again in chat.
+- **Waiting on review means one link per item, to its issue.** The message
+  that hands something over says what it is in a line and links the one
+  tracking issue that carries the item and its context — the question, the
+  options, the measurements, the pull requests. Not a pull request link, not
+  three links, and not the context re-told in chat; if the issue does not
+  hold enough to decide from, fix the issue.
 - **No input needed means no issue to wait on.** A fix with a reproduced
   cause, a chore, a doc: open the pull request and merge it when its checks
   pass. Filing a decision that nobody has to make is a way of not finishing.
