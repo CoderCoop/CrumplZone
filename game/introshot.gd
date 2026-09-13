@@ -2,7 +2,9 @@ extends Node2D
 
 ## A picture of the intro screen at a phone's proportions.
 ##
-##   xvfb-run -a godot --path game res://introshot.tscn -- <out-dir> [tab] [WxH]
+##   xvfb-run -a godot --path game res://introshot.tscn -- <out-dir> [tab] [WxH] [district]
+##
+## With a district, the levels tab is photographed zoomed to it.
 ##
 ## The mobile-first rules in AGENTS.md are written in CSS pixels and say to
 ## check a UI change at a real aspect ratio before calling it done. This is
@@ -15,6 +17,7 @@ var _waited := 0
 var _out := "shots"
 var _tab := ""
 var _shot := SHOT
+var _district := ""
 
 
 func _ready() -> void:
@@ -27,6 +30,8 @@ func _ready() -> void:
 		var parts := args[2].split("x")
 		if parts.size() == 2:
 			_shot = Vector2i(int(parts[0]), int(parts[1]))
+	if args.size() > 3:
+		_district = args[3]
 	DirAccess.make_dir_recursive_absolute(_out)
 	get_window().size = _shot
 	_intro = Intro.new()
@@ -37,11 +42,13 @@ func _process(_delta: float) -> void:
 	_waited += 1
 	if _waited == 2 and _tab != "":
 		_intro.show_tab(_tab)
+		if _district != "":
+			_intro.pick_district(_district)
 	if _waited < 8:
 		return
 	var image := get_viewport().get_texture().get_image()
-	var at := "%s/intro-%s-%dx%d.png" % [_out, _tab if _tab != "" else "how",
-		_shot.x, _shot.y]
+	var at := "%s/intro-%s%s-%dx%d.png" % [_out, _tab if _tab != "" else "how",
+		"-" + _district if _district != "" else "", _shot.x, _shot.y]
 	image.save_png(at)
 	print("wrote " + at)
 	get_tree().quit()
