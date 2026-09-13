@@ -27,12 +27,17 @@ permissions:
   pull-requests: write   # the sticky comment that links it
   actions: write         # ask pages.yml to publish it
 
-# Every run rewrites the previews branch, so two at once would race and one
-# would lose its folder. Serialised, never cancelled: a preview half-pushed is
-# a broken page.
+# One group per pull request, and a newer push to the same branch supersedes
+# the build that was still running for the older one. NOT one group for the
+# whole workflow: GitHub keeps a single pending run per group and cancels the
+# older pending one when another arrives, so with three previews wanted at
+# once the middle pull request silently got none (#77, measured in #81).
+# Two pull requests publishing at the same moment is handled where it has to
+# be, in tools/previews-branch.sh, which pushes under a lease and redoes its
+# change if the branch moved.
 concurrency:
-  group: previews
-  cancel-in-progress: false
+  group: preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 env:
   GODOT_VERSION: 4.6-stable
