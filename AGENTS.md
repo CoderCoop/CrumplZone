@@ -600,9 +600,16 @@ issue — not a line in a reply, and not a private task list.
 - **One issue per thing.** If a fix turns out to need two changes that are
   independently revertable, that is two issues, or one issue and a follow-up
   filed from what was learned.
-- **A decision parked on an open pull request stays on that pull request.**
-  Mirroring it as an issue splits the discussion across two places and neither
-  ends up holding the whole of it.
+- **Every decision point is an issue, labelled `needs-decision`**, and the
+  pull requests that are its options are linked from it — one branch and one
+  draft per option, as the preview module says. The issue holds the question,
+  the comparison and the measurements; the pull requests are the exhibits.
+  The decision is made by review there, on the issue or on a pull request,
+  never in a chat message that scrolls away — and a session that needs the
+  decision waits for that review rather than asking again in chat.
+- **No input needed means no issue to wait on.** A fix with a reproduced
+  cause, a chore, a doc: open the pull request and merge it when its checks
+  pass. Filing a decision that nobody has to make is a way of not finishing.
 - **Close with what was measured.** The issue is where the evidence should end
   up — what reproduced it, which explanations were tested and rejected. Three
   bugs in this project have been chased twice because the first investigation
