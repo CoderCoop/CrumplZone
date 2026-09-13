@@ -7,11 +7,12 @@ and Specification were deliberately left out.
 
 Edit these defaults in `defaults/` in the dotfiles-ai fork, not here.
 
-Two further modules, **Diagnose before fixing** and **Mobile first**, are local
-to this project and are not from dotfiles-ai. They live at the bottom of this
-file, along with **Repo config: what the Settings app really applies**, which
-corrects a vendored module rather than adding one — where the two disagree, the
-correction wins, because it is the one with a measurement behind it.
+Four further modules — **Diagnose before fixing**, **Mobile first**, **Issues
+track the work** and **Every branch ships a preview** — are local to this
+project and are not from dotfiles-ai. They live at the bottom of this file, along with **Repo config:
+what the Settings app really applies**, which corrects a vendored module rather
+than adding one — where the two disagree, the correction wins, because it is
+the one with a measurement behind it.
 
 ---
 
@@ -555,6 +556,120 @@ often one-thumbed. Design for that first and let the desktop inherit it.
 - **Check it at real aspect ratios**, portrait included, before calling a UI
   change done — a screenshot at desktop proportions proves nothing about a
   phone.
+
+---
+
+# Issues track the work
+
+*Project-local, not from dotfiles-ai.*
+
+**Every feature request and every bug gets a GitHub issue before it gets code,
+and the pull request closes it.**
+
+A conversation is not a tracker. Work discussed and not done evaporates when
+the session ends; work in an issue is still there next week, with its evidence
+attached. If something is worth doing and is not being done right now, it is an
+issue — not a line in a reply, and not a private task list.
+
+## The mechanism, which is GitHub's own
+
+- **Issue forms** in `.github/ISSUE_TEMPLATE/` — `bug_report.yml` and
+  `feature_request.yml`, the YAML form format rather than the older markdown
+  templates, so the fields that save time are asked for rather than hoped for.
+  Blank issues stay enabled: most issues here are filed from a conversation,
+  and a form that has to be side-stepped is friction.
+- **The kind of an issue is its type**, not a label. This organization defines
+  `Bug`, `Feature` and `Task` as GitHub issue types, and each form sets its own
+  via the form's `type:` key. Labels carry *area* — `physics`, `generator`,
+  `levels`, `ui`, `ci`, `docs` — and *state* — `needs-decision`,
+  `blocked-by-environment`, `debt`. Declared in `.github/settings.yml`, like
+  every other setting here.
+- **`Closes #N` in the pull request description**, which is what makes GitHub
+  close the issue on merge. Three details that are easy to get wrong:
+  a bare `#N` cross-references and closes nothing; the keyword only auto-closes
+  when the pull request targets the default branch; and it must be in the
+  description rather than in a branch commit, because this repository
+  squash-merges and the squash message is composed at merge time.
+  `.github/pull_request_template.md` puts the line there so it is filled in
+  rather than remembered.
+
+## Where the line falls
+
+- **File the issue first**, then do the work, then link it. An issue opened
+  after the fact to decorate a finished branch is bookkeeping.
+- **One issue per thing.** If a fix turns out to need two changes that are
+  independently revertable, that is two issues, or one issue and a follow-up
+  filed from what was learned.
+- **A decision parked on an open pull request stays on that pull request.**
+  Mirroring it as an issue splits the discussion across two places and neither
+  ends up holding the whole of it.
+- **Close with what was measured.** The issue is where the evidence should end
+  up — what reproduced it, which explanations were tested and rejected. Three
+  bugs in this project have been chased twice because the first investigation
+  was written in a chat log and not anywhere durable.
+- **Not everything is an issue.** A typo, a comment, a revert, a rename — do
+  it. The test is whether anyone would want to find it again.
+
+---
+
+# Every branch ships a preview
+
+*Project-local, not from dotfiles-ai.*
+
+**Every pull request comes with a playable build and screenshots, and a
+question with more than one answer gets one branch per answer.**
+
+A description of a change to a physics game is not the change. Two decisions
+sat on one pull request for a week that would have taken thirty seconds each
+with the build in hand — how far a charge should reach, and whether twice the
+debris is acceptable on a phone. Prose cannot answer "how does it feel";
+playing it can.
+
+## What every pull request gets, automatically
+
+- **A playable build** at `https://codercoop.github.io/CrumplZone/pr/<n>/`,
+  rebuilt on every push and taken down when the pull request closes. It is
+  the same export, patched and verified the same way, as the live site.
+- **Screenshots** beside it under `/pr/<n>/shots/`: the help screen and the
+  level list at a phone's proportions, one of every building, and the build
+  as a real browser renders it before and after a tap.
+- **A comment on the pull request** with the link and the pictures inline,
+  refreshed on every push. Reviewing starts by playing, not by reading.
+
+`preview.yml` does this. The design and its one known unknown are in
+`ARCHITECTURE.md`.
+
+## What the author still has to do
+
+- **Make the preview show the change.** The stock screenshots cover the intro,
+  the map and one building of each kind. A change to anything else — a tool,
+  a collapse, the results screen — is invisible in them, and a preview that
+  does not show the change proves nothing. Extend or add a `*shot.gd` harness
+  *on the same branch* so the pull request's own screenshots include what it
+  did. That harness is part of the change, the way a test is.
+- **Look at it on a phone.** The screenshots are at phone proportions; the
+  playable build is meant to be opened on one. A change to layout or touch is
+  not done until it has been.
+- **Do not commit screenshots or builds to the branch.** They live in the
+  preview deployment, not in git. A web export is around 37 MB and a feature
+  branch merges into `main`; the previews branch is a deploy artifact that is
+  rewritten as one commit each time precisely so nothing accumulates.
+
+## When there is more than one way to do it
+
+- **One branch and one draft pull request per option**, each with its own
+  preview. Name the branch for the option, not the issue —
+  `spike/blast-radius-110`, `spike/blast-radius-155-weaker-throw` — and open
+  them as drafts so nobody mistakes an option for a proposal.
+- **Each pull request says what it demonstrates and what it costs**, in a
+  paragraph, and links the issue it is an answer to. The issue is where the
+  comparison lives; the pull requests are the exhibits.
+- **Decide by playing them**, then close the losers with a sentence about why,
+  and take the draft off the winner. A closed option is not wasted: its
+  preview is gone, but its measurements stay on the issue.
+- **This is how "propose before building" is satisfied here** rather than
+  contradicted. A branch that can be played is the proposal; the cost of
+  throwing it away is a click.
 
 ---
 

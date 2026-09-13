@@ -63,13 +63,61 @@ const JACKHAMMER_INTERVAL := 0.22
 ##
 ## It costs accordingly — see HOLD, where the explosive is the expensive tool.
 ## The bar buys about five full charges rather than eight.
-const BLAST_RADIUS := 155.0
-const BLAST_FORCE := 950.0
+const BLAST_RADIUS := 110.0
 const BLAST_SHATTER := 52.0
 const BLAST_DAMAGE := 85
 ## How gently damage falls away past the core. Below 1 keeps it high further
 ## out; 1.0 would be the linear falloff this replaced.
 const BLAST_FALLOFF := 0.6
+
+## What the blast throws with, per unit of the piece's area.
+##
+## Per area, not per piece, because that is what a blast does: the pressure
+## wave pushes on the face it meets, so what it delivers is proportional to
+## how much of the piece is facing it. A piece's mass is its area times its
+## density, so an impulse proportional to area leaves a velocity proportional
+## to 1 over density — light things fly and dense things shift, and how far a
+## thing goes says what it is made of.
+##
+## What this replaced was `impulse * body.mass`, which cancels the mass out
+## again: apply_impulse divides by mass, so every piece in the radius left at
+## exactly the same speed whatever it was and whatever it weighed. A pane of
+## glass and a reinforced core departed together, which is why the charge read
+## as a uniform nudge rather than as an explosion.
+##
+## Densities run 0.0003 for sheeting to 0.0019 for reinforced concrete, so the
+## lightest thing here leaves about six times faster than the heaviest. That
+## is a spread you can see and it is bounded — throwing by raw mass instead
+## would have spanned two orders of magnitude and put small debris through the
+## far wall.
+const BLAST_THROW := 1.5
+
+## How sharply the throw falls away with distance, against BLAST_FALLOFF for
+## damage. Above 1 concentrates it near the charge, which is the opposite of
+## what damage wants: damage is deliberately gentle so a charge cracks what
+## stands around it, while a blast that shoved everything in a 155 px circle
+## equally hard would look like a bubble rather than a detonation.
+const BLAST_THROW_FALLOFF := 1.5
+
+## How far off centre the throw lands, as a share of the piece's own reach.
+##
+## A blast arrives at a face, not at the centre of mass, so it spins what it
+## hits. Applied dead centre — which is what apply_impulse does with no
+## position — nothing rotates at all, and debris travelling outward without
+## tumbling reads as cards being slid rather than a building coming apart.
+##
+## Across the push, not along it. Written first as an offset toward the
+## charge, which is where the pressure does arrive and which produces exactly
+## no torque: the arm and the impulse were antiparallel, so their cross
+## product was zero and the measured spin was a column of 0.0 rad/s. What
+## actually spins a piece is that the face the blast lands on is not centred
+## on its mass, and that is a sideways offset.
+##
+## The offset is drawn from the piece's own seed rather than at random. The
+## solver rebuilds a level thousands of times and replaytest asserts that a
+## rebuild breaks the same way; a blast that span pieces differently each run
+## would make every verdict it reaches meaningless.
+const BLAST_SPIN := 0.55
 
 ## What a held tool costs: something for reaching for it at all, and the rest
 ## for how long you held. A tap is cheap and weak, a full hold is neither.
@@ -160,6 +208,20 @@ static func _explosive(level: Level, at: Vector2, charge: float) -> bool:
 	var radius := BLAST_RADIUS * packed
 	var core := BLAST_SHATTER * packed
 	var touched := false
+	# Damage first, throw second, in two passes over the whole radius.
+	#
+	# It was one pass, and the order in it is most of why a charge read as
+	# damage rather than as a detonation. A blast applied to a building that
+	# is still standing is applied to bodies wedged against each other, and
+	# the contact solver eats nearly all of it: measured, raising the throw
+	# from 0.85 to 16.0 — nineteen times — moved the median speed of a thrown
+	# piece from 9 to 27 px/s. The impulse was never the limit.
+	#
+	# What moves is a piece that is free to move, and a piece becomes free
+	# when the charge breaks it out of the structure. So everything in reach
+	# is damaged and shattered first, and then the throw is applied to what is
+	# there afterwards — which includes the fragments the shatter just made,
+	# and they are the debris a blast is supposed to send outward.
 	for body in level.live_blocks().duplicate():
 		if not is_instance_valid(body):
 			continue
@@ -175,12 +237,53 @@ static func _explosive(level: Level, at: Vector2, charge: float) -> bool:
 		# the line. Damage falls off with distance, so a charge takes out what
 		# it is placed on and cracks what stands around it.
 		var full := BLAST_DAMAGE * packed
-		var force: int = int(round(full if distance < core else full * falloff))
-		level.damage(body, force, at)
-		if distance < core:
+		level.damage(body,
+			int(round(full if distance < core else full * falloff)), at)
+
+	if not touched:
+		return false
+
+	# Everything still in reach, fragments included, sent outward.
+	#
+	# The push used to be skipped for anything within the core radius — a
+	# `continue` sat above it — so the pieces closest to the charge, the ones
+	# that should go furthest, were the only ones the blast never moved. They
+	# were shattered instead, and shatter gives its fragments a flat nudge of
+	# 16 per unit mass, which next to a real blast is nothing.
+	for body in level.live_blocks().duplicate():
+		if not is_instance_valid(body):
+			continue
+		var offset: Vector2 = body.global_position - at
+		var distance := offset.length()
+		if distance > radius:
 			continue
 		# A floor on the distance keeps a charge placed on a block's centre
 		# from producing a near-infinite direction vector.
 		var push := offset.normalized() if distance > 1.0 else Vector2.UP
-		body.apply_impulse(push * BLAST_FORCE * packed * falloff * body.mass)
+		var thrown: float = BLAST_THROW * packed \
+			* pow(1.0 - distance / radius, BLAST_THROW_FALLOFF) \
+			* _area_of(body)
+		var lean: float = float(int(body.get_meta("seed", 0)) % 2000 - 1000) \
+			/ 1000.0
+		body.apply_impulse(push * thrown,
+			push.orthogonal() * _reach_of(body) * BLAST_SPIN * lean)
 	return touched
+
+
+## How much of a piece the blast has to push on.
+##
+## Read back from the body rather than carried alongside it: mass is area
+## times density, and both are already on the piece.
+static func _area_of(body: RigidBody2D) -> float:
+	var made := Materials.of(String(body.get_meta("material", Materials.CONCRETE)))
+	var density := float(made["density"])
+	if density <= 0.0:
+		return body.mass
+	return body.mass / density
+
+
+## Roughly how far a piece reaches from its own centre, for deciding where off
+## centre the throw lands. Taken from the area rather than the polygon so that
+## a fragment of any shape gives an answer in the right order of magnitude.
+static func _reach_of(body: RigidBody2D) -> float:
+	return sqrt(maxf(_area_of(body), 1.0)) * 0.5

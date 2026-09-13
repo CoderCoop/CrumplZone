@@ -1,0 +1,181 @@
+name: preview
+
+# A playable build of every pull request, with screenshots, without anyone
+# building anything by hand.
+#
+#   https://codercoop.github.io/CrumplZone/pr/<number>/
+#
+# GitHub Pages serves one deployment per repository, so a preview cannot be
+# its own site. Instead the built preview is pushed to the `previews` branch
+# (tools/previews-branch.sh) and pages.yml folds every folder on that branch
+# into the live deployment under /pr/. That is the same pattern as
+# rossjrw/pr-preview-action, done by hand because this repository deploys
+# Pages through Actions rather than from a branch, and the two must not mix.
+#
+# Nothing a workflow does with GITHUB_TOKEN triggers another workflow, so
+# pushing the branch publishes nothing on its own: pages.yml is asked to run
+# explicitly, the way generate-levels.yml asks ci.yml (#57). No secret, no
+# App, and the gate that protects the live site is the one that publishes
+# the preview.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+
+permissions:
+  contents: write        # push the built preview to the previews branch
+  pull-requests: write   # the sticky comment that links it
+  actions: write         # ask pages.yml to publish it
+
+# Every run rewrites the previews branch, so two at once would race and one
+# would lose its folder. Serialised, never cancelled: a preview half-pushed is
+# a broken page.
+concurrency:
+  group: previews
+  cancel-in-progress: false
+
+env:
+  GODOT_VERSION: 4.6-stable
+  SITE: https://codercoop.github.io/CrumplZone
+
+jobs:
+  build:
+    # A fork's pull request has no token that can push here; better to skip
+    # than to fail on every push to it.
+    if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: godot
+        uses: ./.github/actions/setup-godot
+        with:
+          version: ${{ env.GODOT_VERSION }}
+          templates: "true"
+
+      - name: Export the web build
+        run: tools/export-web.sh "${{ steps.godot.outputs.godot }}" build/web
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      # The same check the live site passes before it deploys: served with no
+      # COOP/COEP headers, loaded in a real Chromium, responds to a tap. Its
+      # screenshots are the first two pictures of the preview — the build as
+      # a browser actually shows it.
+      - name: Prove it runs in a browser, and keep the pictures
+        run: |
+          npm install --no-save --silent playwright
+          npx playwright install --with-deps chromium
+          SHOTS="$PWD/build/web/shots" tools/verify-web-export.sh "$PWD/build/web"
+
+      # Then the engine's own pictures at a phone's proportions — the help
+      # screen, the level list, and one of every building — because a change
+      # to how something is drawn should be looked at, not described. These
+      # need a window rather than --headless; see ARCHITECTURE.md on why.
+      - name: Screenshots at a phone's proportions
+        run: |
+          godot="${{ steps.godot.outputs.godot }}"
+          out="$PWD/build/web/shots"
+          shot() {
+            timeout 300 xvfb-run -a --server-args="-screen 0 500x1000x24" \
+              "$godot" --rendering-driver opengl3 --path game "$@" 2>/dev/null
+          }
+          shot res://introshot.tscn -- "$out"
+          shot res://introshot.tscn -- "$out" levels
+          shot res://shots.tscn -- "$out"
+          echo "screenshots:"; ls -1 "$out"
+
+      - name: Publish into the previews branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: tools/previews-branch.sh put "${{ github.event.pull_request.number }}" build/web
+
+      - name: Ask pages.yml to publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          code=$(curl -s -o /tmp/dispatch -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/pages.yml/dispatches" \
+            -d '{"ref":"main"}')
+          if [ "$code" != "204" ]; then
+            echo "::error::could not ask pages.yml to run (HTTP $code)"; cat /tmp/dispatch; exit 1
+          fi
+          echo "::notice::pages.yml dispatched; the preview is live once it finishes"
+
+      - name: Link it from the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          base="$SITE/pr/$PR"
+          body=$(cat <<MD
+          <!-- pr-preview -->
+          ### Playable preview
+
+          **▶ $base/** — live a few minutes after this comment, once the [pages run](https://github.com/${{ github.repository }}/actions/workflows/pages.yml) finishes. Built from \`${SHA:0:7}\`.
+
+          | help screen | level list | a level, in the browser | after one tap |
+          | --- | --- | --- | --- |
+          | ![help]($base/shots/intro-how-430x880.png) | ![levels]($base/shots/intro-levels-430x880.png) | ![before]($base/shots/canvas-before.png) | ![after]($base/shots/canvas-after.png) |
+
+          One of every building, at a phone's proportions: [$base/shots/]($base/shots/)
+
+          *Refreshed on every push to this branch; removed when it closes.*
+          MD
+          )
+          api="https://api.github.com/repos/${{ github.repository }}"
+          hdr=(-H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json")
+          existing=$(curl -s "${hdr[@]}" "$api/issues/$PR/comments?per_page=100" \
+            | jq -r '.[] | select(.body | startswith("<!-- pr-preview -->")) | .id' | head -1)
+          payload=$(jq -n --arg b "$body" '{body:$b}')
+          if [ -n "$existing" ]; then
+            curl -sf "${hdr[@]}" -X PATCH "$api/issues/comments/$existing" -d "$payload" >/dev/null
+          else
+            curl -sf "${hdr[@]}" -X POST "$api/issues/$PR/comments" -d "$payload" >/dev/null
+          fi
+
+  prune:
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # The script from main, not from the pull request: a closed pull
+      # request's merge ref may already be gone.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Take the preview down
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: tools/previews-branch.sh remove "${{ github.event.pull_request.number }}"
+
+      - name: Ask pages.yml to publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          code=$(curl -s -o /tmp/dispatch -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/pages.yml/dispatches" \
+            -d '{"ref":"main"}')
+          [ "$code" = "204" ] || { echo "::error::could not ask pages.yml to run (HTTP $code)"; cat /tmp/dispatch; exit 1; }
+
+      - name: Say so on the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          api="https://api.github.com/repos/${{ github.repository }}"
+          hdr=(-H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json")
+          existing=$(curl -s "${hdr[@]}" "$api/issues/$PR/comments?per_page=100" \
+            | jq -r '.[] | select(.body | startswith("<!-- pr-preview -->")) | .id' | head -1)
+          [ -n "$existing" ] || exit 0
+          payload=$(jq -n '{body:"<!-- pr-preview -->\n*Preview removed — this pull request is closed.*"}')
+          curl -sf "${hdr[@]}" -X PATCH "$api/issues/comments/$existing" -d "$payload" >/dev/null

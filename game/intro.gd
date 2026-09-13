@@ -473,7 +473,8 @@ func _how_to_play() -> VBoxContainer:
 			% [int(Level.BALL_MASS), int(Tools.cost(Tools.Kind.WRECKING_BALL, 1.0))]))
 	box.add_child(_tool_line("3", "Explosive", ACCENT,
 		("hold to pack more in, let go to blow it. Up to %d damage where you "
-		+ "place it and less further out, for up to %d power")
+		+ "place it and less further out, then it throws what it broke "
+		+ "loose — light things go furthest — for up to %d power")
 			% [Tools.BLAST_DAMAGE, int(Tools.cost(Tools.Kind.EXPLOSIVE, 1.0))]))
 
 	box.add_child(_spacer(6))

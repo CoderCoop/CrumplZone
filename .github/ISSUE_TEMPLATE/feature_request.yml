@@ -1,0 +1,44 @@
+name: Feature request
+description: Something the game should do that it does not do yet.
+title: "Feature: "
+type: Feature
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What it should do
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: What it is for
+      description: >
+        The problem behind the request, not only the shape of the fix. It
+        usually admits more than one solution, and the other one is sometimes
+        better.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part
+      options:
+        - The demolition itself — tools, physics, scoring
+        - The buildings and how they are generated
+        - The city, the map, picking a level
+        - Presentation — art, sound, feedback
+        - Something else (say above)
+    validations:
+      required: true
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Anything it must not break
+      description: >
+        Optional. Worth a line if you already know — for instance that no
+        level may be clearable in a single move, which is a rule the game is
+        gated on and has caught a change that broke it.
