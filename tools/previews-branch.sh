@@ -18,6 +18,8 @@ set -euo pipefail
 
 cmd="${1:?put|remove}"; n="${2:?pr-number}"; src="${3:-}"
 [ "$cmd" = put ] && [ -z "$src" ] && { echo "put needs a built dir"; exit 2; }
+# Absolute, because the work is done inside a temporary clone elsewhere.
+[ -n "$src" ] && src="$(cd "$src" && pwd)"
 : "${GH_TOKEN:?GH_TOKEN}"; : "${GITHUB_REPOSITORY:?GITHUB_REPOSITORY}"
 
 repo="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
