@@ -296,12 +296,15 @@ func _show(pane: Control) -> void:
 	_levels_button.button_pressed = _levels.visible
 
 
-## The city: a drawn map with a pin on each district, and the levels of
-## whichever district is picked listed underneath.
+## The city: a drawn model with a pin on each district. Tap one and the same
+## board zooms to that district, with a pin on each of its levels standing on
+## the building it is; a back button returns to the city.
 ##
 ## Two steps rather than one, on purpose. A map small enough to sit in a
 ## thumb's reach on a phone cannot also carry seventeen legible level tiles,
-## and pan-and-zoom is a worse answer than a tap.
+## and pan-and-zoom is a worse answer than a tap. The second step is a closer
+## map rather than a grid because a level is a building somewhere in town, and
+## a tile under the map had stopped saying so (#63).
 func _level_list() -> VBoxContainer:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
@@ -314,31 +317,40 @@ func _level_list() -> VBoxContainer:
 			% [done["cleared"], done["of"], done["stars"], done["possible"]],
 		BODY_SIZE, DIM, true))
 
-	var districts := Districts.inhabited()
-	if _district == "" or not districts.has(_district):
-		_district = String(districts[0]) if not districts.is_empty() else ""
+	if _district != "" and not Districts.inhabited().has(_district):
+		_district = ""
 
 	_map = CityMap.new()
-	_map.selected = _district
 	_map.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_map.district_picked.connect(func(picked: String) -> void:
-		_district = picked
-		_rebuild_levels())
-	box.add_child(_map)
-
-	if _district != "":
+	if _district == "":
+		# The whole city, with the district of the level Play would start
+		# picked out, so a returning player can see where they are.
+		_map.selected = Levels.district_of(_selected) if _selected != "" else ""
+		_map.district_picked.connect(func(picked: String) -> void:
+			_district = picked
+			_rebuild_levels())
+		box.add_child(_map)
 		box.add_child(_spacer(6))
-		box.add_child(_label(Districts.title(_district), BODY_SIZE, ACCENT))
-		box.add_child(_label(Districts.about(_district), 14, DIM, true))
-		var grid := GridContainer.new()
-		grid.columns = 3
-		grid.add_theme_constant_override("h_separation", 8)
-		grid.add_theme_constant_override("v_separation", 8)
-		grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		for id in Levels.all_ids():
-			if Levels.district_of(String(id)) == _district:
-				grid.add_child(_level_tile(String(id)))
-		box.add_child(grid)
+		box.add_child(_label("Tap a district to see its levels.", 14, DIM, true))
+	else:
+		_map.district_view = _district
+		_map.window = CityMap.window_for(_district)
+		_map.selected_level = _selected
+		_map.level_picked.connect(func(id: String) -> void:
+			_selected = id
+			_refresh_play()
+			play_pressed.emit(id))
+		box.add_child(_map)
+		box.add_child(_spacer(6))
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		row.add_child(_back_button())
+		var words := VBoxContainer.new()
+		words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		words.add_child(_label(Districts.title(_district), BODY_SIZE, ACCENT))
+		words.add_child(_label(Districts.about(_district), 14, DIM, true))
+		row.add_child(words)
+		box.add_child(row)
 
 	box.add_child(_spacer(10))
 	# Everything open at once. A toggle rather than a hidden code, because it
@@ -376,6 +388,42 @@ func _level_list() -> VBoxContainer:
 	return box
 
 
+## Zoom to a district, or back out to the city with "". The picture harness
+## uses this to photograph the close-up; the back button and the pins use it
+## from inside.
+func pick_district(district: String) -> void:
+	_district = district
+	_rebuild_levels()
+
+
+## Back to the city: a chevron drawn as lines, not a glyph from a font the
+## build may not ship, and 48 px square so it is a thumb target.
+func _back_button() -> Button:
+	var button := BackButton.new()
+	button.focus_mode = Control.FOCUS_NONE
+	button.custom_minimum_size = Vector2(48.0, 48.0)
+	for state in ["normal", "hover", "pressed", "hover_pressed"]:
+		var style := StyleBoxFlat.new()
+		style.bg_color = (Color(0.30, 0.32, 0.38) if state.contains("pressed")
+			else Color(0.20, 0.21, 0.25))
+		style.corner_radius_top_left = 8
+		style.corner_radius_top_right = 8
+		style.corner_radius_bottom_left = 8
+		style.corner_radius_bottom_right = 8
+		button.add_theme_stylebox_override(state, style)
+	button.pressed.connect(func() -> void: pick_district(""))
+	return button
+
+
+class BackButton extends Button:
+	func _draw() -> void:
+		var c := size * 0.5
+		var r := 9.0
+		draw_polyline(PackedVector2Array([
+			c + Vector2(r * 0.55, -r), c + Vector2(-r * 0.55, 0.0),
+			c + Vector2(r * 0.55, r)]), Color(0.92, 0.94, 0.96), 3.0, true)
+
+
 ## The map again, after something changed what it should say.
 func _rebuild_levels() -> void:
 	if _levels == null or _column == null:
@@ -392,56 +440,10 @@ func _rebuild_levels() -> void:
 	relayout()
 
 
-func _level_tile(id: String) -> Button:
-	var spec := Levels.by_id(id)
-	var kind := String(spec.get("kind", ""))
-	var open := Progress.unlocked(id)
-	var earned := Progress.stars(id)
-	var button := Button.new()
-	# Stars as filled and hollow pips, drawn in text rather than as glyphs the
-	# font may not have — the tofu-box trap this project has hit twice. A
-	# locked level says so instead of showing an empty rating it cannot earn.
-	var rating := "· · ·"
-	if open:
-		rating = ""
-		for i in 3:
-			rating += ("*" if i < earned else "·") + (" " if i < 2 else "")
-	button.text = "%s\n%s\n%s" % [Levels.title_for(id),
-		Architecture.ABOUT.get(kind, ["", ""])[0], rating]
-	button.disabled = not open
-	button.focus_mode = Control.FOCUS_NONE
-	button.clip_text = true
-	button.autowrap_mode = TextServer.AUTOWRAP_OFF
-	# Comfortably over the 44 px floor in both directions, and the grid puts
-	# 8 px between them so a thumb cannot land on two at once.
-	button.custom_minimum_size = Vector2(0.0, 74.0)
-	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button.add_theme_font_size_override("font_size", 14)
-	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
-		button.add_theme_stylebox_override(state,
-			_tile_style(kind, state.contains("pressed"), not open))
-	var ink := Color(0.10, 0.10, 0.12) if open else Color(0.55, 0.57, 0.62)
-	button.add_theme_color_override("font_color", ink)
-	button.add_theme_color_override("font_pressed_color", ink)
-	button.add_theme_color_override("font_disabled_color", ink)
-	if open:
-		button.pressed.connect(func() -> void:
-			_selected = id
-			_refresh_play()
-			play_pressed.emit(id))
-	return button
-
-
-## A tile takes the colour of what it is made of, so the list reads as a row
-## of different buildings rather than a row of numbers.
+## The Play button takes the colour of what the level is made of, the same
+## colour its pin on the map has.
 func _tile_style(kind: String, held := false, locked := false) -> StyleBoxFlat:
-	var tint: Color = {
-		Architecture.CURTAIN_WALL: Color(0.62, 0.78, 0.92),
-		Architecture.MASONRY: Color(0.86, 0.55, 0.44),
-		Architecture.FLAT_SLAB: Color(0.78, 0.80, 0.83),
-		Architecture.STACK: Color(0.84, 0.62, 0.46),
-		Architecture.SHED: Color(0.70, 0.76, 0.72),
-	}.get(kind, Color(0.95, 0.78, 0.34)) as Color
+	var tint := CityMap.kind_tint(kind)
 	var style := StyleBoxFlat.new()
 	style.bg_color = tint.darkened(0.18) if held else tint
 	if locked:
